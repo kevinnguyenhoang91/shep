@@ -404,7 +404,8 @@ export async function initializeContainer(): Promise<typeof container> {
         c.resolve<ISecurityEventRepository>('ISecurityEventRepository'),
         c.resolve<ISettingsRepository>('ISettingsRepository'),
         c.resolve<DependencyRiskEvaluator>('DependencyRiskEvaluator'),
-        c.resolve<ReleaseIntegrityEvaluator>('ReleaseIntegrityEvaluator')
+        c.resolve<ReleaseIntegrityEvaluator>('ReleaseIntegrityEvaluator'),
+        c.resolve<IGitHubRepositoryService>('IGitHubRepositoryService')
       ),
   });
 
