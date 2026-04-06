@@ -83,7 +83,7 @@
     "spec:validate": "tsx scripts/spec-validate.ts",
     "cli": "tsx src/presentation/cli/index.ts",
     "prepare": "husky",
-    "validate": "pnpm run lint:fix && pnpm run format && pnpm run typecheck && pnpm run tsp:compile"
+    "validate": "pnpm run lint:fix && pnpm run format && pnpm run typecheck && pnpm run tsp:codegen"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
@@ -169,7 +169,9 @@
       "sharp"
     ],
     "overrides": {
-      "minimatch": "^7.x"
+      "minimatch": "^7.x",
+      "ajv": ">=8.18.0",
+      "@anthropic-ai/sdk": ">=0.81.0"
     }
   },
   "packageManager": "pnpm@10.30.0",
