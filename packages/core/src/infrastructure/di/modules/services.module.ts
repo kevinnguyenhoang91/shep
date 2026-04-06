@@ -36,6 +36,10 @@ import type { IGitHubRepositoryService } from '../../../application/ports/output
 import { GitHubRepositoryService } from '../../services/external/github-repository.service.js';
 import type { ISpecInitializerService } from '../../../application/ports/output/services/spec-initializer.interface.js';
 import { SpecInitializerService } from '../../services/spec/spec-initializer.service.js';
+import type { IProcessMonitorService } from '../../../application/ports/output/services/process-monitor.interface.js';
+import { ProcessMonitorService } from '../../services/process/process-monitor.service.js';
+import type { IFileSystemService } from '../../../application/ports/output/services/file-system.interface.js';
+import { FileSystemService } from '../../services/filesystem/file-system.service.js';
 
 export function registerServices(container: DependencyContainer, db: Database.Database): void {
   // Register external dependencies as tokens
@@ -101,4 +105,11 @@ export function registerServices(container: DependencyContainer, db: Database.Da
   container.register<ISpecInitializerService>('ISpecInitializerService', {
     useFactory: () => new SpecInitializerService(),
   });
+
+  // Process & filesystem infrastructure adapters
+  container.registerSingleton<IProcessMonitorService>(
+    'IProcessMonitorService',
+    ProcessMonitorService
+  );
+  container.registerSingleton<IFileSystemService>('IFileSystemService', FileSystemService);
 }
