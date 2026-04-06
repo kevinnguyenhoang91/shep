@@ -522,6 +522,11 @@ export enum AgentAuthMethod {
   Session = 'session',
   Token = 'token',
 }
+export enum PermissionMode {
+  Default = 'default',
+  Strict = 'strict',
+  Autonomous = 'autonomous',
+}
 
 /**
  * AI coding agent configuration
@@ -539,6 +544,10 @@ export type AgentConfig = {
    * API token for token-based auth (optional)
    */
   token?: string;
+  /**
+   * Permission mode for tool approvals (optional, defaults to agent default)
+   */
+  permissionMode?: PermissionMode;
 };
 
 /**

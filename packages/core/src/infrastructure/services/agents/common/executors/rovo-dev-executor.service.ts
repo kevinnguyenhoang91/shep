@@ -327,8 +327,13 @@ export class RovoDevExecutorService extends AbstractAgentExecutor implements IAg
    * Prompt is piped via stdin — not passed as a CLI argument.
    */
   private buildArgs(options?: AgentExecutionOptions, outputFormat = 'json'): string[] {
+    // Permission mode: strict omits --auto-approve (requires confirmation); default/autonomous keep it
+    const flags =
+      options?.permissionMode === 'strict'
+        ? BASE_FLAGS.filter((f) => f !== '--auto-approve')
+        : [...BASE_FLAGS];
     // -p flag signals that prompt comes from stdin pipe
-    const args = ['-p', '--output-format', outputFormat, ...BASE_FLAGS];
+    const args = ['-p', '--output-format', outputFormat, ...flags];
 
     if (options?.resumeSession) args.push('--resume', options.resumeSession);
     if (options?.model) args.push('--model', options.model);

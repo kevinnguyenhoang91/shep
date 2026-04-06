@@ -620,12 +620,14 @@ export class CodexCliExecutorService extends AbstractAgentExecutor implements IA
     options?: AgentExecutionOptions,
     tempSchemaPath?: string
   ): string[] {
+    // Permission mode: strict uses --ask-for-approval always; default/autonomous use never
+    const approvalMode = options?.permissionMode === 'strict' ? 'always' : 'never';
     const baseFlags = [
       '--json',
       '--sandbox',
       'danger-full-access',
       '--ask-for-approval',
-      'never',
+      approvalMode,
       '--skip-git-repo-check',
       '--color',
       'never',

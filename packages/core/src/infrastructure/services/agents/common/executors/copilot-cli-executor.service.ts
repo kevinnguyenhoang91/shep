@@ -433,7 +433,12 @@ export class CopilotCliExecutorService extends AbstractAgentExecutor implements 
    * Prompt is passed via -p flag (not stdin).
    */
   private buildArgs(prompt: string, options?: AgentExecutionOptions): string[] {
-    const args = ['-p', prompt, ...BASE_FLAGS];
+    // Permission mode: strict omits --allow-all (requires confirmation); default/autonomous keep it
+    const flags =
+      options?.permissionMode === 'strict'
+        ? BASE_FLAGS.filter((f) => f !== '--allow-all')
+        : [...BASE_FLAGS];
+    const args = ['-p', prompt, ...flags];
 
     if (options?.model) {
       args.push('--model', this.normalizeModel(options.model));

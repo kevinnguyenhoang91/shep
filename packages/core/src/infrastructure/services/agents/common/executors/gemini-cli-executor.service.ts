@@ -364,7 +364,14 @@ export class GeminiCliExecutorService extends AbstractAgentExecutor implements I
   ): string[] {
     // Prompt is piped via stdin — not passed as a CLI argument — to avoid
     // ENAMETOOLONG on Windows when prompts exceed the ~32 KB arg-length limit.
-    const args = ['-p', '--output-format', outputFormat, '-y'];
+    const args = ['-p', '--output-format', outputFormat];
+
+    // Permission mode: strict uses --sandbox (restricted); default/autonomous use -y (auto-approve)
+    if (options?.permissionMode === 'strict') {
+      args.push('--sandbox');
+    } else {
+      args.push('-y');
+    }
 
     if (options?.resumeSession) args.push('--resume', options.resumeSession);
     if (options?.model) args.push('-m', options.model);

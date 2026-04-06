@@ -9,5 +9,6 @@ enum:
   - aider
   - continue
   - cursor
+  - rovo-dev
   - dev
 description: AI coding agent tool selection

@@ -168,6 +168,7 @@ function createTestRow(overrides: Partial<SettingsRow> = {}): SettingsRow {
     fab_position_swapped: 0,
     skill_injection_enabled: 0,
     skill_injection_skills: null,
+    agent_permission_mode: null,
     ...overrides,
   };
 }

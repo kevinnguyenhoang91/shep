@@ -312,7 +312,15 @@ export class ClaudeCodeExecutorService extends AbstractAgentExecutor implements 
   private buildArgs(_prompt: string, options?: AgentExecutionOptions): string[] {
     // Prompt is piped via stdin — not passed as a CLI argument — to avoid
     // ENAMETOOLONG on Windows when prompts exceed the ~32 KB arg-length limit.
-    const args = ['-p', '--output-format', 'json', '--dangerously-skip-permissions'];
+    const args = ['-p', '--output-format', 'json'];
+
+    // Permission mode: strict uses plan mode; default/autonomous use dangerously-skip-permissions
+    if (options?.permissionMode === 'strict') {
+      args.push('--permission-mode', 'plan');
+    } else {
+      args.push('--dangerously-skip-permissions');
+    }
+
     if (options?.resumeSession) args.push('--resume', options.resumeSession);
     if (options?.model) args.push('--model', options.model);
     if (options?.systemPrompt) args.push('--append-system-prompt', options.systemPrompt);

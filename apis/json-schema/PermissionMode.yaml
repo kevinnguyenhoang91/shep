@@ -1,0 +1,8 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: PermissionMode.yaml
+type: string
+enum:
+  - default
+  - strict
+  - autonomous
+description: Permission mode controlling how an agent handles tool approvals

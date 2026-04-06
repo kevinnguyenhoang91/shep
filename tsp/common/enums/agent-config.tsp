@@ -116,3 +116,24 @@ enum AgentAuthMethod {
   @doc("Use API token stored in settings")
   Token: "token",
 }
+
+/**
+ * Permission mode controlling how an agent handles tool approvals.
+ *
+ * ```
+ * default     ← Agent's default behavior — no override applied
+ * strict      ← Prompt for every tool use (most restrictive)
+ * autonomous  ← Auto-approve all tool uses (autonomous mode)
+ * ```
+ */
+@doc("Permission mode controlling how an agent handles tool approvals")
+enum PermissionMode {
+  @doc("Agent's default behavior — no override applied")
+  Default: "default",
+
+  @doc("Prompt for every tool use (most restrictive)")
+  Strict: "strict",
+
+  @doc("Auto-approve all tool uses (autonomous mode)")
+  Autonomous: "autonomous",
+}

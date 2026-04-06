@@ -22,6 +22,7 @@ import {
   type AgentAuthMethod,
   type EditorType,
   type Language,
+  type PermissionMode,
   type TerminalType,
 } from '../../../../domain/generated/output.js';
 
@@ -138,6 +139,9 @@ export interface SettingsRow {
   // Skill injection config (added in migration 051)
   skill_injection_enabled: number;
   skill_injection_skills: string | null;
+
+  // Agent permission mode (added in migration 056)
+  agent_permission_mode: string | null;
 }
 
 /**
@@ -178,10 +182,11 @@ export function toDatabase(settings: Settings): SettingsRow {
     sys_auto_update: settings.system.autoUpdate ? 1 : 0,
     sys_log_level: settings.system.logLevel,
 
-    // AgentConfig (optional token → NULL)
+    // AgentConfig (optional token → NULL, optional permissionMode → NULL)
     agent_type: settings.agent.type,
     agent_auth_method: settings.agent.authMethod,
     agent_token: settings.agent.token ?? null,
+    agent_permission_mode: settings.agent.permissionMode ?? null,
 
     // NotificationPreferences (boolean → 0/1)
     notif_in_app_enabled: settings.notifications.inApp.enabled ? 1 : 0,
@@ -371,11 +376,14 @@ export function fromDatabase(row: SettingsRow): Settings {
       logLevel: row.sys_log_level,
     },
 
-    // AgentConfig (NULL → undefined for optional token)
+    // AgentConfig (NULL → undefined for optional token and permissionMode)
     agent: {
       type: row.agent_type as AgentType,
       authMethod: row.agent_auth_method as AgentAuthMethod,
       ...(row.agent_token !== null && { token: row.agent_token }),
+      ...(row.agent_permission_mode !== null && {
+        permissionMode: row.agent_permission_mode as PermissionMode,
+      }),
     },
 
     // NotificationPreferences (INTEGER 0/1 → boolean)

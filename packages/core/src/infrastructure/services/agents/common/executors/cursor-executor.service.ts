@@ -322,7 +322,14 @@ export class CursorExecutorService extends AbstractAgentExecutor implements IAge
     // This is the documented flag across Cursor CLI versions (cursor-agent --help).
     // Equivalent to Claude Code's --dangerously-skip-permissions, Codex's
     // --sandbox danger-full-access, or Copilot's --allow-all.
-    const args = ['--yolo', '-p', prompt, '--output-format', 'json'];
+    const args: string[] = [];
+
+    // Permission mode: strict omits --yolo (requires confirmation); default/autonomous keep it
+    if (options?.permissionMode !== 'strict') {
+      args.push('--yolo');
+    }
+
+    args.push('-p', prompt, '--output-format', 'json');
     if (options?.resumeSession) args.push('--resume', options.resumeSession);
     if (options?.model) args.push('--model', toCursorModelName(options.model));
     // Unsupported options silently omitted: systemPrompt, allowedTools, maxTurns, outputSchema

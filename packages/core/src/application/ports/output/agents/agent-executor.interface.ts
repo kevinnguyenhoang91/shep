@@ -21,7 +21,11 @@
  * ```
  */
 
-import type { AgentType, AgentFeature } from '../../../../domain/generated/output.js';
+import type {
+  AgentType,
+  AgentFeature,
+  PermissionMode,
+} from '../../../../domain/generated/output.js';
 
 /**
  * Token usage and execution statistics returned by an agent.
@@ -93,6 +97,8 @@ export interface AgentExecutionOptions {
   disableMcp?: boolean;
   /** Restrict available built-in tools via --tools flag */
   tools?: string[];
+  /** Permission mode controlling how the agent handles tool approvals */
+  permissionMode?: PermissionMode;
 }
 
 /**

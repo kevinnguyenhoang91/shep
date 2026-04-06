@@ -461,6 +461,15 @@ model AgentConfig {
    */
   @doc("API token for token-based auth (optional)")
   token?: string;
+
+  /**
+   * Permission mode controlling how the agent handles tool approvals.
+   * - default: Agent's default behavior (no override)
+   * - strict: Prompt for every tool use (most restrictive)
+   * - autonomous: Auto-approve all tool uses
+   */
+  @doc("Permission mode for tool approvals (optional, defaults to agent default)")
+  permissionMode?: PermissionMode;
 }
 
 /**
