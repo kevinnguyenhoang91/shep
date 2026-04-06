@@ -1,0 +1,119 @@
+# Research Artifact (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: shipit-fork-adoption
+summary: Analysis of 98 fork commits across 12 themes, prioritized into 37 adoption items
+
+relatedFeatures: []
+technologies:
+  - TypeSpec 0.60
+  - inversify DI
+  - pnpm overrides
+  - Radix UI
+  - Next.js middleware
+  - GitHub Actions
+
+relatedLinks:
+  - title: Fork repository
+    url: https://github.com/jrmatherly/shipit
+  - title: Full analysis document
+    url: ../../TODOS.md
+
+decisions:
+  - title: Adoption strategy
+    chosen: Cherry-pick by theme, not by commit
+    rejected:
+      - Full merge of fork
+      - Commit-by-commit cherry-pick
+    rationale: >
+      Fork includes rebrand commits and design system changes we don't want.
+      Theme-based adoption lets us take security/architecture wins while skipping
+      ShipIt-specific aesthetic choices.
+
+  - title: DI modularization approach
+    chosen: 8 focused module files with thin orchestrator
+    rejected:
+      - Keep monolithic container
+      - Use decorators-only approach
+    rationale: >
+      Fork's pattern of 8 modules (database, repositories, services, agents,
+      notifications, use-cases, interactive, web-tokens) maps cleanly to our
+      existing registration groupings. Orchestrator reduced from 645 to 80 lines.
+
+  - title: God class decomposition pattern
+    chosen: Facade delegation preserving backward compatibility
+    rejected:
+      - Direct replacement of all call sites
+      - Mixin-based decomposition
+    rationale: >
+      Facade pattern means zero call-site changes needed. Sub-services are internal
+      implementation details. Callers can migrate to direct sub-service injection
+      gradually over time.
+
+  - title: TypeSpec date fix approach
+    chosen: pnpm patch on emitter to add utcDateTime->Date mapping
+    rejected:
+      - Upgrade TypeSpec to 1.10 (risky major version jump)
+      - Manual post-processing of generated output
+    rationale: >
+      Emitter patch is targeted and low-risk. Adds scalar mappings for utcDateTime,
+      plainDate, plainTime, offsetDateTime -> Date. TypeSpec 1.10 upgrade deferred
+      since 0.60 syntax is already compatible.
+
+  - title: Permission mode granularity
+    chosen: Three modes (Default, Strict, Autonomous) per agent
+    rejected:
+      - Per-tool permission matrix
+      - Universal single mode for all agents
+    rationale: >
+      Three modes map cleanly to each executor's CLI flags. Per-tool matrix is
+      over-engineering; universal mode ignores that agents have different flag systems.
+
+openQuestions: []
+
+content: |
+  ## Status
+
+  - **Phase:** Research Complete
+  - **Updated:** 2026-04-06
+
+  ## Technology Decisions
+
+  ### Adoption Strategy
+
+  **Options considered:**
+  1. Full merge of fork (rejected: includes rebrand and design changes)
+  2. Commit-by-commit cherry-pick (rejected: 98 commits, many intertwined)
+  3. Theme-based adoption (chosen: selective, prioritized by value)
+
+  **Decision:** Theme-based adoption with subagent-driven implementation.
+
+  ### DI Modularization
+
+  Fork split 615-line container into 8 modules. We adopted the same pattern,
+  reducing our 645-line container to 80 lines.
+
+  ### God Class Decomposition
+
+  Fork decomposed GitPrService and InteractiveSessionService. We adopted using
+  facade pattern for backward compatibility.
+
+  ### TypeSpec Date Fix
+
+  Fork patched emitter via pnpm patch. We adopted the same approach, fixing 29
+  `any`-typed date fields across the domain model.
+
+  ## Security Considerations
+
+  Critical security fixes adopted:
+  - Command injection in open-shell.ts (path with shell metacharacters)
+  - jq injection in github-repository.service.ts (unsanitized regex in jq filter)
+  - Path traversal in 3 API routes (TOCTOU, prefix attacks, missing containment)
+  - Stack trace exposure in error responses (apiError helper)
+  - CVE overrides for ajv ReDoS and @anthropic-ai/sdk sandbox escape
+
+  ## Performance Implications
+
+  SSE polling reduced from ~2N+1 queries to 3 queries per poll cycle via batch
+  repository methods (findByIds, findByRunIds). Executor stderr capped at 100KB
+  to prevent memory exhaustion.

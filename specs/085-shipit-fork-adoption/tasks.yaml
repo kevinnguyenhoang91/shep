@@ -1,0 +1,464 @@
+# Task Breakdown (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: shipit-fork-adoption
+summary: Task breakdown for 085-shipit-fork-adoption
+
+relatedFeatures: []
+technologies:
+  - TypeScript
+  - TypeSpec
+  - inversify
+  - Next.js
+  - Vitest
+
+relatedLinks: []
+
+tasks:
+  # === P0 Security ===
+  - id: task-1
+    title: Patch CVE overrides (ajv ReDoS + SDK sandbox escape)
+    description: Add pnpm overrides for GHSA-2g4f-4pwh-qvx6 and GHSA-5474-4w2j-mq4c
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - pnpm overrides force patched versions
+      - pnpm install succeeds
+      - build passes
+    tdd: null
+    estimatedEffort: S
+
+  - id: task-2
+    title: Extract shared path sanitizers and fix containment checks
+    description: Create path-sanitizers.ts utility, replace 4 inline implementations
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - ensureContainedPath defeats traversal and prefix attacks
+      - 11 unit tests pass
+      - 4 consumer files updated
+    tdd:
+      red:
+        - Write tests for ensureContainedPath (traversal, prefix attack, symlink)
+        - Write tests for normalizePath and isSamePath
+      green:
+        - Implement path-sanitizers.ts
+      refactor:
+        - Update 4 consumer files to use shared utility
+    estimatedEffort: M
+
+  - id: task-3
+    title: Fix CodeQL alerts (command injection + jq injection)
+    description: Fix command injection in open-shell.ts and jq injection in github-repository.service.ts
+    state: Done
+    dependencies:
+      - task-2
+    acceptanceCriteria:
+      - open-shell.ts rejects paths with shell metacharacters
+      - github-repository.service.ts escapes all regex/jq metacharacters
+      - build passes
+    tdd: null
+    estimatedEffort: M
+
+  - id: task-4
+    title: Add apiError helper and sanitize error responses
+    description: Create apiError() helper, apply to all API routes leaking stack traces
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - apiError() logs full error server-side, returns safe message to client
+      - All API routes use apiError in catch blocks
+      - No stack traces in any error response
+    tdd: null
+    estimatedEffort: M
+
+  # === P1 Correctness ===
+  - id: task-5
+    title: Batch SSE queries and cap executor stderr buffer
+    description: Add findByIds/findByRunIds to repositories, refactor SSE poll, add 100KB stderr cap
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - SSE poll uses 3 queries instead of ~2N+1
+      - Batch methods use parameterized IN queries
+      - Executor stderr capped at 100KB
+      - 24 test mocks updated
+    tdd:
+      red:
+        - Write tests for findByIds and findByRunIds
+      green:
+        - Implement batch queries in SQLite repositories
+      refactor:
+        - Refactor SSE route to use batch + lookup maps
+    estimatedEffort: L
+
+  - id: task-6
+    title: Fix executor bugs (Codex hang, Copilot allowedTools, Cursor flag)
+    description: Fix 3 latent bugs in agent executor buildArgs methods
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - Codex has --ask-for-approval never (already present)
+      - Copilot uses console.warn for unsupported allowedTools
+      - Cursor --yolo flag documented with cross-agent comparison
+    tdd: null
+    estimatedEffort: S
+
+  # === P1 Architecture ===
+  - id: task-7
+    title: Modularize DI container into 8 focused modules
+    description: Split 645-line initializeContainer into database, repositories, services, agents, notifications, use-cases, interactive, web-tokens modules
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - 8 module files in packages/core/src/infrastructure/di/modules/
+      - Orchestrator reduced to ~80 lines
+      - All DI bindings resolve correctly
+      - Build and tests pass
+    tdd: null
+    estimatedEffort: L
+
+  - id: task-8
+    title: Decompose GitPrService into 5 focused services
+    description: Split 1078-line god class into DiffAnalyzer, BranchDiscovery, CiStatus, PrCreation, MergeStrategy services
+    state: Done
+    dependencies:
+      - task-7
+    acceptanceCriteria:
+      - 5 new service files created
+      - GitPrService becomes 249-line facade
+      - All 185 git-related tests pass
+    tdd: null
+    estimatedEffort: L
+
+  - id: task-9
+    title: Decompose InteractiveSessionService into 6 focused classes
+    description: Split 1284-line service into SubscriberNotifier, SessionStateManager, ChatStateBuilder, TurnExecutor, SessionBootSequence
+    state: Done
+    dependencies:
+      - task-7
+    acceptanceCriteria:
+      - 6 new class files created
+      - Service becomes 200-line facade
+      - All 41 interactive session tests pass
+    tdd: null
+    estimatedEffort: L
+
+  - id: task-10
+    title: Extract AbstractAgentExecutor base class
+    description: Extract duplicated log/constructor/spawn patterns from 5 executors into base class
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - AbstractAgentExecutor with log, buildBaseSpawnOptions, silent flag
+      - 5 executors extend base class
+      - ~46 lines net reduction
+      - 241 executor tests pass
+    tdd: null
+    estimatedEffort: M
+
+  - id: task-11
+    title: Extract PollAgentEventsUseCase from SSE route
+    description: Move ~250 lines of business logic from SSE route into application-layer use case
+    state: Done
+    dependencies:
+      - task-5
+      - task-7
+    acceptanceCriteria:
+      - Use case encapsulates polling, delta detection, event emission
+      - Route reduced from 467 to ~118 lines
+      - Registered as transient in DI (per-connection state)
+    tdd: null
+    estimatedEffort: M
+
+  - id: task-12
+    title: Create port interfaces for ProcessMonitor and FileSystem
+    description: Add IProcessMonitorService and IFileSystemService port interfaces with implementations
+    state: Done
+    dependencies:
+      - task-7
+    acceptanceCriteria:
+      - 2 port interfaces in application/ports/output/services/
+      - 2 infrastructure implementations
+      - Registered in DI container
+    tdd: null
+    estimatedEffort: S
+
+  - id: task-13
+    title: Add ISettingsReader port and fix application-layer getSettings() violations
+    description: Create ISettingsReader interface, fix 4 use cases + 7 presentation files
+    state: Done
+    dependencies:
+      - task-7
+      - task-12
+    acceptanceCriteria:
+      - ISettingsReader port interface created
+      - SettingsReaderAdapter wraps existing singleton
+      - 4 application-layer use cases use DI
+      - 7 web actions use DI
+      - 9 test files updated
+    tdd: null
+    estimatedEffort: L
+
+  # === P1 TypeSpec ===
+  - id: task-14
+    title: Patch TypeSpec emitter to map utcDateTime to Date
+    description: pnpm patch @typespec-tools/emitter-typescript to fix 29 date fields typed as any
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - Patch adds utcDateTime/plainDate/plainTime/offsetDateTime -> Date
+      - 29 date fields in output.ts typed as Date
+      - 59 type errors across 24 files fixed
+      - Zero any types remain for date fields
+    tdd: null
+    estimatedEffort: L
+
+  - id: task-15
+    title: Fix validate script to use tsp:codegen
+    description: Change validate script from tsp:compile to tsp:codegen to prevent generated file drift
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - validate script uses tsp:codegen
+      - Generated files are always prettified
+    tdd: null
+    estimatedEffort: S
+
+  # === P2 Agents ===
+  - id: task-16
+    title: Add Rovo Dev CLI as first-class agent
+    description: TypeSpec enum, executor service, factory registration, auth detection, UI components, i18n
+    state: Done
+    dependencies:
+      - task-10
+    acceptanceCriteria:
+      - RovoDev enum value in TypeSpec
+      - Executor extends AbstractAgentExecutor
+      - Factory switch case, model list, CLI info
+      - Auth detection (ATLASSIAN_TOKEN, ~/.rovo)
+      - Icon, labels, TUI prompt, 8 language translations
+      - 30 factory tests pass
+    tdd:
+      red:
+        - Write factory tests for rovo-dev creation, caching, CLI info, models
+      green:
+        - Implement executor and factory registration
+      refactor:
+        - Add UI components and i18n
+    estimatedEffort: L
+
+  - id: task-17
+    title: Add per-agent permission modes
+    description: TypeSpec PermissionMode enum, AgentConfig extension, executor flag mapping, DB migration
+    state: Done
+    dependencies:
+      - task-6
+      - task-16
+    acceptanceCriteria:
+      - PermissionMode enum (Default, Strict, Autonomous)
+      - AgentConfig.permissionMode optional field
+      - Each executor maps modes to CLI flags
+      - DB migration 056 adds column
+      - Settings mapper persistence
+    tdd: null
+    estimatedEffort: L
+
+  - id: task-18
+    title: Add agent availability badges to picker
+    description: Hook for auth detection, badge component, integration into AgentModelPicker
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - useAgentAvailability hook with caching
+      - AgentAvailabilityBadge component (4 states)
+      - Storybook story
+      - Integrated into picker dropdown
+    tdd: null
+    estimatedEffort: M
+
+  # === P2 Testing/DX ===
+  - id: task-19
+    title: Create shared test factories
+    description: Builder functions for Feature, AgentRun, Settings, and mock repositories
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - 6 factory files in tests/helpers/factories/
+      - 17 tests covering defaults, overrides, unique IDs
+      - Barrel export via index.ts
+    tdd:
+      red:
+        - Write tests for factory default creation and override
+      green:
+        - Implement factory builders
+      refactor:
+        - Add barrel exports
+    estimatedEffort: M
+
+  - id: task-20
+    title: Add i18n parity and architecture layer violation hooks
+    description: PostToolUse hooks for translation drift detection and cross-layer import violations
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - i18n-parity.sh warns on missing translation keys
+      - architecture-validator.sh warns on cross-layer imports
+      - Both registered in .claude/settings.json
+      - Advisory only (exit 0 always)
+    tdd: null
+    estimatedEffort: S
+
+  # === P2 A11y ===
+  - id: task-21
+    title: Add aria-describedby for form errors and centralize drawer Escape
+    description: WCAG 3.3.1/1.3.1 compliance for form errors, centralized Escape handling in BaseDrawer
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - 5 form components with aria-describedby + aria-invalid + role=alert
+      - BaseDrawer has centralized Escape handler
+    tdd: null
+    estimatedEffort: M
+
+  - id: task-22
+    title: Add route-change screen-reader announcements
+    description: useRouteAnnouncer hook + RouteAnnouncer component in root layout
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - aria-live polite region announces page navigation
+      - Integrated into root layout.tsx
+    tdd: null
+    estimatedEffort: S
+
+  # === P2 CI/CD ===
+  - id: task-23
+    title: Add Dependabot config and CODEOWNERS
+    description: Create .github/dependabot.yml with grouped updates and .github/CODEOWNERS
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - Weekly npm + github-actions updates
+      - Dependency groups for typespec, storybook, testing, ai-sdk
+      - CODEOWNERS assigns @shep-ai/core
+    tdd: null
+    estimatedEffort: S
+
+  - id: task-24
+    title: Migrate semgrep action
+    description: Replace deprecated returntocorp/semgrep-action with semgrep/semgrep-action
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - CI workflow uses semgrep/semgrep-action@v1
+    tdd: null
+    estimatedEffort: S
+
+  - id: task-25
+    title: Add concurrency groups to all workflow files
+    description: Ensure all GitHub workflow files cancel stale runs on non-main branches
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - All 4 workflow files have concurrency groups
+      - cancel-in-progress true except main
+    tdd: null
+    estimatedEffort: S
+
+  - id: task-26
+    title: Fix ajv override breaking ESLint 9
+    description: Remove ajv>=8.18.0 pnpm override that conflicts with @eslint/eslintrc
+    state: Done
+    dependencies: []
+    acceptanceCriteria:
+      - pnpm lint works without TypeError
+      - ajv 8.18.0 still available as direct dependency
+    tdd: null
+    estimatedEffort: S
+
+  - id: task-27
+    title: Configure OIDC trusted publishers for npm
+    description: Switch npm publishing from NPM_TOKEN secret to OIDC trusted publishers
+    state: Todo
+    dependencies: []
+    acceptanceCriteria:
+      - Release job uses OIDC instead of NPM_TOKEN
+      - npm publish --provenance works
+    tdd: null
+    estimatedEffort: M
+
+  # === P3 Dependency Upgrades (deferred) ===
+  - id: task-28
+    title: Upgrade TypeSpec 0.60 to 1.10
+    description: Upgrade all 6 TypeSpec packages with syntax migration
+    state: Todo
+    dependencies:
+      - task-14
+    acceptanceCriteria:
+      - All @typespec packages at ^1.10.0
+      - tsp:compile succeeds
+      - Generated output valid
+    tdd: null
+    estimatedEffort: M
+
+  - id: task-29
+    title: Upgrade Storybook 8.6 to 10
+    description: Two-step migration (8->9->10) with 140 story file updates
+    state: Todo
+    dependencies: []
+    acceptanceCriteria:
+      - Storybook 10 installed
+      - All stories render correctly
+      - build:storybook passes
+    tdd: null
+    estimatedEffort: XL
+
+  - id: task-30
+    title: Upgrade TypeScript to 6.0
+    description: Use @andrewbranch/ts5to6 migration tool, fix new type errors
+    state: Todo
+    dependencies: []
+    acceptanceCriteria:
+      - TypeScript 6.0.2 installed
+      - tsconfig migrated
+      - typecheck passes
+    tdd: null
+    estimatedEffort: L
+
+  - id: task-31
+    title: Upgrade Vite 8 / Tailwind 4.2 / jsdom 29
+    description: Build tool + CSS framework + test runtime upgrades
+    state: Todo
+    dependencies:
+      - task-29
+    acceptanceCriteria:
+      - Vite 8 with Rolldown
+      - Tailwind 4.2
+      - jsdom 29
+      - All tests and builds pass
+    tdd: null
+    estimatedEffort: L
+
+totalEstimate: XL
+
+openQuestions: []
+
+content: |
+  ## Summary
+
+  ShipIt fork adoption — 31 tasks across 7 phases. 27 tasks completed, 4 remaining
+  (OIDC publishers + 3 dependency upgrades as separate PRs).
+
+  ## Acceptance Checklist
+
+  Before marking feature complete:
+
+  - [x] All P0 security tasks completed
+  - [x] All P1 correctness/architecture tasks completed
+  - [x] All P1 TypeSpec tasks completed
+  - [x] All P2 agent/testing/a11y/CI tasks completed
+  - [x] Tests passing (`pnpm test`)
+  - [x] Build passing (`pnpm build`)
+  - [ ] P3 dependency upgrades (separate PRs)
+  - [ ] PR created and reviewed

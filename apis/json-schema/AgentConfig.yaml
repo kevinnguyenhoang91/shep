@@ -13,6 +13,9 @@ properties:
   token:
     type: string
     description: API token for token-based auth (optional)
+  permissionMode:
+    $ref: PermissionMode.yaml
+    description: Permission mode for tool approvals (optional, defaults to agent default)
 required:
   - type
   - authMethod

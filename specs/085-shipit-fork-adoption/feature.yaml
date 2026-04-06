@@ -1,0 +1,42 @@
+feature:
+  id: '085-shipit-fork-adoption'
+  name: 'shipit-fork-adoption'
+  number: 85
+  branch: 'feat/shipit-fork-adoption'
+  lifecycle: 'implementation'
+  createdAt: '2026-04-06T12:00:00Z'
+
+status:
+  phase: 'implementation'
+  progress:
+    completed: 27
+    total: 31
+    percentage: 87
+  currentTask: null
+  lastUpdated: '2026-04-06T15:44:42Z'
+  lastUpdatedBy: 'shep-kit:new-feature-fast'
+
+validation:
+  lastRun: null
+  gatesPassed: []
+  autoFixesApplied: []
+
+tasks:
+  current: null
+  blocked: []
+  failed: []
+
+checkpoints:
+  - phase: 'feature-created'
+    completedAt: '2026-04-06T12:00:00Z'
+    completedBy: 'shep-kit:new-feature-fast'
+  - phase: 'research-complete'
+    completedAt: '2026-04-06T12:30:00Z'
+    completedBy: 'shep-kit:new-feature-fast'
+  - phase: 'plan-complete'
+    completedAt: '2026-04-06T13:00:00Z'
+    completedBy: 'shep-kit:new-feature-fast'
+
+errors:
+  current: null
+  history: []

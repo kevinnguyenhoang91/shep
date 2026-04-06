@@ -1,0 +1,198 @@
+# Implementation Plan (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: shipit-fork-adoption
+summary: Implementation plan for 085-shipit-fork-adoption
+
+relatedFeatures: []
+technologies:
+  - TypeScript
+  - TypeSpec
+  - inversify
+  - Next.js
+  - Radix UI
+  - Vitest
+
+relatedLinks: []
+
+phases:
+  - id: phase-1
+    name: 'P0 Security Hardening'
+    parallel: false
+    taskIds:
+      - task-1
+      - task-2
+      - task-3
+      - task-4
+
+  - id: phase-2
+    name: 'P1 Correctness & Performance'
+    parallel: false
+    taskIds:
+      - task-5
+      - task-6
+
+  - id: phase-3
+    name: 'P1 Architecture Refactors'
+    parallel: false
+    taskIds:
+      - task-7
+      - task-8
+      - task-9
+      - task-10
+      - task-11
+      - task-12
+      - task-13
+
+  - id: phase-4
+    name: 'P1 TypeSpec Modernization'
+    parallel: false
+    taskIds:
+      - task-14
+      - task-15
+
+  - id: phase-5
+    name: 'P2 Agent System'
+    parallel: false
+    taskIds:
+      - task-16
+      - task-17
+      - task-18
+
+  - id: phase-6
+    name: 'P2 Testing, DX, A11y, CI/CD'
+    parallel: true
+    taskIds:
+      - task-19
+      - task-20
+      - task-21
+      - task-22
+      - task-23
+      - task-24
+      - task-25
+      - task-26
+      - task-27
+
+  - id: phase-7
+    name: 'P3 Dependency Upgrades (deferred)'
+    parallel: true
+    taskIds:
+      - task-28
+      - task-29
+      - task-30
+      - task-31
+
+filesToCreate:
+  - packages/core/src/infrastructure/services/filesystem/path-sanitizers.ts
+  - src/presentation/web/lib/api-error.ts
+  - packages/core/src/infrastructure/di/modules/database.module.ts
+  - packages/core/src/infrastructure/di/modules/repositories.module.ts
+  - packages/core/src/infrastructure/di/modules/services.module.ts
+  - packages/core/src/infrastructure/di/modules/agent-infrastructure.module.ts
+  - packages/core/src/infrastructure/di/modules/notifications.module.ts
+  - packages/core/src/infrastructure/di/modules/use-cases.module.ts
+  - packages/core/src/infrastructure/di/modules/interactive.module.ts
+  - packages/core/src/infrastructure/di/modules/web-tokens.module.ts
+  - packages/core/src/infrastructure/services/agents/common/executors/abstract-agent-executor.ts
+  - packages/core/src/infrastructure/services/agents/common/executors/rovo-dev-executor.service.ts
+  - packages/core/src/infrastructure/services/git/diff-analyzer.service.ts
+  - packages/core/src/infrastructure/services/git/branch-discovery.service.ts
+  - packages/core/src/infrastructure/services/git/ci-status.service.ts
+  - packages/core/src/infrastructure/services/git/pr-creation.service.ts
+  - packages/core/src/infrastructure/services/git/merge-strategy.service.ts
+  - packages/core/src/infrastructure/services/interactive/subscriber-notifier.ts
+  - packages/core/src/infrastructure/services/interactive/session-state-manager.ts
+  - packages/core/src/infrastructure/services/interactive/chat-state-builder.ts
+  - packages/core/src/infrastructure/services/interactive/turn-executor.ts
+  - packages/core/src/infrastructure/services/interactive/session-boot-sequence.ts
+  - packages/core/src/application/use-cases/notifications/poll-agent-events.use-case.ts
+  - packages/core/src/application/ports/output/services/process-monitor.interface.ts
+  - packages/core/src/application/ports/output/services/file-system.interface.ts
+  - packages/core/src/application/ports/output/services/settings-reader.interface.ts
+  - src/presentation/web/hooks/use-route-announcer.ts
+  - src/presentation/web/hooks/use-agent-availability.ts
+  - src/presentation/web/components/common/route-announcer.tsx
+  - src/presentation/web/components/features/settings/AgentAvailabilityBadge.tsx
+  - tests/helpers/factories/feature.factory.ts
+  - tests/helpers/factories/agent-run.factory.ts
+  - tests/helpers/factories/settings.factory.ts
+  - tests/helpers/factories/repository-mocks.factory.ts
+  - .github/dependabot.yml
+  - .github/CODEOWNERS
+  - .claude/hooks/architecture-validator.sh
+  - .claude/hooks/i18n-parity.sh
+
+filesToModify:
+  - package.json
+  - packages/core/src/infrastructure/di/container.ts
+  - packages/core/src/infrastructure/services/git/git-pr.service.ts
+  - packages/core/src/infrastructure/services/interactive/interactive-session.service.ts
+  - packages/core/src/infrastructure/services/agents/common/executors/codex-cli-executor.service.ts
+  - packages/core/src/infrastructure/services/agents/common/executors/copilot-cli-executor.service.ts
+  - packages/core/src/infrastructure/services/agents/common/executors/cursor-executor.service.ts
+  - packages/core/src/infrastructure/services/agents/common/executors/claude-code-executor.service.ts
+  - packages/core/src/infrastructure/services/agents/common/executors/gemini-cli-executor.service.ts
+  - packages/core/src/infrastructure/services/agents/common/agent-executor-factory.service.ts
+  - src/presentation/web/app/api/agent-events/route.ts
+  - src/presentation/web/app/actions/open-shell.ts
+  - packages/core/src/infrastructure/services/external/github-repository.service.ts
+  - src/presentation/web/app/api/directory/list/route.ts
+  - src/presentation/web/app/api/attachments/preview/route.ts
+  - src/presentation/web/app/layout.tsx
+  - src/presentation/web/components/common/base-drawer/base-drawer.tsx
+  - .github/workflows/ci.yml
+  - tsp/common/enums/agent-config.tsp
+  - tsp/domain/entities/settings.tsp
+  - packages/core/src/domain/generated/output.ts
+
+openQuestions: []
+
+content: |
+  ## Architecture Overview
+
+  ```
+  P0 Security         P1 Correctness     P1 Architecture
+  ┌──────────┐        ┌──────────┐       ┌──────────────────┐
+  │ CVE fixes│        │ SSE batch│       │ DI modularization│
+  │ Path san.│        │ Exec bugs│       │ God class decomp │
+  │ API error│        │          │       │ ExecutorBase      │
+  │ CodeQL   │        └──────────┘       │ Port interfaces   │
+  └──────────┘                           │ Settings DI       │
+       │                                 └──────────────────┘
+       ▼                                        │
+  P1 TypeSpec         P2 Agents               ▼
+  ┌──────────┐       ┌──────────────┐    P2 Testing/DX/A11y/CI
+  │ Date fix │       │ Rovo Dev     │    ┌──────────────────┐
+  │ Validate │       │ Permissions  │    │ Test factories   │
+  └──────────┘       │ Badges       │    │ Hooks            │
+                     └──────────────┘    │ A11y fixes       │
+                                         │ CI polish        │
+                                         └──────────────────┘
+  ```
+
+  ## Implementation Strategy
+
+  Phases are ordered by dependency and priority:
+  1. Security first (P0) — all low-risk, high-value
+  2. Correctness bugs next — executor fixes prevent data loss and hangs
+  3. Architecture refactors — DI modularization is foundation for all subsequent decompositions
+  4. TypeSpec modernization — date fix improves type safety across domain model
+  5. Agent system — new agent + permission modes build on fixed executors
+  6. Testing/DX/A11y/CI — independent items, can parallelize
+
+  ## Testing Strategy (TDD: Tests FIRST)
+
+  - Path sanitizer: 11 unit tests covering traversal, prefix attacks, normalization
+  - Test factories: 17 tests validating factory builders
+  - Repository batch methods: tested via existing repository test suites
+  - Executor changes: verified via existing 241+ executor unit tests
+  - A11y: manual verification + Storybook stories
+
+  ## Risk Mitigation
+
+  | Risk | Mitigation |
+  | ---- | ---------- |
+  | DI refactor breaks all services | Preserve exact same bindings; run full test suite |
+  | God class decomposition misses a method | Facade pattern preserves all call sites |
+  | TypeSpec date fix cascading type errors | Fix all 59 errors before committing |
+  | ESLint broken by ajv override | Removed override, ajv 8.18.0 as direct dep suffices |

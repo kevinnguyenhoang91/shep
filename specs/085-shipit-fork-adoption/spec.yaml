@@ -1,0 +1,83 @@
+# Feature Specification (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: shipit-fork-adoption
+number: 85
+branch: feat/shipit-fork-adoption
+oneLiner: Adopt high-value changes from jrmatherly/shipit fork back into shep-ai/cli
+summary: >
+  Systematic adoption of security fixes, architecture refactors, performance improvements,
+  agent system upgrades, accessibility enhancements, and CI/CD polish from a hard-copy fork
+  (jrmatherly/shipit) that accumulated 98 AI-authored commits over 4 days. Prioritized into
+  P0 (security), P1 (correctness/architecture/TypeSpec), P2 (agents/testing/a11y/CI), and
+  P3 (dependency upgrades).
+phase: Implementation
+sizeEstimate: XL
+
+relatedFeatures: []
+
+technologies:
+  - TypeScript
+  - TypeSpec
+  - Next.js
+  - React
+  - Radix UI
+  - inversify (DI)
+  - better-sqlite3
+  - Playwright
+  - Vitest
+  - GitHub Actions
+
+relatedLinks:
+  - title: Fork analysis source
+    url: https://github.com/jrmatherly/shipit
+  - title: Adoption analysis document
+    url: ../../TODOS.md
+
+openQuestions: []
+
+content: |
+  ## Problem Statement
+
+  A hard-copy fork (jrmatherly/shipit) of the Shep CLI accumulated 98 AI-authored commits
+  with significant security fixes, architecture improvements, and feature additions. Many
+  of these changes address real vulnerabilities and code quality issues in our codebase.
+  We need to systematically evaluate, adopt, and integrate the high-value changes while
+  skipping rebrand-specific and aesthetic changes.
+
+  ## Success Criteria
+
+  - [x] All P0 security vulnerabilities patched (CVE overrides, CodeQL alerts, path sanitizers, API error handling)
+  - [x] Critical executor bugs fixed (Codex hang, Copilot allowedTools, Cursor flag documentation)
+  - [x] SSE query performance improved (batch queries reduce ~40 DB calls to ~3 per poll)
+  - [x] DI container modularized (645 lines -> 80-line orchestrator + 8 modules)
+  - [x] God classes decomposed (GitPrService 1078->249, InteractiveSessionService 1284->200)
+  - [x] TypeSpec utcDateTime -> Date mapping fixed (29 fields, 59 type errors resolved)
+  - [x] Rovo Dev CLI added as first-class agent
+  - [x] Per-agent permission modes with executor flag mapping
+  - [x] Agent availability badges in picker UI
+  - [x] WCAG accessibility improvements (form errors, route announcements, drawer focus)
+  - [x] CI/CD improvements (dependabot, CODEOWNERS, semgrep migration, concurrency groups)
+  - [ ] Remaining P3 dependency upgrades (Storybook 10, TS 6, Vite 8) as separate PRs
+
+  ## Affected Areas
+
+  | Area | Impact | Reasoning |
+  | ---- | ------ | --------- |
+  | Security (web API routes) | Critical | Path traversal, command injection, jq injection, stack trace exposure |
+  | Agent executors | High | Bug fixes + permission modes + new agent (Rovo Dev) |
+  | DI container | High | Modularized into 8 modules, enables further refactoring |
+  | Infrastructure services | High | GitPrService and InteractiveSessionService decomposed |
+  | TypeSpec / domain model | High | Date type mapping fixed, permission mode enum added |
+  | Web UI | Medium | A11y improvements, availability badges, route announcements |
+  | CI/CD | Medium | Dependabot, CODEOWNERS, semgrep, concurrency groups |
+  | Testing | Medium | Shared test factories, port interfaces for testability |
+
+  ## Dependencies
+
+  None — this is a standalone adoption initiative.
+
+  ## Size Estimate
+
+  **XL** — 37 items across 9 priority groups, touching 100+ files across all architecture layers.
+  23 commits already landed; remaining items are P3 dependency upgrades (separate PRs).
