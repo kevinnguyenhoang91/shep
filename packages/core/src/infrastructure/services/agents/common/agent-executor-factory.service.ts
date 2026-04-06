@@ -22,6 +22,7 @@ import { DevAgentExecutorService } from './executors/dev-executor.service.js';
 import { GeminiCliExecutorService } from './executors/gemini-cli-executor.service.js';
 import { CodexCliExecutorService } from './executors/codex-cli-executor.service.js';
 import { CopilotCliExecutorService } from './executors/copilot-cli-executor.service.js';
+import { RovoDevExecutorService } from './executors/rovo-dev-executor.service.js';
 import type { SpawnFunction } from './types.js';
 
 /**
@@ -71,6 +72,9 @@ export class AgentExecutorFactory implements IAgentExecutorFactory {
       case 'copilot-cli':
         executor = new CopilotCliExecutorService(this.spawn, _authConfig);
         break;
+      case 'rovo-dev':
+        executor = new RovoDevExecutorService(this.spawn, _authConfig);
+        break;
       default:
         throw new Error(
           `Unsupported agent type: ${agentType}. Supported: ${this.getSupportedAgents().join(', ')}`
@@ -94,6 +98,7 @@ export class AgentExecutorFactory implements IAgentExecutorFactory {
       'gemini-cli' as AgentType,
       'codex-cli' as AgentType,
       'copilot-cli' as AgentType,
+      'rovo-dev' as AgentType,
     ];
   }
 
@@ -104,6 +109,7 @@ export class AgentExecutorFactory implements IAgentExecutorFactory {
       { agentType: 'cursor' as AgentType, cmd: 'cursor', versionArgs: ['--version'] },
       { agentType: 'codex-cli' as AgentType, cmd: 'codex', versionArgs: ['--version'] },
       { agentType: 'copilot-cli' as AgentType, cmd: 'copilot', versionArgs: ['--version'] },
+      { agentType: 'rovo-dev' as AgentType, cmd: 'rovo', versionArgs: ['--version'] },
     ];
   }
 
@@ -126,6 +132,8 @@ export class AgentExecutorFactory implements IAgentExecutorFactory {
         return CODEX_CLI_MODELS;
       case 'copilot-cli':
         return COPILOT_CLI_MODELS;
+      case 'rovo-dev':
+        return ROVO_DEV_MODELS;
       default:
         return [];
     }
@@ -212,3 +220,5 @@ const COPILOT_CLI_MODELS = [
   'gpt-5.4',
   'gpt-5.4-mini',
 ];
+// TODO: Update with actual Rovo Dev model identifiers when available
+const ROVO_DEV_MODELS = ['rovo-agent-1', 'rovo-agent-1-mini'];

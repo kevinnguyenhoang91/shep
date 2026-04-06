@@ -9,6 +9,7 @@ export type AgentTypeValue =
   | 'copilot-cli'
   | 'cursor'
   | 'gemini-cli'
+  | 'rovo-dev'
   | 'aider'
   | 'continue'
   | 'dev';
@@ -96,6 +97,7 @@ const agentTypeIconMap: Record<AgentTypeValue, ComponentType<IconProps>> = {
   'copilot-cli': createBrandIcon('/icons/agents/copilot.svg', 'Copilot CLI'),
   cursor: createBrandIcon('/icons/agents/cursor.jpeg', 'Cursor'),
   'gemini-cli': createBrandIcon('/icons/agents/gemini-cli.jpeg', 'Gemini CLI'),
+  'rovo-dev': createBrandIcon('/icons/agents/rovo-dev.svg', 'Rovo Dev'),
   aider: createBrandIcon('/icons/agents/aider.png', 'Aider'),
   continue: createBrandIcon('/icons/agents/continue.jpeg', 'Continue'),
   dev: DevAgentIcon,
@@ -108,6 +110,7 @@ export const agentTypeLabels: Record<AgentTypeValue, string> = {
   'copilot-cli': 'Copilot CLI',
   cursor: 'Cursor',
   'gemini-cli': 'Gemini CLI',
+  'rovo-dev': 'Rovo Dev',
   aider: 'Aider',
   continue: 'Continue',
   dev: 'Demo',

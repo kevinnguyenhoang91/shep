@@ -19,6 +19,7 @@
  * codex-cli    ← Currently supported
  * copilot-cli  ← Currently supported
  * cursor       ← Currently supported
+ * rovo-dev     ← Currently supported
  * gemini-cli   ← Coming Soon
  * aider        ← Coming Soon
  * continue     ← Coming Soon
@@ -74,6 +75,13 @@ enum AgentType {
    */
   @doc("Cursor AI coding agent")
   Cursor: "cursor",
+
+  /**
+   * Atlassian's Rovo Dev CLI coding agent.
+   * Supported — uses the `rovo` binary for CLI execution with Atlassian models.
+   */
+  @doc("Rovo Dev CLI by Atlassian")
+  RovoDev: "rovo-dev",
 
   /**
    * Local development mock executor.

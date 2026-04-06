@@ -7,6 +7,7 @@ const allAgentTypes: { type: AgentTypeValue; label: string }[] = [
   { type: 'copilot-cli', label: 'Copilot CLI' },
   { type: 'cursor', label: 'Cursor' },
   { type: 'gemini-cli', label: 'Gemini CLI' },
+  { type: 'rovo-dev', label: 'Rovo Dev' },
   { type: 'aider', label: 'Aider' },
   { type: 'continue', label: 'Continue' },
   { type: 'dev', label: 'Dev (Mock)' },

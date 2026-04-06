@@ -14,6 +14,7 @@
           "description": "GitHub Copilot CLI (Standard: Claude Sonnet 4.5, erfordert Copilot-Abonnement)"
         },
         "cursor": { "name": "Cursor", "description": "Cursor KI-Coding-Agent" },
+        "rovoDev": { "name": "Rovo Dev", "description": "Atlassian Rovo Dev CLI-Coding-Agent" },
         "devMock": {
           "name": "Dev (Mock)",
           "description": "Lokaler Entwicklungs-Mock — kein Agent-Binary erforderlich"

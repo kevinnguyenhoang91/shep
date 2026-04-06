@@ -25,6 +25,7 @@ const AGENT_TYPE_OPTIONS = [
   { value: AgentType.CopilotCli, label: 'Copilot CLI' },
   { value: AgentType.Cursor, label: 'Cursor' },
   { value: AgentType.GeminiCli, label: 'Gemini CLI' },
+  { value: AgentType.RovoDev, label: 'Rovo Dev' },
   { value: AgentType.Aider, label: 'Aider' },
   { value: AgentType.Continue, label: 'Continue' },
   { value: AgentType.Dev, label: 'Dev' },

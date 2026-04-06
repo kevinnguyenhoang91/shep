@@ -23,6 +23,10 @@
           "name": "Cursor",
           "description": "סוכן קידוד Cursor AI"
         },
+        "rovoDev": {
+          "name": "Rovo Dev",
+          "description": "סוכן קידוד Atlassian Rovo Dev CLI"
+        },
         "devMock": {
           "name": "Dev (Mock)",
           "description": "מוק פיתוח מקומי — לא נדרש קובץ סוכן"

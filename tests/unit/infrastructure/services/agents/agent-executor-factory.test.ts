@@ -13,6 +13,7 @@ import { AgentExecutorFactory } from '@/infrastructure/services/agents/common/ag
 import { DevAgentExecutorService } from '@/infrastructure/services/agents/common/executors/dev-executor.service.js';
 import { CodexCliExecutorService } from '@/infrastructure/services/agents/common/executors/codex-cli-executor.service.js';
 import { CopilotCliExecutorService } from '@/infrastructure/services/agents/common/executors/copilot-cli-executor.service.js';
+import { RovoDevExecutorService } from '@/infrastructure/services/agents/common/executors/rovo-dev-executor.service.js';
 import type { SpawnFunction } from '@/infrastructure/services/agents/common/types.js';
 import { AgentType, AgentAuthMethod } from '@/domain/generated/output.js';
 import type { AgentConfig } from '@/domain/generated/output.js';
@@ -172,6 +173,31 @@ describe('AgentExecutorFactory', () => {
       expect(executor1).toBe(executor2);
     });
 
+    it('should create RovoDevExecutorService for rovo-dev type', () => {
+      const rovoConfig: AgentConfig = {
+        type: AgentType.RovoDev,
+        authMethod: AgentAuthMethod.Session,
+      };
+
+      const executor = factory.createExecutor(AgentType.RovoDev, rovoConfig);
+
+      expect(executor).toBeDefined();
+      expect(executor).toBeInstanceOf(RovoDevExecutorService);
+      expect(executor.agentType).toBe(AgentType.RovoDev);
+    });
+
+    it('should cache rovo-dev executor instances', () => {
+      const rovoConfig: AgentConfig = {
+        type: AgentType.RovoDev,
+        authMethod: AgentAuthMethod.Session,
+      };
+
+      const executor1 = factory.createExecutor(AgentType.RovoDev, rovoConfig);
+      const executor2 = factory.createExecutor(AgentType.RovoDev, rovoConfig);
+
+      expect(executor1).toBe(executor2);
+    });
+
     it('should return executor with correct agentType', () => {
       const executor = factory.createExecutor(AgentType.ClaudeCode, defaultAuthConfig);
 
@@ -195,8 +221,9 @@ describe('AgentExecutorFactory', () => {
       expect(supported).toContain('gemini-cli');
       expect(supported).toContain('codex-cli');
       expect(supported).toContain('copilot-cli');
+      expect(supported).toContain('rovo-dev');
       expect(supported).toContain('dev');
-      expect(supported).toHaveLength(6);
+      expect(supported).toHaveLength(7);
     });
 
     it('should not include unsupported agents', () => {
@@ -224,6 +251,15 @@ describe('AgentExecutorFactory', () => {
       expect(copilotInfo).toBeDefined();
       expect(copilotInfo!.cmd).toBe('copilot');
       expect(copilotInfo!.versionArgs).toEqual(['--version']);
+    });
+
+    it('should include rovo-dev entry with cmd rovo', () => {
+      const cliInfos = factory.getCliInfo();
+      const rovoInfo = cliInfos.find((info) => info.agentType === AgentType.RovoDev);
+
+      expect(rovoInfo).toBeDefined();
+      expect(rovoInfo!.cmd).toBe('rovo');
+      expect(rovoInfo!.versionArgs).toEqual(['--version']);
     });
   });
 
@@ -299,6 +335,12 @@ describe('AgentExecutorFactory', () => {
         'gpt-5.4',
         'gpt-5.4-mini',
       ]);
+    });
+
+    it('should return rovo-dev model list', () => {
+      const models = factory.getSupportedModels(AgentType.RovoDev);
+
+      expect(models).toEqual(['rovo-agent-1', 'rovo-agent-1-mini']);
     });
 
     it('should return empty array for dev agent', () => {

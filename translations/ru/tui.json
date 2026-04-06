@@ -23,6 +23,10 @@
           "name": "Cursor",
           "description": "AI-агент для кодирования Cursor"
         },
+        "rovoDev": {
+          "name": "Rovo Dev",
+          "description": "CLI-агент для кодирования Atlassian Rovo Dev"
+        },
         "devMock": {
           "name": "Dev (Mock)",
           "description": "Локальная заглушка для разработки — бинарный файл агента не требуется"

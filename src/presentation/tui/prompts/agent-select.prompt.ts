@@ -46,6 +46,11 @@ export function createAgentSelectConfig() {
         description: t('tui:prompts.selectAgent.choices.cursor.description'),
       },
       {
+        name: t('tui:prompts.selectAgent.choices.rovoDev.name'),
+        value: AgentType.RovoDev,
+        description: t('tui:prompts.selectAgent.choices.rovoDev.description'),
+      },
+      {
         name: t('tui:prompts.selectAgent.choices.devMock.name'),
         value: AgentType.Dev,
         description: t('tui:prompts.selectAgent.choices.devMock.description'),

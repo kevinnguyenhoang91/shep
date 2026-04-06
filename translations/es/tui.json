@@ -23,6 +23,10 @@
           "name": "Cursor",
           "description": "Agente de codificación AI Cursor"
         },
+        "rovoDev": {
+          "name": "Rovo Dev",
+          "description": "Agente de codificación CLI Atlassian Rovo Dev"
+        },
         "devMock": {
           "name": "Dev (Mock)",
           "description": "Mock de desarrollo local — no requiere binario de agente"

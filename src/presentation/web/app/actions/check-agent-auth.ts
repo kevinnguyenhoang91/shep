@@ -31,6 +31,7 @@ const AGENT_LABELS: Record<string, string> = {
   'gemini-cli': 'Gemini CLI',
   aider: 'Aider',
   copilot: 'Copilot CLI',
+  'rovo-dev': 'Rovo Dev',
   continue: 'Continue',
   dev: 'Demo',
 };
@@ -40,6 +41,7 @@ const AGENT_TOOL_MAP: Record<string, string> = {
   cursor: 'cursor-cli',
   'gemini-cli': 'gemini-cli',
   copilot: 'copilot-cli',
+  'rovo-dev': 'rovo-dev-cli',
 };
 
 const AGENT_BINARY_MAP: Record<string, string> = {
@@ -47,6 +49,7 @@ const AGENT_BINARY_MAP: Record<string, string> = {
   cursor: 'cursor-agent',
   'gemini-cli': 'gemini',
   copilot: 'copilot',
+  'rovo-dev': 'rovo',
 };
 
 /**
@@ -86,6 +89,13 @@ function tier1AuthCheck(agentType: string): boolean {
       const ghDir = IS_WINDOWS ? join(home, '.copilot') : join(home, '.config', 'gh');
       return existsSync(ghDir);
     }
+    case 'rovo-dev': {
+      if (process.env['ATLASSIAN_TOKEN']) return true;
+      if (process.env['ROVO_TOKEN']) return true;
+      // Rovo Dev CLI stores creds after `rovo auth login`
+      const rovoDir = join(home, '.rovo');
+      return existsSync(rovoDir);
+    }
 
     default:
       // dev, aider, continue — assume no auth needed
@@ -113,6 +123,10 @@ function tier2AuthVerify(agentType: string, binaryName: string): Promise<boolean
         break;
       case 'copilot-cli':
         cmd = 'gh';
+        args = ['auth', 'status'];
+        break;
+      case 'rovo-dev':
+        cmd = binaryName;
         args = ['auth', 'status'];
         break;
       default:
