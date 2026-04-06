@@ -23,10 +23,9 @@ export async function GET(): Promise<Response> {
     resolve<ListFeaturesUseCase>('ListFeaturesUseCase');
     checks.container = { ok: true };
   } catch (error) {
-    checks.container = {
-      ok: false,
-      detail: error instanceof Error ? error.message : String(error),
-    };
+    // eslint-disable-next-line no-console
+    console.error('[Health] container check failed:', error);
+    checks.container = { ok: false, detail: 'DI container unavailable' };
   }
 
   // Check 2: Feature listing works
@@ -39,10 +38,9 @@ export async function GET(): Promise<Response> {
       detail: `${features.length} features (${withRuns} with agent runs)`,
     };
   } catch (error) {
-    checks.features = {
-      ok: false,
-      detail: error instanceof Error ? error.message : String(error),
-    };
+    // eslint-disable-next-line no-console
+    console.error('[Health] feature listing failed:', error);
+    checks.features = { ok: false, detail: 'Feature listing failed' };
   }
 
   // Check 3: Agent run repository works
@@ -57,10 +55,9 @@ export async function GET(): Promise<Response> {
       detail: `${runs.length} runs (${active} active)`,
     };
   } catch (error) {
-    checks.agentRuns = {
-      ok: false,
-      detail: error instanceof Error ? error.message : String(error),
-    };
+    // eslint-disable-next-line no-console
+    console.error('[Health] agent run check failed:', error);
+    checks.agentRuns = { ok: false, detail: 'Agent run query failed' };
   }
 
   const allOk = Object.values(checks).every((c) => c.ok);
