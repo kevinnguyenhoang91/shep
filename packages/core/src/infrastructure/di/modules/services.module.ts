@@ -21,6 +21,11 @@ import type { IToolInstallerService } from '../../../application/ports/output/se
 import { ToolInstallerServiceImpl } from '../../services/tool-installer/tool-installer.service.js';
 import type { IGitPrService } from '../../../application/ports/output/services/git-pr-service.interface.js';
 import { GitPrService } from '../../services/git/git-pr.service.js';
+import { DiffAnalyzerService } from '../../services/git/diff-analyzer.service.js';
+import { BranchDiscoveryService } from '../../services/git/branch-discovery.service.js';
+import { CiStatusService } from '../../services/git/ci-status.service.js';
+import { PrCreationService } from '../../services/git/pr-creation.service.js';
+import { MergeStrategyService } from '../../services/git/merge-strategy.service.js';
 import type { IGitForkService } from '../../../application/ports/output/services/git-fork-service.interface.js';
 import { GitForkService } from '../../services/git/git-fork.service.js';
 import type { ISkillInjectorService } from '../../../application/ports/output/services/skill-injector.interface.js';
@@ -84,6 +89,13 @@ export function registerServices(container: DependencyContainer, db: Database.Da
     'IToolInstallerService',
     ToolInstallerServiceImpl
   );
+  // Git PR sub-services (focused responsibilities, independently injectable)
+  container.registerSingleton(DiffAnalyzerService);
+  container.registerSingleton(BranchDiscoveryService);
+  container.registerSingleton(CiStatusService);
+  container.registerSingleton(PrCreationService);
+  container.registerSingleton(MergeStrategyService);
+  // GitPrService facade — delegates to sub-services, preserves IGitPrService contract
   container.registerSingleton<IGitPrService>('IGitPrService', GitPrService);
   container.registerSingleton<IGitForkService>('IGitForkService', GitForkService);
   container.registerSingleton<IGitHubRepositoryService>(
