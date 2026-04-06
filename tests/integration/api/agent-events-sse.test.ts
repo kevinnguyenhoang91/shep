@@ -22,10 +22,173 @@ const mockTimings = new Map<string, PhaseTiming[]>();
 const mockListFeatures = { execute: vi.fn(async () => [...mockFeatures]) };
 const mockAgentRunRepo = {
   findById: vi.fn(async (id: string) => mockRuns.get(id) ?? null),
+  findByIds: vi.fn(async (ids: string[]) =>
+    ids.map((id) => mockRuns.get(id)).filter((r): r is AgentRun => r != null)
+  ),
 };
 const mockPhaseTimingRepo = {
   findByRunId: vi.fn(async (runId: string) => mockTimings.get(runId) ?? []),
+  findByRunIds: vi.fn(async (runIds: string[]) =>
+    runIds.flatMap((runId) => mockTimings.get(runId) ?? [])
+  ),
 };
+const mockInteractiveSessionRepo = {
+  findAllActive: vi.fn(async () => []),
+  findById: vi.fn(async () => null),
+};
+const mockProcessMonitor = {
+  isAlive: vi.fn(() => true),
+};
+
+/**
+ * Mock PollAgentEventsUseCase that delegates to the same mock repos/services
+ * the tests already control, replicating the real use case's delta-detection
+ * logic enough for the SSE route integration tests.
+ */
+function createMockPollAgentEventsUseCase() {
+  const featureCache = new Map<
+    string,
+    {
+      status: string | null;
+      lifecycle: string;
+      completedPhases: Set<string>;
+      featureName: string;
+      prStatus?: string;
+      prMergeable?: boolean;
+      prCiStatus?: string;
+    }
+  >();
+
+  return {
+    execute: vi.fn(async (runIdFilter?: string | null) => {
+      const events: any[] = [];
+      const features = await mockListFeatures.execute();
+
+      for (const feature of features) {
+        const run = feature.agentRunId ? (mockRuns.get(feature.agentRunId) ?? null) : null;
+        if (!run) continue;
+        if (runIdFilter && run.id !== runIdFilter) continue;
+
+        const prev = featureCache.get(feature.id);
+        if (!prev) {
+          // Seed cache — no events emitted on first poll
+          const completedPhases = new Set<string>();
+          const timings = mockTimings.get(run.id) ?? [];
+          for (const t of timings) {
+            if ((t as any).completedAt) completedPhases.add((t as any).phase);
+          }
+          featureCache.set(feature.id, {
+            status: run.status,
+            lifecycle: feature.lifecycle,
+            completedPhases,
+            featureName: feature.name,
+            prStatus: feature.pr?.status,
+            prMergeable: feature.pr?.mergeable,
+            prCiStatus: feature.pr?.ciStatus,
+          });
+          continue;
+        }
+
+        // Status change detection
+        if (prev.status !== run.status) {
+          prev.status = run.status;
+          const statusMap: Record<string, { eventType: string; severity: string }> = {
+            running: {
+              eventType: NotificationEventType.AgentStarted,
+              severity: 'info',
+            },
+            completed: {
+              eventType: NotificationEventType.AgentCompleted,
+              severity: 'success',
+            },
+            failed: {
+              eventType: NotificationEventType.AgentFailed,
+              severity: 'error',
+            },
+          };
+          const mapping = statusMap[run.status];
+          if (mapping) {
+            events.push({
+              kind: 'notification',
+              event: {
+                eventType: mapping.eventType,
+                agentRunId: run.id,
+                featureId: feature.id,
+                featureName: feature.name,
+                message: `Agent status: ${run.status}`,
+                severity: mapping.severity,
+                timestamp: new Date(),
+              },
+            });
+          }
+        }
+
+        // Lifecycle change detection
+        if (prev.lifecycle !== feature.lifecycle) {
+          const prevLifecycle = prev.lifecycle;
+          prev.lifecycle = feature.lifecycle;
+
+          if (feature.lifecycle === 'Review' && prevLifecycle !== 'Review') {
+            const prUrl = feature.pr?.url;
+            const message = prUrl
+              ? `Ready for merge review — PR: ${prUrl}`
+              : 'Ready for merge review';
+            events.push({
+              kind: 'notification',
+              event: {
+                eventType: NotificationEventType.MergeReviewReady,
+                agentRunId: run.id,
+                featureId: feature.id,
+                featureName: feature.name,
+                phaseName: 'merge',
+                message,
+                severity: 'info',
+                timestamp: new Date(),
+              },
+            });
+          } else {
+            events.push({
+              kind: 'notification',
+              event: {
+                eventType: NotificationEventType.PhaseCompleted,
+                agentRunId: run.id,
+                featureId: feature.id,
+                featureName: feature.name,
+                phaseName: feature.lifecycle.toLowerCase(),
+                message: `Entered ${feature.lifecycle.toLowerCase()} phase`,
+                severity: 'info',
+                timestamp: new Date(),
+              },
+            });
+          }
+        }
+
+        // Phase completion detection
+        const timings = mockTimings.get(run.id) ?? [];
+        for (const t of timings) {
+          if ((t as any).completedAt && !prev.completedPhases.has((t as any).phase)) {
+            prev.completedPhases.add((t as any).phase);
+            events.push({
+              kind: 'notification',
+              event: {
+                eventType: NotificationEventType.PhaseCompleted,
+                agentRunId: run.id,
+                featureId: feature.id,
+                featureName: feature.name,
+                phaseName: (t as any).phase,
+                message: `Completed ${(t as any).phase} phase`,
+                severity: 'info',
+                timestamp: new Date(),
+              },
+            });
+          }
+        }
+      }
+
+      return events;
+    }),
+  };
+}
 
 vi.mock('@/lib/server-container', () => ({
   resolve: vi.fn((token: string) => {
@@ -36,6 +199,12 @@ vi.mock('@/lib/server-container', () => ({
         return mockAgentRunRepo;
       case 'IPhaseTimingRepository':
         return mockPhaseTimingRepo;
+      case 'IInteractiveSessionRepository':
+        return mockInteractiveSessionRepo;
+      case 'IProcessMonitorService':
+        return mockProcessMonitor;
+      case 'PollAgentEventsUseCase':
+        return createMockPollAgentEventsUseCase();
       default:
         throw new Error(`Unknown token: ${token}`);
     }

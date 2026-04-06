@@ -161,8 +161,8 @@ describe('Agent Infrastructure Integration', () => {
         status: 'pending' as any,
         prompt: 'Test prompt',
         threadId: 'test-thread-001',
-        createdAt: new Date().toISOString() as any,
-        updatedAt: new Date().toISOString() as any,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
       await repo.create(agentRun);
