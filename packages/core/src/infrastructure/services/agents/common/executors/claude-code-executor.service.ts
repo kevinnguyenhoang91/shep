@@ -18,8 +18,7 @@ import type {
   AgentExecutionStreamEvent,
 } from '../../../../../application/ports/output/agents/agent-executor.interface.js';
 import { MAX_STDERR_BUFFER_SIZE, type SpawnFunction } from '../types.js';
-import { getCurrentPhase, getLogPrefix } from '../../feature-agent/log-context.js';
-import { IS_WINDOWS } from '../../../../platform.js';
+import { AbstractAgentExecutor } from './abstract-agent-executor.js';
 
 /** Features supported by Claude Code CLI */
 const SUPPORTED_FEATURES = new Set<string>([
@@ -34,19 +33,11 @@ const SUPPORTED_FEATURES = new Set<string>([
  * Executor service for Claude Code agent.
  * Uses subprocess spawning to interact with the `claude` CLI.
  */
-export class ClaudeCodeExecutorService implements IAgentExecutor {
+export class ClaudeCodeExecutorService extends AbstractAgentExecutor implements IAgentExecutor {
   readonly agentType: AgentType = 'claude-code' as AgentType;
 
-  /** When true, suppresses debug logging (set per-call via options.silent) */
-  private silent = false;
-
-  constructor(private readonly spawn: SpawnFunction) {}
-
-  /** Debug logging — writes to stdout so it appears in the worker log file */
-  private log(message: string): void {
-    if (this.silent) return;
-    const ts = new Date().toISOString();
-    process.stdout.write(`[${ts}] ${getCurrentPhase()}${getLogPrefix()}${message}\n`);
+  constructor(spawn: SpawnFunction) {
+    super(spawn);
   }
 
   async execute(prompt: string, options?: AgentExecutionOptions): Promise<AgentExecutionResult> {
@@ -344,28 +335,7 @@ export class ClaudeCodeExecutorService implements IAgentExecutor {
   }
 
   private buildSpawnOptions(options?: AgentExecutionOptions): Record<string, unknown> {
-    const spawnOpts: Record<string, unknown> = {};
-    if (options?.cwd) spawnOpts.cwd = options.cwd;
-
-    // Explicitly pipe stdio so streams are available even when parent disconnects
-    spawnOpts.stdio = ['pipe', 'pipe', 'pipe'];
-
-    // On Windows: windowsHide=true to prevent blank console windows.
-    // Do NOT use shell=true — it causes DEP0190 argument escaping issues
-    // and mangles prompts with special characters. The claude CLI is a
-    // native .exe, so spawn() finds it on PATH without shell.
-    if (IS_WINDOWS) {
-      spawnOpts.windowsHide = true;
-    }
-
-    // Strip CLAUDECODE env var to prevent "nested session" error when shep
-    // is invoked from within a Claude Code session. The claude CLI checks for
-    // this variable and refuses to start if it's set.
-
-    const { CLAUDECODE: _, ...cleanEnv } = process.env;
-    spawnOpts.env = cleanEnv;
-
-    return spawnOpts;
+    return this.buildBaseSpawnOptions(options?.cwd);
   }
 
   private parseJsonResult(stdout: string): AgentExecutionResult {

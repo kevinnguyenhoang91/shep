@@ -27,7 +27,7 @@ import type {
   AgentExecutionStreamEvent,
 } from '../../../../../application/ports/output/agents/agent-executor.interface.js';
 import { MAX_STDERR_BUFFER_SIZE, type SpawnFunction } from '../types.js';
-import { getCurrentPhase, getLogPrefix } from '../../feature-agent/log-context.js';
+import { AbstractAgentExecutor } from './abstract-agent-executor.js';
 import { randomUUID } from 'node:crypto';
 import { unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -90,22 +90,14 @@ interface PreparedPrompt {
  * Executor service for GitHub Copilot CLI agent.
  * Uses subprocess spawning to interact with the `copilot` CLI.
  */
-export class CopilotCliExecutorService implements IAgentExecutor {
+export class CopilotCliExecutorService extends AbstractAgentExecutor implements IAgentExecutor {
   readonly agentType: AgentType = 'copilot-cli' as AgentType;
 
-  /** When true, suppresses debug logging (set per-call via options.silent) */
-  private silent = false;
-
   constructor(
-    private readonly spawn: SpawnFunction,
+    spawn: SpawnFunction,
     private readonly authConfig?: AgentConfig
-  ) {}
-
-  /** Debug logging — writes to stdout so it appears in the worker log file */
-  private log(message: string): void {
-    if (this.silent) return;
-    const ts = new Date().toISOString();
-    process.stdout.write(`[${ts}] ${getCurrentPhase()}${getLogPrefix()}${message}\n`);
+  ) {
+    super(spawn);
   }
 
   supportsFeature(feature: AgentFeature): boolean {
@@ -531,26 +523,7 @@ export class CopilotCliExecutorService implements IAgentExecutor {
   }
 
   private buildSpawnOptions(options?: AgentExecutionOptions): Record<string, unknown> {
-    const spawnOpts: Record<string, unknown> = {};
-    if (options?.cwd) spawnOpts.cwd = options.cwd;
-
-    // Explicitly pipe stdio so streams are available
-    spawnOpts.stdio = ['pipe', 'pipe', 'pipe'];
-
-    // On Windows: windowsHide=true to prevent blank console windows.
-    // Copilot CLI is a Node.js binary, so shell=true is NOT needed.
-    if (process.platform === 'win32') {
-      spawnOpts.windowsHide = true;
-    }
-
-    // Strip CLAUDECODE env var to prevent "nested session" error when shep
-    // is invoked from within a Claude Code session.
-    const { CLAUDECODE: _, ...cleanEnv } = process.env;
-
-    // Copilot CLI uses GitHub OAuth — no API key injection.
-    spawnOpts.env = cleanEnv;
-
-    return spawnOpts;
+    return this.buildBaseSpawnOptions(options?.cwd);
   }
 
   /**

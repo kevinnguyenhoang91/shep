@@ -21,8 +21,8 @@ import type {
   AgentExecutionStreamEvent,
 } from '../../../../../application/ports/output/agents/agent-executor.interface.js';
 import { MAX_STDERR_BUFFER_SIZE, type SpawnFunction } from '../types.js';
-import { getCurrentPhase, getLogPrefix } from '../../feature-agent/log-context.js';
 import { IS_WINDOWS } from '../../../../platform.js';
+import { AbstractAgentExecutor } from './abstract-agent-executor.js';
 
 /**
  * Map canonical model IDs (used across shep) to Cursor CLI model names.
@@ -47,19 +47,11 @@ const SUPPORTED_FEATURES = new Set<string>(['session-resume', 'streaming']);
  * Executor service for Cursor agent.
  * Uses subprocess spawning to interact with the `cursor-agent` CLI.
  */
-export class CursorExecutorService implements IAgentExecutor {
+export class CursorExecutorService extends AbstractAgentExecutor implements IAgentExecutor {
   readonly agentType: AgentType = 'cursor' as AgentType;
 
-  /** When true, suppresses debug logging (set per-call via options.silent) */
-  private silent = false;
-
-  constructor(private readonly spawn: SpawnFunction) {}
-
-  /** Debug logging — writes to stdout so it appears in the worker log file */
-  private log(message: string): void {
-    if (this.silent) return;
-    const ts = new Date().toISOString();
-    process.stdout.write(`[${ts}] ${getCurrentPhase()}${getLogPrefix()}${message}\n`);
+  constructor(spawn: SpawnFunction) {
+    super(spawn);
   }
 
   supportsFeature(feature: AgentFeature): boolean {

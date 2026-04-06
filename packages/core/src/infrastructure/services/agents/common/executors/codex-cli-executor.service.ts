@@ -24,7 +24,7 @@ import type {
   AgentExecutionStreamEvent,
 } from '../../../../../application/ports/output/agents/agent-executor.interface.js';
 import { MAX_STDERR_BUFFER_SIZE, type SpawnFunction } from '../types.js';
-import { getCurrentPhase, getLogPrefix } from '../../feature-agent/log-context.js';
+import { AbstractAgentExecutor } from './abstract-agent-executor.js';
 
 /** Features supported by Codex CLI */
 const SUPPORTED_FEATURES = new Set<string>([
@@ -50,22 +50,14 @@ const FATAL_STDERR_PATTERNS = [
  * Executor service for OpenAI Codex CLI agent.
  * Uses subprocess spawning to interact with the `codex` CLI.
  */
-export class CodexCliExecutorService implements IAgentExecutor {
+export class CodexCliExecutorService extends AbstractAgentExecutor implements IAgentExecutor {
   readonly agentType: AgentType = 'codex-cli' as AgentType;
 
-  /** When true, suppresses debug logging (set per-call via options.silent) */
-  private silent = false;
-
   constructor(
-    private readonly spawn: SpawnFunction,
+    spawn: SpawnFunction,
     private readonly authConfig?: AgentConfig
-  ) {}
-
-  /** Debug logging — writes to stdout so it appears in the worker log file */
-  private log(message: string): void {
-    if (this.silent) return;
-    const ts = new Date().toISOString();
-    process.stdout.write(`[${ts}] ${getCurrentPhase()}${getLogPrefix()}${message}\n`);
+  ) {
+    super(spawn);
   }
 
   supportsFeature(feature: AgentFeature): boolean {
@@ -654,26 +646,12 @@ export class CodexCliExecutorService implements IAgentExecutor {
   }
 
   private buildSpawnOptions(_options?: AgentExecutionOptions): Record<string, unknown> {
-    const spawnOpts: Record<string, unknown> = {};
-
-    // Explicitly pipe stdio so streams are available even when parent disconnects
-    spawnOpts.stdio = ['pipe', 'pipe', 'pipe'];
-
-    // On Windows: windowsHide=true to prevent blank console windows.
-    // Codex CLI is a native Rust binary, so shell=true is NOT needed.
-    if (process.platform === 'win32') {
-      spawnOpts.windowsHide = true;
-    }
-
-    // Strip CLAUDECODE env var to prevent "nested session" error when shep
-    // is invoked from within a Claude Code session.
-    const { CLAUDECODE: _, ...cleanEnv } = process.env;
+    const spawnOpts = this.buildBaseSpawnOptions();
 
     // Inject CODEX_API_KEY when using token auth
     if (this.authConfig?.authMethod === 'token' && this.authConfig.token) {
-      spawnOpts.env = { ...cleanEnv, CODEX_API_KEY: this.authConfig.token };
-    } else {
-      spawnOpts.env = cleanEnv;
+      const baseEnv = spawnOpts.env as Record<string, string | undefined>;
+      spawnOpts.env = { ...baseEnv, CODEX_API_KEY: this.authConfig.token };
     }
 
     return spawnOpts;
