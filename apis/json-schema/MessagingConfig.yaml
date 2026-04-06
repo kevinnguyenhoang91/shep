@@ -9,6 +9,12 @@ properties:
   gatewayUrl:
     type: string
     description: URL of the Commands.com Gateway instance
+  deviceId:
+    type: string
+    description: Device ID used when registering integration routes and opening the tunnel
+  gatewayClientId:
+    type: string
+    description: OAuth client ID for fetching gateway access tokens (demo mode uses public client)
   telegram:
     $ref: MessagingPlatformConfig.yaml
     description: Telegram platform configuration

@@ -13,12 +13,17 @@
 import { Command } from 'commander';
 import { select, input, confirm } from '@inquirer/prompts';
 import { container } from '@/infrastructure/di/container.js';
+import { BeginMessagingPairingUseCase } from '@/application/use-cases/messaging/begin-pairing.use-case.js';
+import { ConfirmMessagingPairingUseCase } from '@/application/use-cases/messaging/confirm-pairing.use-case.js';
+import { DisconnectMessagingUseCase } from '@/application/use-cases/messaging/disconnect-messaging.use-case.js';
 import { UpdateSettingsUseCase } from '@/application/use-cases/settings/update-settings.use-case.js';
 import {
   getSettings,
   resetSettings,
   initializeSettings,
 } from '@/infrastructure/services/settings.service.js';
+import { LoadSettingsUseCase } from '@/application/use-cases/settings/load-settings.use-case.js';
+import { MessagingPlatform } from '@/domain/generated/output.js';
 import { messages } from '../../ui/index.js';
 import { shepTheme } from '../../../tui/themes/shep.theme.js';
 
@@ -88,18 +93,9 @@ Examples:
     .description('Disconnect all messaging platforms')
     .action(async () => {
       try {
-        const settings = getSettings();
-        settings.messaging = {
-          enabled: false,
-          debounceMs: 5000,
-          chatBufferMs: 3000,
-        };
-
-        const useCase = container.resolve(UpdateSettingsUseCase);
-        const updated = await useCase.execute(settings);
-        resetSettings();
-        initializeSettings(updated);
-
+        const useCase = container.resolve(DisconnectMessagingUseCase);
+        await useCase.execute();
+        await refreshSettingsSingleton();
         messages.success('Messaging remote control disconnected.');
       } catch (error) {
         messages.error(
@@ -113,10 +109,17 @@ Examples:
   return cmd;
 }
 
+async function refreshSettingsSingleton(): Promise<void> {
+  const loadUseCase = container.resolve(LoadSettingsUseCase);
+  const fresh = await loadUseCase.execute();
+  resetSettings();
+  initializeSettings(fresh);
+}
+
 async function runMessagingWizard(): Promise<void> {
   const settings = getSettings();
 
-  const platform = await select<string>({
+  const platformChoice = await select<string>({
     message: 'Which platform would you like to connect?',
     choices: [
       { name: 'Telegram', value: 'telegram' },
@@ -126,21 +129,17 @@ async function runMessagingWizard(): Promise<void> {
     theme: shepTheme,
   });
 
-  if (platform === 'disconnect') {
-    settings.messaging = {
-      enabled: false,
-      debounceMs: 5000,
-      chatBufferMs: 3000,
-    };
-
-    const useCase = container.resolve(UpdateSettingsUseCase);
-    const updated = await useCase.execute(settings);
-    resetSettings();
-    initializeSettings(updated);
-
+  if (platformChoice === 'disconnect') {
+    const disconnectUseCase = container.resolve(DisconnectMessagingUseCase);
+    await disconnectUseCase.execute();
+    await refreshSettingsSingleton();
     messages.success('Messaging remote control disconnected.');
     return;
   }
+
+  const platform =
+    platformChoice === 'telegram' ? MessagingPlatform.Telegram : MessagingPlatform.WhatsApp;
+  const platformLabel = platformChoice === 'telegram' ? 'Telegram' : 'WhatsApp';
 
   // Get Gateway URL
   const gatewayUrl = await input({
@@ -158,40 +157,72 @@ async function runMessagingWizard(): Promise<void> {
     theme: shepTheme,
   });
 
-  const platformConfig = {
-    enabled: true,
-    paired: false,
-    chatId: undefined,
-  };
+  // Begin pairing — generates a one-time code and persists pending state.
+  const beginUseCase = container.resolve(BeginMessagingPairingUseCase);
+  const session = await beginUseCase.execute({ platform, gatewayUrl });
+  await refreshSettingsSingleton();
 
-  // Update settings
-  settings.messaging = {
-    ...settings.messaging,
-    enabled: true,
-    gatewayUrl,
-    debounceMs: settings.messaging?.debounceMs ?? 5000,
-    chatBufferMs: settings.messaging?.chatBufferMs ?? 3000,
-    [platform]: platformConfig,
-  };
+  messages.info(`${platformLabel} pairing initiated.`);
+  console.log('');
+  console.log(`  Pairing code: ${session.code}`);
+  console.log(`  Expires at:   ${new Date(session.expiresAt).toLocaleString()}`);
+  console.log('');
+  console.log(`  Webhook URL (${platformLabel}):`);
+  console.log(`    ${session.publicUrl}`);
+  console.log('');
+  console.log('  Next steps:');
+  console.log(`    1. Point your ${platformLabel} bot webhook at the URL above`);
+  console.log(
+    `       (Telegram: curl -X POST https://api.telegram.org/bot<TOKEN>/setWebhook -d url=...)`
+  );
+  console.log(`    2. Send: /pair ${session.code}`);
+  console.log(`    3. Return here and enter the chat ID the bot replies with`);
+  console.log('');
 
-  const useCase = container.resolve(UpdateSettingsUseCase);
-  const updated = await useCase.execute(settings);
-  resetSettings();
-  initializeSettings(updated);
-
-  messages.success(`${platform === 'telegram' ? 'Telegram' : 'WhatsApp'} messaging configured.`);
-  messages.info('Next steps:');
-  console.log('  1. Deploy the Commands.com Gateway (if not already running)');
-  console.log('  2. Create integration routes on the Gateway for this platform');
-  console.log(`  3. Restart the Shep daemon to activate messaging`);
-
-  const shouldTest = await confirm({
-    message: 'Would you like to test the connection?',
-    default: false,
+  const shouldConfirm = await confirm({
+    message: 'Confirm pairing now?',
+    default: true,
     theme: shepTheme,
   });
 
-  if (shouldTest) {
-    messages.info('Connection test will be available after daemon restart with messaging enabled.');
+  if (!shouldConfirm) {
+    messages.info('You can confirm pairing later by re-running `shep settings messaging`.');
+    return;
   }
+
+  const chatId = await input({
+    message: 'Chat ID the bot replied with:',
+    validate: (value: string) => (value.trim() ? true : 'Chat ID is required'),
+    theme: shepTheme,
+  });
+
+  const confirmUseCase = container.resolve(ConfirmMessagingPairingUseCase);
+  await confirmUseCase.execute({ platform, chatId });
+  await refreshSettingsSingleton();
+
+  // Collect the bot API token so the daemon can reply to the user.
+  const botToken = await input({
+    message: `${platformLabel} bot API token (leave blank to use $SHEP_TELEGRAM_BOT_TOKEN):`,
+    default: '',
+    theme: shepTheme,
+  });
+
+  if (botToken.trim()) {
+    const current = getSettings();
+    const key: 'telegram' | 'whatsapp' =
+      platform === MessagingPlatform.Telegram ? 'telegram' : 'whatsapp';
+    const existingPlatform = current.messaging?.[key];
+    if (existingPlatform && current.messaging) {
+      current.messaging = {
+        ...current.messaging,
+        [key]: { ...existingPlatform, botToken: botToken.trim() },
+      };
+      const updateUseCase = container.resolve(UpdateSettingsUseCase);
+      await updateUseCase.execute(current);
+      await refreshSettingsSingleton();
+    }
+  }
+
+  messages.success(`${platformLabel} messaging paired.`);
+  messages.info('Restart the Shep daemon (`shep _serve`) to activate messaging.');
 }

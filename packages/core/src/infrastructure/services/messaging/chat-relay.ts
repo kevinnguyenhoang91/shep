@@ -12,7 +12,7 @@
  */
 
 import type { MessagingNotification } from '../../../domain/generated/output.js';
-import type { MessagingTunnelAdapter } from './messaging-tunnel.adapter.js';
+import type { IMessageSender } from '../../../application/ports/output/services/message-sender.interface.js';
 import { sanitizeForMessaging } from './content-sanitizer.js';
 
 const DEFAULT_BUFFER_INTERVAL_MS = 3_000;
@@ -21,6 +21,8 @@ interface ActiveRelay {
   featureId: string;
   chatId: string;
   platform: string;
+  worktreePath: string;
+  unsubscribe?: () => void;
 }
 
 /**
@@ -33,19 +35,31 @@ export class MessagingChatRelay {
   private bufferTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
-    private readonly tunnelAdapter: MessagingTunnelAdapter,
+    private readonly sender: IMessageSender,
     private readonly bufferIntervalMs: number = DEFAULT_BUFFER_INTERVAL_MS
   ) {}
 
   /** Start a chat relay for a specific feature */
-  startRelay(featureId: string, chatId: string, platform: string): string {
-    // Stop existing relay if any
+  startRelay(
+    featureId: string,
+    chatId: string,
+    platform: string,
+    worktreePath = '',
+    unsubscribe?: () => void
+  ): string {
+    // Tear down any previous relay (including its subscription).
     if (this.activeRelay) {
       this.flushBuffer();
+      this.activeRelay.unsubscribe?.();
     }
 
-    this.activeRelay = { featureId, chatId, platform };
+    this.activeRelay = { featureId, chatId, platform, worktreePath, unsubscribe };
     return `Chat relay started for feature #${featureId}. Send messages here to talk to the agent. /end to stop.`;
+  }
+
+  /** Get the worktree path of the active relay, if any. */
+  getActiveWorktreePath(): string | null {
+    return this.activeRelay?.worktreePath ?? null;
   }
 
   /** End the active chat relay */
@@ -56,6 +70,7 @@ export class MessagingChatRelay {
 
     this.flushBuffer();
     const fid = this.activeRelay.featureId;
+    this.activeRelay.unsubscribe?.();
     this.activeRelay = null;
     return `Chat relay ended for feature #${fid}.`;
   }
@@ -96,7 +111,7 @@ export class MessagingChatRelay {
         title: '',
         message: sanitizeForMessaging(this.buffer),
       };
-      this.tunnelAdapter.sendNotification(notification);
+      void this.sender.send(notification);
       this.buffer = '';
     }
 
@@ -109,6 +124,7 @@ export class MessagingChatRelay {
   /** Stop the relay and clean up all resources */
   stop(): void {
     this.flushBuffer();
+    this.activeRelay?.unsubscribe?.();
     this.activeRelay = null;
   }
 }

@@ -10,5 +10,8 @@ enum:
   - status
   - mute
   - unmute
+  - list
+  - chat
+  - end
   - help
 description: Slash commands supported via messaging remote control

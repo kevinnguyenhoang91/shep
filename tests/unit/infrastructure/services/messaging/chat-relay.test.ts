@@ -7,21 +7,21 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MessagingChatRelay } from '@/infrastructure/services/messaging/chat-relay.js';
-import type { MessagingTunnelAdapter } from '@/infrastructure/services/messaging/messaging-tunnel.adapter.js';
+import type { IMessageSender } from '@/application/ports/output/services/message-sender.interface.js';
 
 describe('MessagingChatRelay', () => {
   let relay: MessagingChatRelay;
-  let mockTunnelAdapter: { sendNotification: ReturnType<typeof vi.fn> };
+  let mockSender: { send: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     vi.useFakeTimers();
 
-    mockTunnelAdapter = {
-      sendNotification: vi.fn(),
+    mockSender = {
+      send: vi.fn().mockResolvedValue(undefined),
     };
 
     relay = new MessagingChatRelay(
-      mockTunnelAdapter as unknown as MessagingTunnelAdapter,
+      mockSender as unknown as IMessageSender,
       100 // short buffer interval for testing
     );
   });
@@ -63,12 +63,12 @@ describe('MessagingChatRelay', () => {
       relay.bufferAgentOutput('Hello ');
       relay.bufferAgentOutput('world!');
 
-      expect(mockTunnelAdapter.sendNotification).not.toHaveBeenCalled();
+      expect(mockSender.send).not.toHaveBeenCalled();
 
       vi.advanceTimersByTime(100);
 
-      expect(mockTunnelAdapter.sendNotification).toHaveBeenCalledTimes(1);
-      expect(mockTunnelAdapter.sendNotification).toHaveBeenCalledWith(
+      expect(mockSender.send).toHaveBeenCalledTimes(1);
+      expect(mockSender.send).toHaveBeenCalledWith(
         expect.objectContaining({
           event: 'chat.response',
           featureId: 'feat-123',
@@ -80,7 +80,7 @@ describe('MessagingChatRelay', () => {
     it('should not send when no active relay', () => {
       relay.bufferAgentOutput('test');
       vi.advanceTimersByTime(100);
-      expect(mockTunnelAdapter.sendNotification).not.toHaveBeenCalled();
+      expect(mockSender.send).not.toHaveBeenCalled();
     });
   });
 
@@ -91,13 +91,13 @@ describe('MessagingChatRelay', () => {
       relay.bufferAgentOutput('immediate');
       relay.flushBuffer();
 
-      expect(mockTunnelAdapter.sendNotification).toHaveBeenCalledTimes(1);
+      expect(mockSender.send).toHaveBeenCalledTimes(1);
     });
 
     it('should not send when buffer is empty', () => {
       relay.startRelay('feat-123', 'chat-456', 'telegram');
       relay.flushBuffer();
-      expect(mockTunnelAdapter.sendNotification).not.toHaveBeenCalled();
+      expect(mockSender.send).not.toHaveBeenCalled();
     });
   });
 
@@ -107,8 +107,43 @@ describe('MessagingChatRelay', () => {
       relay.bufferAgentOutput('final output');
       relay.stop();
 
-      expect(mockTunnelAdapter.sendNotification).toHaveBeenCalledTimes(1);
+      expect(mockSender.send).toHaveBeenCalledTimes(1);
       expect(relay.hasActiveRelay()).toBe(false);
+    });
+
+    it('invokes the unsubscribe callback passed to startRelay', () => {
+      const unsubscribe = vi.fn();
+      relay.startRelay('feat-1', 'chat-1', 'telegram', '/wt/feat-1', unsubscribe);
+      relay.stop();
+      expect(unsubscribe).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('worktree path and subscription', () => {
+    it('exposes the active worktree path', () => {
+      relay.startRelay('feat-42', 'chat-1', 'telegram', '/wt/feat-42');
+      expect(relay.getActiveWorktreePath()).toBe('/wt/feat-42');
+    });
+
+    it('returns null worktree path when no active relay', () => {
+      expect(relay.getActiveWorktreePath()).toBeNull();
+    });
+
+    it('calls the unsubscribe on endRelay', () => {
+      const unsubscribe = vi.fn();
+      relay.startRelay('feat-1', 'chat-1', 'telegram', '/wt', unsubscribe);
+      relay.endRelay();
+      expect(unsubscribe).toHaveBeenCalledOnce();
+    });
+
+    it('tears down the previous subscription when startRelay is called again', () => {
+      const firstUnsub = vi.fn();
+      const secondUnsub = vi.fn();
+      relay.startRelay('feat-1', 'chat-1', 'telegram', '/wt/1', firstUnsub);
+      relay.startRelay('feat-2', 'chat-1', 'telegram', '/wt/2', secondUnsub);
+      expect(firstUnsub).toHaveBeenCalledOnce();
+      expect(secondUnsub).not.toHaveBeenCalled();
+      expect(relay.getActiveFeatureId()).toBe('feat-2');
     });
   });
 });

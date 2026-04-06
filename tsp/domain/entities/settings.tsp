@@ -694,6 +694,24 @@ model MessagingPlatformConfig {
 
   @doc("Whether the chat has been verified via pairing code")
   paired: boolean = false;
+
+  @doc("One-time code shown to the user during pairing, cleared once confirmed")
+  pendingPairingCode?: string;
+
+  @doc("Expiry timestamp for the pending pairing code (ISO-8601)")
+  pendingPairingExpiresAt?: utcDateTime;
+
+  @doc("Gateway integration route ID allocated during pairing")
+  routeId?: string;
+
+  @doc("Gateway integration route token (path-auth) allocated during pairing")
+  routeToken?: string;
+
+  @doc("Public webhook URL that the messaging platform should POST updates to")
+  publicUrl?: string;
+
+  @doc("Bot API token used by the daemon to send outbound messages (Telegram: 123456:ABC...)")
+  botToken?: string;
 }
 
 @doc("Messaging remote control configuration")
@@ -703,6 +721,12 @@ model MessagingConfig {
 
   @doc("URL of the Commands.com Gateway instance")
   gatewayUrl?: string;
+
+  @doc("Device ID used when registering integration routes and opening the tunnel")
+  deviceId?: string;
+
+  @doc("OAuth client ID for fetching gateway access tokens (demo mode uses public client)")
+  gatewayClientId?: string;
 
   @doc("Telegram platform configuration")
   telegram?: MessagingPlatformConfig;

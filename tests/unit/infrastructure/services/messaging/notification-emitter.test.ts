@@ -11,7 +11,7 @@ import { EventEmitter } from 'node:events';
 import { MessagingNotificationEmitter } from '@/infrastructure/services/messaging/notification-emitter.js';
 import type { NotificationEvent } from '@/domain/generated/output.js';
 import { NotificationEventType, NotificationSeverity } from '@/domain/generated/output.js';
-import type { MessagingTunnelAdapter } from '@/infrastructure/services/messaging/messaging-tunnel.adapter.js';
+import type { IMessageSender } from '@/application/ports/output/services/message-sender.interface.js';
 import type {
   NotificationBus,
   NotificationEventMap,
@@ -32,20 +32,20 @@ function createTestEvent(overrides: Partial<NotificationEvent> = {}): Notificati
 
 describe('MessagingNotificationEmitter', () => {
   let emitter: MessagingNotificationEmitter;
-  let mockTunnelAdapter: { sendNotification: ReturnType<typeof vi.fn> };
+  let mockSender: { send: ReturnType<typeof vi.fn> };
   let bus: NotificationBus;
 
   beforeEach(() => {
     vi.useFakeTimers();
 
-    mockTunnelAdapter = {
-      sendNotification: vi.fn(),
+    mockSender = {
+      send: vi.fn().mockResolvedValue(undefined),
     };
 
     bus = new EventEmitter<NotificationEventMap>();
 
     emitter = new MessagingNotificationEmitter(
-      mockTunnelAdapter as unknown as MessagingTunnelAdapter,
+      mockSender as unknown as IMessageSender,
       bus,
       100 // short debounce for testing
     );
@@ -59,17 +59,17 @@ describe('MessagingNotificationEmitter', () => {
   it('should not forward events before start()', () => {
     bus.emit('notification', createTestEvent());
     vi.advanceTimersByTime(200);
-    expect(mockTunnelAdapter.sendNotification).not.toHaveBeenCalled();
+    expect(mockSender.send).not.toHaveBeenCalled();
   });
 
   it('should forward events after start() with debouncing', () => {
     emitter.start();
 
     bus.emit('notification', createTestEvent());
-    expect(mockTunnelAdapter.sendNotification).not.toHaveBeenCalled();
+    expect(mockSender.send).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(100);
-    expect(mockTunnelAdapter.sendNotification).toHaveBeenCalledTimes(1);
+    expect(mockSender.send).toHaveBeenCalledTimes(1);
   });
 
   it('should debounce multiple events for the same feature+type', () => {
@@ -82,10 +82,8 @@ describe('MessagingNotificationEmitter', () => {
     bus.emit('notification', createTestEvent({ message: 'third' }));
 
     vi.advanceTimersByTime(100);
-    expect(mockTunnelAdapter.sendNotification).toHaveBeenCalledTimes(1);
-    expect(mockTunnelAdapter.sendNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'third' })
-    );
+    expect(mockSender.send).toHaveBeenCalledTimes(1);
+    expect(mockSender.send).toHaveBeenCalledWith(expect.objectContaining({ message: 'third' }));
   });
 
   it('should NOT debounce waiting_approval events', () => {
@@ -94,7 +92,7 @@ describe('MessagingNotificationEmitter', () => {
     bus.emit('notification', createTestEvent({ eventType: NotificationEventType.WaitingApproval }));
 
     // Should be sent immediately, no debounce
-    expect(mockTunnelAdapter.sendNotification).toHaveBeenCalledTimes(1);
+    expect(mockSender.send).toHaveBeenCalledTimes(1);
   });
 
   it('should not debounce events for different features', () => {
@@ -104,7 +102,7 @@ describe('MessagingNotificationEmitter', () => {
     bus.emit('notification', createTestEvent({ featureId: 'feat-2' }));
 
     vi.advanceTimersByTime(100);
-    expect(mockTunnelAdapter.sendNotification).toHaveBeenCalledTimes(2);
+    expect(mockSender.send).toHaveBeenCalledTimes(2);
   });
 
   it('should stop forwarding after stop()', () => {
@@ -113,7 +111,7 @@ describe('MessagingNotificationEmitter', () => {
 
     bus.emit('notification', createTestEvent());
     vi.advanceTimersByTime(200);
-    expect(mockTunnelAdapter.sendNotification).not.toHaveBeenCalled();
+    expect(mockSender.send).not.toHaveBeenCalled();
   });
 
   it('should sanitize messages before forwarding', () => {
@@ -125,7 +123,7 @@ describe('MessagingNotificationEmitter', () => {
     );
 
     vi.advanceTimersByTime(100);
-    expect(mockTunnelAdapter.sendNotification).toHaveBeenCalledWith(
+    expect(mockSender.send).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'Error at [path]' })
     );
   });

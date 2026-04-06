@@ -18,6 +18,7 @@ import {
   Timer,
   MessageSquare,
   LayoutGrid,
+  MessageCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -41,6 +42,7 @@ import {
 import { getEditorTypeIcon } from '@/components/common/editor-type-icons';
 import { AgentModelPicker } from '@/components/features/settings/AgentModelPicker';
 import { LanguageSettingsSection } from '@/components/features/settings/language-settings-section';
+import { MessagingSettingsSection } from '@/components/features/settings/messaging-settings-section';
 import { TimeoutSlider } from '@/components/features/settings/timeout-slider';
 import type {
   Settings,
@@ -73,6 +75,7 @@ const SECTIONS = [
   { id: 'ci', labelKey: 'settings.sections.ci', icon: Activity },
   { id: 'stage-timeouts', labelKey: 'settings.sections.timeouts', icon: Timer },
   { id: 'notifications', labelKey: 'settings.sections.notifications', icon: Bell },
+  { id: 'messaging', labelKey: 'settings.sections.messaging', icon: MessageCircle },
   { id: 'feature-flags', labelKey: 'settings.sections.flags', icon: Flag },
   { id: 'interactive-agent', labelKey: 'settings.sections.chat', icon: MessageSquare },
   { id: 'fab-layout', labelKey: 'settings.sections.layout', icon: LayoutGrid },
@@ -1516,6 +1519,25 @@ export function SettingsPageClient({
             ]}
           >
             {t('settings.notifications.hint')}
+          </SectionHint>
+        </div>
+
+        {/* ── Messaging Remote Control ── */}
+        <div
+          id="section-messaging"
+          className="grid scroll-mt-18 grid-cols-1 gap-x-5 rounded-lg lg:grid-cols-[1fr_280px]"
+        >
+          <MessagingSettingsSection messaging={settings.messaging} />
+          <SectionHint
+            links={[
+              {
+                label: 'Commands.com Gateway',
+                href: 'https://github.com/Commands-com/gateway',
+              },
+            ]}
+          >
+            Drive Shep remotely from Telegram or WhatsApp. Pair a chat to send commands and receive
+            notifications through the Commands.com Gateway.
           </SectionHint>
         </div>
 

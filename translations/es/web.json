@@ -15,7 +15,8 @@
       "flags": "Opciones",
       "chat": "Chat",
       "layout": "Diseño",
-      "database": "Base de datos"
+      "database": "Base de datos",
+      "messaging": "Messaging"
     },
     "language": {
       "title": "Idioma",

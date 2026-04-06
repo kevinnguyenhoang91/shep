@@ -14,7 +14,7 @@
 import type { NotificationEvent, MessagingNotification } from '../../../domain/generated/output.js';
 import type { NotificationBus } from '../notifications/notification-bus.js';
 import { sanitizeForMessaging } from './content-sanitizer.js';
-import type { MessagingTunnelAdapter } from './messaging-tunnel.adapter.js';
+import type { IMessageSender } from '../../../application/ports/output/services/message-sender.interface.js';
 
 const DEFAULT_DEBOUNCE_MS = 5_000;
 
@@ -28,7 +28,7 @@ export class MessagingNotificationEmitter {
   private handler: ((event: NotificationEvent) => void) | null = null;
 
   constructor(
-    private readonly tunnelAdapter: MessagingTunnelAdapter,
+    private readonly sender: IMessageSender,
     private readonly notificationBus: NotificationBus,
     private readonly debounceMs: number = DEFAULT_DEBOUNCE_MS
   ) {}
@@ -47,7 +47,7 @@ export class MessagingNotificationEmitter {
 
       // Gate/approval events are always delivered immediately
       if (event.eventType === 'waiting_approval') {
-        this.tunnelAdapter.sendNotification(notification);
+        void this.sender.send(notification);
         return;
       }
 
@@ -85,7 +85,7 @@ export class MessagingNotificationEmitter {
     if (existing) clearTimeout(existing);
 
     const timer = setTimeout(() => {
-      this.tunnelAdapter.sendNotification(notification);
+      void this.sender.send(notification);
       this.debounceTimers.delete(key);
     }, this.debounceMs);
 

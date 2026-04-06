@@ -88,6 +88,11 @@ import { LoadSettingsUseCase } from '../../application/use-cases/settings/load-s
 import { UpdateSettingsUseCase } from '../../application/use-cases/settings/update-settings.use-case.js';
 import { CompleteOnboardingUseCase } from '../../application/use-cases/settings/complete-onboarding.use-case.js';
 import { CompleteWebOnboardingUseCase } from '../../application/use-cases/settings/complete-web-onboarding.use-case.js';
+import { BeginMessagingPairingUseCase } from '../../application/use-cases/messaging/begin-pairing.use-case.js';
+import { ConfirmMessagingPairingUseCase } from '../../application/use-cases/messaging/confirm-pairing.use-case.js';
+import { DisconnectMessagingUseCase } from '../../application/use-cases/messaging/disconnect-messaging.use-case.js';
+import type { IGatewayClient } from '../../application/ports/output/services/gateway-client.interface.js';
+import { HttpGatewayClient } from '../services/messaging/http-gateway.client.js';
 import { ConfigureAgentUseCase } from '../../application/use-cases/agents/configure-agent.use-case.js';
 import { ValidateAgentAuthUseCase } from '../../application/use-cases/agents/validate-agent-auth.use-case.js';
 import { RunAgentUseCase } from '../../application/use-cases/agents/run-agent.use-case.js';
@@ -372,6 +377,12 @@ export async function initializeContainer(): Promise<typeof container> {
   container.registerSingleton(UpdateSettingsUseCase);
   container.registerSingleton(CompleteOnboardingUseCase);
   container.registerSingleton(CompleteWebOnboardingUseCase);
+  container.register<IGatewayClient>('IGatewayClient', {
+    useFactory: () => new HttpGatewayClient(),
+  });
+  container.registerSingleton(BeginMessagingPairingUseCase);
+  container.registerSingleton(ConfirmMessagingPairingUseCase);
+  container.registerSingleton(DisconnectMessagingUseCase);
   container.registerSingleton(ConfigureAgentUseCase);
   container.registerSingleton(ValidateAgentAuthUseCase);
   container.registerSingleton(RunAgentUseCase);
@@ -541,6 +552,15 @@ export async function initializeContainer(): Promise<typeof container> {
   container.register('CompleteWebOnboardingUseCase', {
     useFactory: (c) => c.resolve(CompleteWebOnboardingUseCase),
   });
+  container.register('BeginMessagingPairingUseCase', {
+    useFactory: (c) => c.resolve(BeginMessagingPairingUseCase),
+  });
+  container.register('ConfirmMessagingPairingUseCase', {
+    useFactory: (c) => c.resolve(ConfirmMessagingPairingUseCase),
+  });
+  container.register('DisconnectMessagingUseCase', {
+    useFactory: (c) => c.resolve(DisconnectMessagingUseCase),
+  });
   container.register('CleanupFeatureWorktreeUseCase', {
     useFactory: (c) => c.resolve(CleanupFeatureWorktreeUseCase),
   });
@@ -635,6 +655,9 @@ export async function initializeContainer(): Promise<typeof container> {
       const getInstance = async (): Promise<IMessagingService> => {
         if (!instance) {
           const { MessagingService } = await import('../services/messaging/messaging.service.js');
+          const { HttpTelegramClient } = await import(
+            '../services/messaging/http-telegram.client.js'
+          );
           const settingsModule = await import('../services/settings.service.js');
           const settings = settingsModule.getSettings();
           const messagingConfig = settings.messaging ?? {
@@ -643,9 +666,34 @@ export async function initializeContainer(): Promise<typeof container> {
             chatBufferMs: 3000,
           };
 
+          // Fetch an OAuth access token from the Gateway so the tunnel
+          // upgrade carries a valid Bearer header. If the fetch fails the
+          // service still constructs (isConfigured will return false) so
+          // startup doesn't crash the daemon.
+          let accessToken = '';
+          if (messagingConfig.enabled && messagingConfig.gatewayUrl) {
+            try {
+              const gatewayClient = c.resolve<IGatewayClient>('IGatewayClient');
+              const token = await gatewayClient.fetchAccessToken({
+                gatewayUrl: messagingConfig.gatewayUrl,
+                clientId: messagingConfig.gatewayClientId ?? 'commands-desktop-public',
+              });
+              accessToken = token.accessToken;
+            } catch {
+              // Non-fatal — isConfigured() will gate start().
+            }
+          }
+
+          // Bot token precedence: settings.db > env var. Per-platform token
+          // from settings takes priority; env var is a dev convenience.
+          const telegramBotToken =
+            messagingConfig.telegram?.botToken ?? process.env.SHEP_TELEGRAM_BOT_TOKEN;
+
           instance = new MessagingService({
             config: messagingConfig,
-            authToken: '', // Resolved from Gateway OAuth at connection time
+            accessToken,
+            telegramClient: new HttpTelegramClient(),
+            telegramBotToken,
             notificationBus: c.resolve('NotificationEventBus') as ReturnType<
               typeof getNotificationBus
             >,
@@ -658,6 +706,10 @@ export async function initializeContainer(): Promise<typeof container> {
             listFeatures: c.resolve(ListFeaturesUseCase),
             showFeature: c.resolve(ShowFeatureUseCase),
             listRepositories: c.resolve(ListRepositoriesUseCase),
+            confirmPairing: c.resolve(ConfirmMessagingPairingUseCase),
+            interactiveSessionService: c.resolve<IInteractiveSessionService>(
+              'IInteractiveSessionService'
+            ),
           });
         }
         return instance;
@@ -670,8 +722,18 @@ export async function initializeContainer(): Promise<typeof container> {
               try {
                 const settings = getSettings();
                 const mc = settings.messaging;
-                if (!mc?.enabled || !mc?.gatewayUrl) return false;
-                return !!(mc.telegram?.paired ?? mc.whatsapp?.paired);
+                if (!mc?.enabled || !mc?.gatewayUrl || !mc?.deviceId) return false;
+                const telegramReady = !!(
+                  mc.telegram?.paired &&
+                  mc.telegram.routeId &&
+                  mc.telegram.chatId
+                );
+                const whatsappReady = !!(
+                  mc.whatsapp?.paired &&
+                  mc.whatsapp.routeId &&
+                  mc.whatsapp.chatId
+                );
+                return telegramReady || whatsappReady;
               } catch {
                 return false;
               }

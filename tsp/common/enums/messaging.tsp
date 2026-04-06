@@ -53,6 +53,15 @@ enum MessagingCommandType {
   @doc("Unmute notifications for a feature")
   Unmute: "unmute",
 
+  @doc("List all features")
+  List: "list",
+
+  @doc("Start an interactive chat relay against a feature")
+  Chat: "chat",
+
+  @doc("End the active interactive chat relay")
+  End: "end",
+
   @doc("Show help text")
   Help: "help",
 }

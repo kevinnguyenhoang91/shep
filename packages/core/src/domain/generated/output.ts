@@ -704,6 +704,30 @@ export type MessagingPlatformConfig = {
    * Whether the chat has been verified via pairing code
    */
   paired: boolean;
+  /**
+   * One-time code shown to the user during pairing, cleared once confirmed
+   */
+  pendingPairingCode?: string;
+  /**
+   * Expiry timestamp for the pending pairing code (ISO-8601)
+   */
+  pendingPairingExpiresAt?: any;
+  /**
+   * Gateway integration route ID allocated during pairing
+   */
+  routeId?: string;
+  /**
+   * Gateway integration route token (path-auth) allocated during pairing
+   */
+  routeToken?: string;
+  /**
+   * Public webhook URL that the messaging platform should POST updates to
+   */
+  publicUrl?: string;
+  /**
+   * Bot API token used by the daemon to send outbound messages (Telegram: 123456:ABC...)
+   */
+  botToken?: string;
 };
 
 /**
@@ -718,6 +742,14 @@ export type MessagingConfig = {
    * URL of the Commands.com Gateway instance
    */
   gatewayUrl?: string;
+  /**
+   * Device ID used when registering integration routes and opening the tunnel
+   */
+  deviceId?: string;
+  /**
+   * OAuth client ID for fetching gateway access tokens (demo mode uses public client)
+   */
+  gatewayClientId?: string;
   /**
    * Telegram platform configuration
    */
@@ -1807,6 +1839,9 @@ export enum MessagingCommandType {
   Status = 'status',
   Mute = 'mute',
   Unmute = 'unmute',
+  List = 'list',
+  Chat = 'chat',
+  End = 'end',
   Help = 'help',
 }
 export enum MessagingPlatform {
