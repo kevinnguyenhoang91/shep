@@ -110,6 +110,11 @@ function createMockGitHubService(): IGitHubRepositoryService {
       .fn()
       .mockReturnValue({ owner: 'test', repo: 'repo', nameWithOwner: 'test/repo' }),
     getViewerPermission: vi.fn().mockResolvedValue('ADMIN'),
+    getAuthenticatedUser: vi.fn().mockResolvedValue('test'),
+    checkPushAccess: vi.fn().mockResolvedValue({ hasPushAccess: true, viewerLogin: 'test' }),
+    forkRepository: vi
+      .fn()
+      .mockResolvedValue({ nameWithOwner: 'test/repo', alreadyExisted: false }),
     auditRepositoryGovernance: vi.fn().mockResolvedValue([]),
   };
 }
