@@ -1,3 +1,10 @@
+## [1.175.1](https://github.com/shep-ai/shep/compare/v1.175.0...v1.175.1) (2026-04-06)
+
+
+### Bug Fixes
+
+* **agents:** use allowedtools for v2 sdk tool permissions ([#534](https://github.com/shep-ai/shep/issues/534)) ([7c9c50e](https://github.com/shep-ai/shep/commit/7c9c50e5c1ac9759796eb403f5ed5cbbb47465fc))
+
 # [1.175.0](https://github.com/shep-ai/shep/compare/v1.174.0...v1.175.0) (2026-04-06)
 
 
