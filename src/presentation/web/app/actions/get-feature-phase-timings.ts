@@ -46,7 +46,7 @@ export async function getFeaturePhaseTimings(featureId: string): Promise<GetPhas
     const phaseTimings = await repo.findByFeatureId(featureId);
 
     const toIso = (d: Date | null | undefined): string | undefined =>
-      d instanceof Date ? d.toISOString() : d ?? undefined;
+      d instanceof Date ? d.toISOString() : (d ?? undefined);
 
     const timings: PhaseTimingData[] = phaseTimings.map((t) => ({
       agentRunId: t.agentRunId,

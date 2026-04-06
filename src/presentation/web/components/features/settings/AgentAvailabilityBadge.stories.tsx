@@ -31,19 +31,19 @@ export const AllStatuses: Story = {
   render: () => (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
-        <span className="text-sm w-24">Available:</span>
+        <span className="w-24 text-sm">Available:</span>
         <AgentAvailabilityBadge status="available" />
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-sm w-24">Needs auth:</span>
+        <span className="w-24 text-sm">Needs auth:</span>
         <AgentAvailabilityBadge status="needs-auth" />
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-sm w-24">Not installed:</span>
+        <span className="w-24 text-sm">Not installed:</span>
         <AgentAvailabilityBadge status="not-installed" />
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-sm w-24">Checking:</span>
+        <span className="w-24 text-sm">Checking:</span>
         <AgentAvailabilityBadge status="checking" />
       </div>
     </div>

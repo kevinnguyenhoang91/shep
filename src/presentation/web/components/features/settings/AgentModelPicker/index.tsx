@@ -219,9 +219,7 @@ export function AgentModelPicker({
                     <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
                       <span>{group.label}</span>
                       {availability[group.agentType] ? (
-                        <AgentAvailabilityBadge
-                          status={availability[group.agentType].status}
-                        />
+                        <AgentAvailabilityBadge status={availability[group.agentType].status} />
                       ) : null}
                     </span>
                     {isActive && !hasModels ? (

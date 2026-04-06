@@ -9,10 +9,7 @@ export interface AgentAvailabilityBadgeProps {
   className?: string;
 }
 
-const STATUS_CONFIG: Record<
-  AgentAvailabilityStatus,
-  { dotClass: string; label: string }
-> = {
+const STATUS_CONFIG: Record<AgentAvailabilityStatus, { dotClass: string; label: string }> = {
   available: {
     dotClass: 'bg-emerald-500',
     label: 'Ready',
@@ -35,10 +32,7 @@ export function AgentAvailabilityBadge({ status, className }: AgentAvailabilityB
   const config = STATUS_CONFIG[status];
 
   return (
-    <span
-      className={cn('inline-flex items-center gap-1.5', className)}
-      title={config.label}
-    >
+    <span className={cn('inline-flex items-center gap-1.5', className)} title={config.label}>
       {status === 'checking' ? (
         <Loader2 className="text-muted-foreground h-2.5 w-2.5 animate-spin" />
       ) : (

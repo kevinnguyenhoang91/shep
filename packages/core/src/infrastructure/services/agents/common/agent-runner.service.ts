@@ -100,8 +100,7 @@ export class AgentRunnerService implements IAgentRunner {
       yield {
         type: event.type,
         content: event.content,
-        timestamp:
-          event.timestamp instanceof Date ? event.timestamp : new Date(event.timestamp),
+        timestamp: event.timestamp instanceof Date ? event.timestamp : new Date(event.timestamp),
       } as AgentRunEvent;
     }
 
