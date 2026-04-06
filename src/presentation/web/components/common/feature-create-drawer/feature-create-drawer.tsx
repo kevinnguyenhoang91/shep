@@ -771,6 +771,8 @@ export function FeatureCreateDrawer({
                   onPaste={handlePaste}
                   required
                   disabled={isSubmitting}
+                  aria-invalid={!!uploadError}
+                  aria-describedby={uploadError ? 'feature-description-error' : undefined}
                   className="min-h-0 flex-1 resize-none rounded-none border-0 shadow-none focus-visible:ring-0"
                 />
                 {/* Inline attachment chips — between textarea and controls */}
@@ -793,7 +795,13 @@ export function FeatureCreateDrawer({
                   </div>
                 )}
                 {uploadError ? (
-                  <p className="text-destructive px-3 pb-2 text-xs">{uploadError}</p>
+                  <p
+                    id="feature-description-error"
+                    className="text-destructive px-3 pb-2 text-xs"
+                    role="alert"
+                  >
+                    {uploadError}
+                  </p>
                 ) : null}
                 <div className="border-input flex items-center gap-3 border-t px-3 py-1.5">
                   <AgentModelPicker

@@ -68,6 +68,18 @@ export function BaseDrawer({
   const contentRef = useRef<HTMLDivElement>(null);
   const drawerDirection = i18n.dir() === 'rtl' ? 'left' : 'right';
 
+  // Close on Escape key — centralized so individual drawers don't duplicate this.
+  useEffect(() => {
+    if (!open) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [open, onClose]);
+
   // Close when clicking outside the drawer panel (no overlay needed — canvas stays draggable).
   // Uses `click` (not `pointerdown`) so canvas drags don't trigger this.
   useEffect(() => {
