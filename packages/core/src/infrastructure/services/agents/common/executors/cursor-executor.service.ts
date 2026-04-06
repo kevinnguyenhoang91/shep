@@ -321,6 +321,11 @@ export class CursorExecutorService implements IAgentExecutor {
   }
 
   private buildArgs(prompt: string, options?: AgentExecutionOptions): string[] {
+    // --yolo: Cursor CLI's official flag for unattended/autonomous execution mode.
+    // It skips all tool-use confirmation prompts so the agent can run headlessly.
+    // This is the documented flag across Cursor CLI versions (cursor-agent --help).
+    // Equivalent to Claude Code's --dangerously-skip-permissions, Codex's
+    // --sandbox danger-full-access, or Copilot's --allow-all.
     const args = ['--yolo', '-p', prompt, '--output-format', 'json'];
     if (options?.resumeSession) args.push('--resume', options.resumeSession);
     if (options?.model) args.push('--model', toCursorModelName(options.model));

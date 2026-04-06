@@ -444,9 +444,16 @@ export class CopilotCliExecutorService implements IAgentExecutor {
     }
     if (options?.resumeSession) args.push(`--resume=${options.resumeSession}`);
 
-    // Unsupported options — log and ignore
+    // Copilot CLI has no --allowed-tools flag; it uses --allow-all for blanket permission.
+    // Individual tool restrictions cannot be expressed. Unlike Claude Code (--allowedTools)
+    // and Gemini CLI (--allowed-tools), Copilot only supports blanket --allow-all.
+    // Emit a visible console.warn so callers notice the limitation in logs.
     if (options?.allowedTools?.length) {
-      this.log('allowedTools option is not supported by Copilot CLI — ignoring');
+      // eslint-disable-next-line no-console -- intentional: surface limitation visibly in all log sinks
+      console.warn(
+        `[copilot-cli] allowedTools [${options.allowedTools.join(', ')}] cannot be passed to Copilot CLI — ` +
+          'it only supports blanket --allow-all (already set). Tool restrictions will NOT be enforced.'
+      );
     }
     if (options?.systemPrompt) {
       this.log('systemPrompt option is not supported by Copilot CLI — ignoring');
