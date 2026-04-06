@@ -1,5 +1,4 @@
-import { realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { isSamePath } from '@shepai/core/infrastructure/services/filesystem/path-sanitizers';
 
 /**
  * Check if a target path is the same directory (or a worktree of) the
@@ -10,9 +9,7 @@ export function isSameShepInstance(targetPath: string): boolean {
   const instancePath = process.env.NEXT_PUBLIC_SHEP_INSTANCE_PATH ?? process.cwd();
 
   try {
-    const normalizedTarget = realpathSync(resolve(targetPath)).replace(/\\/g, '/');
-    const normalizedInstance = realpathSync(resolve(instancePath)).replace(/\\/g, '/');
-    return normalizedTarget === normalizedInstance;
+    return isSamePath(targetPath, instancePath);
   } catch {
     return false;
   }

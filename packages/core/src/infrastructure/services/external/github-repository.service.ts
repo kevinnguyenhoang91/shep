@@ -6,8 +6,9 @@
  */
 
 import { injectable, inject } from 'tsyringe';
-import { resolve, normalize } from 'node:path';
+import { resolve, dirname } from 'node:path';
 import { rm } from 'node:fs/promises';
+import { ensureContainedPath } from '../filesystem/path-sanitizers.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { ExecFunction } from '../git/worktree.service.js';
 import type {
@@ -148,8 +149,9 @@ export class GitHubRepositoryService implements IGitHubRepositoryService {
   ): Promise<void> {
     // Validate destination path — reject path traversal
     const resolved = resolve(destination);
-    const normalized = normalize(resolved);
-    if (normalized !== resolved || destination.includes('..')) {
+    try {
+      ensureContainedPath(resolved, dirname(resolved));
+    } catch {
       throw new GitHubCloneError(
         `Invalid clone destination: path traversal detected in "${destination}"`
       );

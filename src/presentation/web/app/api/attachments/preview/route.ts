@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { readFile, stat, readdir } from 'fs/promises';
 import { basename, extname, join, resolve } from 'path';
 import { getShepHomeDir } from '@shepai/core/infrastructure/services/filesystem/shep-directory.service';
+import { ensureContainedPath } from '@shepai/core/infrastructure/services/filesystem/path-sanitizers';
 
 const MIME_MAP: Record<string, string> = {
   '.png': 'image/png',
@@ -71,7 +72,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // Security: only allow paths within SHEP_HOME/attachments
   const attachmentsRoot = resolve(getShepHomeDir(), 'attachments');
-  if (!resolve(path).startsWith(attachmentsRoot)) {
+  try {
+    ensureContainedPath(path, attachmentsRoot);
+  } catch {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
 

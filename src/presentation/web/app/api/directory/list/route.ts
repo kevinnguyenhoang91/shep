@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
+import { apiError } from '@/lib/api-error';
 import { readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { ensureContainedPath } from '@shepai/core/infrastructure/services/filesystem/path-sanitizers';
 
 interface DirectoryEntry {
   name: string;
@@ -30,8 +32,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (isErrnoException(error) && error.code === 'ENOENT') {
       return NextResponse.json({ error: 'Directory not found' }, { status: 404 });
     }
-    const message = error instanceof Error ? error.message : 'Failed to access path';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(error, 500, 'Failed to access path');
   }
 
   try {
@@ -47,6 +48,10 @@ export async function GET(request: Request): Promise<NextResponse> {
       const entryPath = path.join(resolvedPath, dirent.name);
 
       try {
+        // Validate that the resolved entry stays within the listed directory
+        // (defeats symlink-based path traversal)
+        ensureContainedPath(entryPath, resolvedPath);
+
         if (dirent.isDirectory()) {
           const entryStat = await stat(entryPath);
           return {
@@ -69,7 +74,7 @@ export async function GET(request: Request): Promise<NextResponse> {
           }
         }
       } catch {
-        // Skip inaccessible entries (permission denied, broken symlinks)
+        // Skip inaccessible entries (permission denied, broken symlinks, traversal)
       }
 
       return null;
@@ -84,8 +89,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     return NextResponse.json({ entries, currentPath: resolvedPath });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to read directory';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(error, 500, 'Failed to read directory');
   }
 }
 
