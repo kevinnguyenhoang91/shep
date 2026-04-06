@@ -36,6 +36,8 @@ import { VersionService } from '../services/version.service.js';
 import type { IWebServerService } from '../../application/ports/output/services/web-server-service.interface.js';
 import type { IWorktreeService } from '../../application/ports/output/services/worktree-service.interface.js';
 import { WorktreeService } from '../services/git/worktree.service.js';
+import type { IFileSystemService } from '../../application/ports/output/services/file-system-service.interface.js';
+import { FileSystemService } from '../services/file-system.service.js';
 import type { IToolInstallerService } from '../../application/ports/output/services/tool-installer.service.js';
 import { ToolInstallerServiceImpl } from '../services/tool-installer/tool-installer.service.js';
 import type { IGitPrService } from '../../application/ports/output/services/git-pr-service.interface.js';
@@ -245,6 +247,7 @@ export async function initializeContainer(): Promise<typeof container> {
     },
   });
   container.registerSingleton<IWorktreeService>('IWorktreeService', WorktreeService);
+  container.registerSingleton<IFileSystemService>('IFileSystemService', FileSystemService);
   container.registerSingleton<ISkillInjectorService>('ISkillInjectorService', SkillInjectorService);
   container.registerSingleton<IToolInstallerService>(
     'IToolInstallerService',

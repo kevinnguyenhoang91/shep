@@ -382,7 +382,10 @@
   "repositoryNode": {
     "removeRepository": "Repository entfernen",
     "removeConfirmTitle": "Repository entfernen?",
-    "removeConfirmDescription": "Dadurch wird <strong>{{name}}</strong> und alle zugehörigen Features aus dem Arbeitsbereich entfernt. Die Dateien auf der Festplatte werden nicht betroffen.",
+    "removeConfirmDescription": "Dadurch wird <strong>{{name}}</strong> und alle zugehörigen Features aus dem Arbeitsbereich entfernt.",
+    "removeConfirmDescriptionKeepFiles": "Die Repository-Dateien auf der Festplatte werden nicht beeinträchtigt.",
+    "removeConfirmDescriptionDeleteFiles": "Der Repository-Ordner auf der Festplatte wird dauerhaft gelöscht. Dies kann nicht rückgängig gemacht werden.",
+    "deleteFromDiskLabel": "Repository-Ordner zusätzlich von der Festplatte löschen",
     "cancel": "Abbrechen",
     "remove": "Entfernen",
     "openInIde": "In IDE öffnen",

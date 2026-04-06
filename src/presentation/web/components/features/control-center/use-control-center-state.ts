@@ -57,7 +57,10 @@ export interface ControlCenterState {
   handleStartFeature: (featureId: string) => void;
   handleStopFeature: (featureId: string) => void;
   handleUnarchiveFeature: (featureId: string) => void;
-  handleDeleteRepository: (repositoryId: string) => Promise<void>;
+  handleDeleteRepository: (
+    repositoryId: string,
+    options?: { deleteFromDisk?: boolean }
+  ) => Promise<void>;
   createFeatureNode: (
     sourceNodeId: string | null,
     dataOverride?: Partial<FeatureNodeData>,
@@ -528,7 +531,7 @@ export function useControlCenterState(
   );
 
   const handleDeleteRepository = useCallback(
-    async (repositoryId: string) => {
+    async (repositoryId: string, options?: { deleteFromDisk?: boolean }) => {
       const repoNodeId = `repo-${repositoryId}`;
 
       // Find children of this repo via edges
@@ -561,7 +564,9 @@ export function useControlCenterState(
       }
 
       try {
-        const result = await deleteRepository(repositoryId);
+        const result = await deleteRepository(repositoryId, {
+          deleteFromDisk: options?.deleteFromDisk === true,
+        });
         if (!result.success) {
           toast.error(result.error ?? 'Failed to remove repository');
           rollback();

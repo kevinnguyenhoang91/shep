@@ -60,3 +60,4 @@ export type {
   ChatState,
 } from './interactive-session-service.interface.js';
 export type { ISkillInjectorService, SkillInjectionResult } from './skill-injector.interface.js';
+export type { IFileSystemService } from './file-system-service.interface.js';

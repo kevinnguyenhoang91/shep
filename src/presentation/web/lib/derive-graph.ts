@@ -42,7 +42,7 @@ export interface GraphCallbacks {
   /** Called when the user clicks a repo node to navigate to its detail page. */
   onRepositoryClick?: (repoNodeId: string) => void;
   /** Called when the user deletes a repository. */
-  onRepositoryDelete?: (repositoryId: string) => void;
+  onRepositoryDelete?: (repositoryId: string, options?: { deleteFromDisk?: boolean }) => void;
   /** Called when the user retries a failed feature. */
   onRetryFeature?: (featureId: string) => void;
   /** Called when the user starts a pending feature. */
