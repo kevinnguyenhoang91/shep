@@ -47,7 +47,7 @@ describe('POST /api/dialog/pick-files', () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
-    expect(data).toEqual({ files: null, cancelled: false, error: 'Unsupported platform: freebsd' });
+    expect(data).toEqual({ files: null, cancelled: false, error: 'Failed to open file dialog' });
   });
 
   it('returns generic error for non-Error throws', async () => {

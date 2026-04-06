@@ -90,7 +90,7 @@ describe('POST /api/tools/[id]/install', () => {
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body.error).toBe('DI container unavailable');
+    expect(body.error).toBe('Failed to install tool');
   });
 
   it('passes the dynamic route id to the use case', async () => {

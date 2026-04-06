@@ -148,8 +148,15 @@ export class GitHubRepositoryService implements IGitHubRepositoryService {
     destination: string,
     options?: CloneOptions
   ): Promise<void> {
-    // Validate destination path — reject path traversal
+    // Validate destination path — reject path traversal.
+    // The raw-string check catches ".." before resolve() normalizes it away;
+    // ensureContainedPath guards against symlink-based escapes after resolve.
     const resolved = resolve(destination);
+    if (destination.includes('..')) {
+      throw new GitHubCloneError(
+        `Invalid clone destination: path traversal detected in "${destination}"`
+      );
+    }
     try {
       ensureContainedPath(resolved, dirname(resolved));
     } catch {
