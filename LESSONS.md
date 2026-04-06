@@ -1,5 +1,15 @@
 # Lessons Learned
 
+## Canvas Loader Must Forward Global Settings to buildGraphNodes
+
+`buildGraphNodes()` in `src/presentation/web/app/build-graph-nodes.ts` accepts an options bag (`enableEvidence`, `commitEvidence`, `ciWatchEnabled`, `securityMode`, …) that controls what gets rendered on feature/repo nodes. The single call site is `src/presentation/web/app/(dashboard)/get-graph-data.ts`. When you add a new option to `buildGraphNodes`, you MUST also update that call site to pull the value from `getSettings()` and pass it in — otherwise the flag stays stranded and the UI never sees it (the bug looks like "component is wired but renders nothing").
+
+**Symptom:** A Storybook story proves the node variant works, but the live canvas never shows it.
+
+**Check:** After adding an option to `buildGraphNodes`, grep `get-graph-data.ts` for the new field name. If it's absent, wire it.
+
+**Regression lock:** Add a unit test in `tests/unit/presentation/web/app/build-graph-nodes.test.ts` asserting `data.<flag>` is set on the output node when the option is passed.
+
 ## Per-Feature Settings Must Flow Through All Layers
 
 When the create drawer sends per-feature settings (e.g. `forkAndPr`, `commitSpecs`, `ciWatchEnabled`), they must be wired through EVERY layer:
