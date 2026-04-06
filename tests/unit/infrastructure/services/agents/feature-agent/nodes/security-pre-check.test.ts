@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import {
   classifyNodeAction,
   checkSecurityDisposition,
+  resolveEffectiveSecurityMode,
 } from '@/infrastructure/services/agents/feature-agent/nodes/security-pre-check.js';
 import {
   SecurityActionCategory,
@@ -138,5 +139,33 @@ describe('checkSecurityDisposition', () => {
       category: SecurityActionCategory.CiWorkflowModify,
       nodeName: 'ci-fix',
     });
+  });
+});
+
+describe('resolveEffectiveSecurityMode — supplyChainSecurity feature flag gate', () => {
+  it('forces Disabled when the feature flag is false, regardless of state mode', () => {
+    expect(resolveEffectiveSecurityMode(SecurityMode.Enforce, false)).toBe(SecurityMode.Disabled);
+    expect(resolveEffectiveSecurityMode(SecurityMode.Advisory, false)).toBe(SecurityMode.Disabled);
+    expect(resolveEffectiveSecurityMode(SecurityMode.Disabled, false)).toBe(SecurityMode.Disabled);
+    expect(resolveEffectiveSecurityMode(undefined, false)).toBe(SecurityMode.Disabled);
+  });
+
+  it('honors the state mode when the feature flag is true', () => {
+    expect(resolveEffectiveSecurityMode(SecurityMode.Enforce, true)).toBe(SecurityMode.Enforce);
+    expect(resolveEffectiveSecurityMode(SecurityMode.Advisory, true)).toBe(SecurityMode.Advisory);
+    expect(resolveEffectiveSecurityMode(SecurityMode.Disabled, true)).toBe(SecurityMode.Disabled);
+  });
+
+  it('defaults to Disabled when state has no mode set and flag is true', () => {
+    expect(resolveEffectiveSecurityMode(undefined, true)).toBe(SecurityMode.Disabled);
+  });
+
+  it('composes with checkSecurityDisposition to skip all checks when flag is false', () => {
+    // Even an Enforce/Denied state collapses to a skip when supplyChainSecurity is off.
+    const effective = resolveEffectiveSecurityMode(SecurityMode.Enforce, false);
+    const result = checkSecurityDisposition('implement', effective, {
+      [SecurityActionCategory.PackageScriptExec]: SecurityActionDisposition.Denied,
+    });
+    expect(result).toEqual({ action: 'skip' });
   });
 });

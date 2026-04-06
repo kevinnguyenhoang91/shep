@@ -21,6 +21,7 @@ const defaultFlags = {
   gitRebaseSync: false,
   reactFileManager: false,
   inventory: false,
+  supplyChainSecurity: true,
 };
 
 describe('FeatureFlagsSettingsSection', () => {
@@ -29,7 +30,7 @@ describe('FeatureFlagsSettingsSection', () => {
     mockUpdateSettingsAction.mockResolvedValue({ success: true });
   });
 
-  it('renders 6 feature flag toggles with descriptions', () => {
+  it('renders all feature flag toggles with descriptions', () => {
     render(<FeatureFlagsSettingsSection featureFlags={defaultFlags} />);
     expect(screen.getByTestId('switch-flag-skills')).toBeDefined();
     expect(screen.getByTestId('switch-flag-envDeploy')).toBeDefined();
@@ -38,6 +39,8 @@ describe('FeatureFlagsSettingsSection', () => {
     expect(screen.getByTestId('switch-flag-adoptBranch')).toBeDefined();
     expect(screen.getByTestId('switch-flag-gitRebaseSync')).toBeDefined();
     expect(screen.getByTestId('switch-flag-reactFileManager')).toBeDefined();
+    expect(screen.getByTestId('switch-flag-inventory')).toBeDefined();
+    expect(screen.getByTestId('switch-flag-supplyChainSecurity')).toBeDefined();
     expect(screen.getByText('Skills')).toBeDefined();
     expect(screen.getByText('Deployments')).toBeDefined();
     expect(screen.getByText('Debug')).toBeDefined();
@@ -45,6 +48,7 @@ describe('FeatureFlagsSettingsSection', () => {
     expect(screen.getByText('Adopt Branch')).toBeDefined();
     expect(screen.getByText('Git Rebase & Sync')).toBeDefined();
     expect(screen.getByText('React File Manager')).toBeDefined();
+    expect(screen.getByText('Supply Chain Security')).toBeDefined();
   });
 
   it('renders description text for each flag', () => {

@@ -592,6 +592,9 @@ model FeatureFlags {
 
   @doc("Enable the Inventory page showing all repositories and features")
   inventory: boolean = false;
+
+  @doc("Enable the supply chain security feature (policy engine, badges, settings, CLI, CI gate). When false, the feature is inert regardless of SecurityMode.")
+  supplyChainSecurity: boolean = true;
 }
 
 /**

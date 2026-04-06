@@ -34,6 +34,10 @@ properties:
     type: boolean
     default: false
     description: Enable the Inventory page showing all repositories and features
+  supplyChainSecurity:
+    type: boolean
+    default: true
+    description: Enable the supply chain security feature (policy engine, badges, settings, CLI, CI gate). When false, the feature is inert regardless of SecurityMode.
 required:
   - skills
   - envDeploy
@@ -43,4 +47,5 @@ required:
   - gitRebaseSync
   - reactFileManager
   - inventory
+  - supplyChainSecurity
 description: Feature flag toggles for runtime feature control

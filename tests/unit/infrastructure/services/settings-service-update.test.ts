@@ -77,6 +77,7 @@ describe('updateSettings', () => {
         gitRebaseSync: false,
         reactFileManager: false,
         inventory: false,
+        supplyChainSecurity: true,
       },
     };
     updateSettings(updated);

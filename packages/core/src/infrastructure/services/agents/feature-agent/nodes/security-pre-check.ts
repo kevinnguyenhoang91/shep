@@ -33,6 +33,29 @@ export function classifyNodeAction(nodeName: string): SecurityActionCategory | n
   return NODE_ACTION_MAP[nodeName] ?? null;
 }
 
+/**
+ * Resolve the effective SecurityMode for a node execution, honoring the
+ * supplyChainSecurity master kill switch. When the feature flag is false,
+ * the mode is forced to Disabled regardless of the mode stored in state.
+ *
+ * Extracted as a pure function so the gate can be unit-tested without
+ * spinning up the full node-helpers infrastructure.
+ *
+ * @param stateMode - The security mode carried in FeatureAgentState (or undefined)
+ * @param supplyChainSecurityEnabled - Value of the supplyChainSecurity feature flag
+ * @returns SecurityMode.Disabled when the flag is off, otherwise the state mode
+ *          (or Disabled when state has no mode set).
+ */
+export function resolveEffectiveSecurityMode(
+  stateMode: SecurityMode | undefined,
+  supplyChainSecurityEnabled: boolean
+): SecurityMode {
+  if (!supplyChainSecurityEnabled) {
+    return SecurityMode.Disabled;
+  }
+  return stateMode ?? SecurityMode.Disabled;
+}
+
 /** Result of a security disposition check. */
 export type SecurityCheckResult =
   | { action: 'skip' }

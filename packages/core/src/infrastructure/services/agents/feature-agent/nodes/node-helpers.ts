@@ -16,10 +16,9 @@ import type {
   AgentExecutionResult,
 } from '@/application/ports/output/agents/agent-executor.interface.js';
 import type { ApprovalGates, Evidence } from '@/domain/generated/output.js';
-import { SecurityMode } from '@/domain/generated/output.js';
 import { hasSettings, getSettings } from '@/infrastructure/services/settings.service.js';
 import { SecurityViolationError } from '@/domain/errors/security-violation.error.js';
-import { checkSecurityDisposition } from './security-pre-check.js';
+import { checkSecurityDisposition, resolveEffectiveSecurityMode } from './security-pre-check.js';
 import type { FeatureAgentState } from '../state.js';
 import { reportNodeStart } from '../heartbeat.js';
 import {
@@ -568,10 +567,20 @@ export function executeNode(
       }
     }
 
-    // Security pre-check: evaluate policy before executing the agent
+    // Security pre-check: evaluate policy before executing the agent.
+    // Master kill switch — when the supplyChainSecurity feature flag is off,
+    // resolveEffectiveSecurityMode forces the mode to Disabled so
+    // checkSecurityDisposition returns a skip and no security logic runs.
+    const supplyChainSecurityEnabled = hasSettings()
+      ? (getSettings().featureFlags?.supplyChainSecurity ?? true)
+      : true;
+    const effectiveSecurityMode = resolveEffectiveSecurityMode(
+      state.securityMode,
+      supplyChainSecurityEnabled
+    );
     const securityCheck = checkSecurityDisposition(
       nodeName,
-      state.securityMode ?? SecurityMode.Disabled,
+      effectiveSecurityMode,
       state.securityActionDispositions ?? {}
     );
     if (securityCheck.action === 'deny') {

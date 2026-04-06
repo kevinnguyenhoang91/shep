@@ -209,10 +209,18 @@ jobs:
   # Supply Chain Security Enforcement
   # Runs shep security enforce to validate dependency risk, release integrity,
   # and governance posture. Gates release and dev-release jobs.
+  #
+  # Master kill switch: set the repository variable or workflow env
+  # SHEP_SUPPLY_CHAIN_SECURITY=false to make this job a no-op.
+  # The CLI honors the env var and exits 0 with a "flag disabled" note.
   # ===========================================================================
   security-enforce:
     name: Security Enforce
     runs-on: ubuntu-latest
+    env:
+      # Default: inherit from repo vars, fall back to true. Flip to 'false' (repo var
+      # or workflow-level env) to disable the entire feature in CI.
+      SHEP_SUPPLY_CHAIN_SECURITY: ${{ vars.SHEP_SUPPLY_CHAIN_SECURITY || 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

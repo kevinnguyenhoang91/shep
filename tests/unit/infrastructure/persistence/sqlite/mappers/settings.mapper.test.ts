@@ -165,6 +165,7 @@ function createTestRow(overrides: Partial<SettingsRow> = {}): SettingsRow {
     feature_flag_git_rebase_sync: 0,
     feature_flag_react_file_manager: 0,
     feature_flag_inventory: 0,
+    feature_flag_supply_chain_security: 1,
     interactive_agent_enabled: 1,
     interactive_agent_auto_timeout_minutes: 15,
     interactive_agent_max_concurrent_sessions: 3,
@@ -1340,6 +1341,75 @@ describe('Settings Mapper', () => {
       expect(restored.security?.mode).toBe(SecurityMode.Disabled);
       expect(restored.security?.lastEvaluationAt).toBeUndefined();
       expect(restored.security?.policySource).toBeUndefined();
+    });
+  });
+
+  describe('supplyChainSecurity feature flag (migration 056)', () => {
+    it('maps featureFlags.supplyChainSecurity=true to feature_flag_supply_chain_security=1', () => {
+      const settings = createTestSettings({
+        featureFlags: {
+          skills: false,
+          envDeploy: false,
+          debug: false,
+          githubImport: false,
+          adoptBranch: false,
+          gitRebaseSync: false,
+          reactFileManager: false,
+          inventory: false,
+          supplyChainSecurity: true,
+        },
+      });
+      const row = toDatabase(settings);
+      expect(row.feature_flag_supply_chain_security).toBe(1);
+    });
+
+    it('maps featureFlags.supplyChainSecurity=false to feature_flag_supply_chain_security=0', () => {
+      const settings = createTestSettings({
+        featureFlags: {
+          skills: false,
+          envDeploy: false,
+          debug: false,
+          githubImport: false,
+          adoptBranch: false,
+          gitRebaseSync: false,
+          reactFileManager: false,
+          inventory: false,
+          supplyChainSecurity: false,
+        },
+      });
+      const row = toDatabase(settings);
+      expect(row.feature_flag_supply_chain_security).toBe(0);
+    });
+
+    it('reconstructs supplyChainSecurity=true from feature_flag_supply_chain_security=1', () => {
+      const row = createTestRow({ feature_flag_supply_chain_security: 1 });
+      const settings = fromDatabase(row);
+      expect(settings.featureFlags?.supplyChainSecurity).toBe(true);
+    });
+
+    it('reconstructs supplyChainSecurity=false from feature_flag_supply_chain_security=0', () => {
+      const row = createTestRow({ feature_flag_supply_chain_security: 0 });
+      const settings = fromDatabase(row);
+      expect(settings.featureFlags?.supplyChainSecurity).toBe(false);
+    });
+
+    it('round-trips supplyChainSecurity through toDatabase → fromDatabase', () => {
+      const settings = createTestSettings({
+        featureFlags: {
+          skills: true,
+          envDeploy: true,
+          debug: true,
+          githubImport: true,
+          adoptBranch: true,
+          gitRebaseSync: true,
+          reactFileManager: true,
+          inventory: true,
+          supplyChainSecurity: false,
+        },
+      });
+      const row = toDatabase(settings);
+      const restored = fromDatabase(row);
+      expect(restored.featureFlags).toEqual(settings.featureFlags);
     });
   });
 });

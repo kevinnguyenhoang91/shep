@@ -19,6 +19,8 @@ const FLAG_DESCRIPTIONS: Record<keyof FeatureFlags, string> = {
   reactFileManager:
     'Use the built-in React file manager instead of the native OS folder picker. Also serves as automatic fallback when the native picker is unavailable.',
   inventory: 'Enable the Inventory page showing all repositories and features in a tree view',
+  supplyChainSecurity:
+    'Master switch for the supply chain security feature (policy engine, canvas badges, Settings section, CLI enforce, CI gate). Turn off to disable the entire feature regardless of Security Mode.',
 };
 
 const FLAG_LABELS: Record<keyof FeatureFlags, string> = {
@@ -30,6 +32,7 @@ const FLAG_LABELS: Record<keyof FeatureFlags, string> = {
   gitRebaseSync: 'Git Rebase & Sync',
   reactFileManager: 'React File Manager',
   inventory: 'Inventory',
+  supplyChainSecurity: 'Supply Chain Security',
 };
 
 const FLAG_KEYS: (keyof FeatureFlags)[] = [
@@ -41,6 +44,7 @@ const FLAG_KEYS: (keyof FeatureFlags)[] = [
   'gitRebaseSync',
   'reactFileManager',
   'inventory',
+  'supplyChainSecurity',
 ];
 
 export interface FeatureFlagsSettingsSectionProps {

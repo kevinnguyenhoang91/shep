@@ -24,6 +24,7 @@ export const Default: Story = {
       gitRebaseSync: false,
       reactFileManager: false,
       inventory: false,
+      supplyChainSecurity: true,
     },
   },
 };
@@ -39,6 +40,7 @@ export const AllEnabled: Story = {
       gitRebaseSync: true,
       reactFileManager: true,
       inventory: true,
+      supplyChainSecurity: true,
     },
   },
 };
@@ -54,6 +56,7 @@ export const AllDisabled: Story = {
       gitRebaseSync: false,
       reactFileManager: false,
       inventory: false,
+      supplyChainSecurity: false,
     },
   },
 };

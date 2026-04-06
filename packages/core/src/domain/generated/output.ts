@@ -658,6 +658,10 @@ export type FeatureFlags = {
    * Enable the Inventory page showing all repositories and features
    */
   inventory: boolean;
+  /**
+   * Enable the supply chain security feature (policy engine, badges, settings, CLI, CI gate). When false, the feature is inert regardless of SecurityMode.
+   */
+  supplyChainSecurity: boolean;
 };
 
 /**

@@ -224,6 +224,7 @@ export function createDefaultSettings(): Settings {
     gitRebaseSync: false,
     reactFileManager: false,
     inventory: false,
+    supplyChainSecurity: true,
   };
 
   const security: SecurityConfig = {

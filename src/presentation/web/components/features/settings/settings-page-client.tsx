@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useRef, useEffect, useCallback } from 'react';
+import { useState, useTransition, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Check,
   Bot,
@@ -376,6 +376,7 @@ export function SettingsPageClient({
     gitRebaseSync: false,
     reactFileManager: false,
     inventory: false,
+    supplyChainSecurity: true,
   };
 
   // Agent state
@@ -638,11 +639,21 @@ export function SettingsPageClient({
 
   const [activeSection, setActiveSection] = useState<string>('agent');
 
+  // Filter sections based on feature flags. When supplyChainSecurity is off,
+  // hide the Security nav tab AND the section below so the feature is fully inert.
+  const visibleSections = useMemo<readonly (typeof SECTIONS)[number][]>(
+    () =>
+      SECTIONS.filter(
+        (s: (typeof SECTIONS)[number]) => s.id !== 'security' || flags.supplyChainSecurity
+      ),
+    [flags.supplyChainSecurity]
+  );
+
   // Track which section is in view via IntersectionObserver
   useEffect(() => {
-    const els = SECTIONS.map((s) => document.getElementById(`section-${s.id}`)).filter(
-      Boolean
-    ) as HTMLElement[];
+    const els = visibleSections
+      .map((s) => document.getElementById(`section-${s.id}`))
+      .filter(Boolean) as HTMLElement[];
     if (els.length === 0) return;
 
     const observer = new IntersectionObserver(
@@ -658,7 +669,7 @@ export function SettingsPageClient({
 
     for (const el of els) observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [visibleSections]);
 
   const scrollToSection = useCallback((id: string) => {
     const el = document.getElementById(`section-${id}`);
@@ -698,7 +709,7 @@ export function SettingsPageClient({
             </span>
           </span>
           <nav className="ml-auto flex items-center gap-0.5">
-            {SECTIONS.map((s) => {
+            {visibleSections.map((s) => {
               const SectionIcon = s.icon;
               const isActive = activeSection === s.id;
               return (
@@ -1088,31 +1099,33 @@ export function SettingsPageClient({
           </SectionHint>
         </div>
 
-        {/* ── Security ── */}
-        <div
-          id="section-security"
-          className="grid scroll-mt-18 grid-cols-1 gap-x-5 rounded-lg lg:grid-cols-[1fr_280px]"
-        >
-          <SupplyChainSecuritySettingsSection
-            securityState={{
-              mode: settings.security?.mode ?? SecurityMode.Advisory,
-              lastEvaluationAt: settings.security?.lastEvaluationAt ?? null,
-              policySource: settings.security?.policySource ?? null,
-              recentEvents: [],
-              highestSeverityFinding: null,
-            }}
-          />
-          <SectionHint
-            links={[
-              {
-                label: t('settings.security.links.securitySpec'),
-                href: 'https://github.com/shep-ai/shep/blob/main/specs/083-supply-chain-security/spec.yaml',
-              },
-            ]}
+        {/* ── Security ── (hidden when supplyChainSecurity feature flag is off) */}
+        {flags.supplyChainSecurity ? (
+          <div
+            id="section-security"
+            className="grid scroll-mt-18 grid-cols-1 gap-x-5 rounded-lg lg:grid-cols-[1fr_280px]"
           >
-            {t('settings.security.hint')}
-          </SectionHint>
-        </div>
+            <SupplyChainSecuritySettingsSection
+              securityState={{
+                mode: settings.security?.mode ?? SecurityMode.Advisory,
+                lastEvaluationAt: settings.security?.lastEvaluationAt ?? null,
+                policySource: settings.security?.policySource ?? null,
+                recentEvents: [],
+                highestSeverityFinding: null,
+              }}
+            />
+            <SectionHint
+              links={[
+                {
+                  label: t('settings.security.links.securitySpec'),
+                  href: 'https://github.com/shep-ai/shep/blob/main/specs/083-supply-chain-security/spec.yaml',
+                },
+              ]}
+            >
+              {t('settings.security.hint')}
+            </SectionHint>
+          </div>
+        ) : null}
 
         {/* ── CI ── */}
         <div

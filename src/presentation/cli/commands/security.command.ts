@@ -13,6 +13,7 @@ import { Command } from 'commander';
 import { container } from '@/infrastructure/di/container.js';
 import { EnforceSecurityUseCase } from '@/application/use-cases/security/enforce-security.use-case.js';
 import { SecurityMode } from '@/domain/generated/output.js';
+import { getSettings } from '@/infrastructure/services/settings.service.js';
 import { colors, fmt, messages } from '../ui/index.js';
 import { OutputFormatter, type OutputFormat } from '../ui/output.js';
 import { getCliI18n } from '../i18n.js';
@@ -32,6 +33,21 @@ export function createSecurityCommand(): Command {
     .option('-o, --output <format>', t('cli:commands.security.enforce.outputOption'), 'table')
     .action(async (options: { repo: string; output: string }) => {
       try {
+        // Master kill switch — if the supplyChainSecurity feature flag is off,
+        // the command becomes a no-op and exits 0. Prevents accidental enforcement
+        // after the flag has been used as a rollback.
+        //
+        // Two ways to disable:
+        //   1. SHEP_SUPPLY_CHAIN_SECURITY=false environment variable (intended for CI)
+        //   2. featureFlags.supplyChainSecurity=false in the Shep settings DB (local user)
+        const envOverride = process.env.SHEP_SUPPLY_CHAIN_SECURITY;
+        const envDisabled = envOverride === 'false' || envOverride === '0';
+        const settingsEnabled = getSettings().featureFlags?.supplyChainSecurity ?? true;
+        if (envDisabled || !settingsEnabled) {
+          messages.info(t('cli:commands.security.enforce.flagDisabledNote'));
+          return;
+        }
+
         const useCase = container.resolve(EnforceSecurityUseCase);
         const result = await useCase.execute({ repositoryPath: options.repo });
 

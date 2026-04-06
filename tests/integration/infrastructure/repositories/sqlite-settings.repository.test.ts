@@ -525,6 +525,7 @@ describe('SQLiteSettingsRepository', () => {
         gitRebaseSync: false,
         reactFileManager: false,
         inventory: false,
+        supplyChainSecurity: true,
       };
 
       await repository.initialize(settings);
@@ -539,6 +540,7 @@ describe('SQLiteSettingsRepository', () => {
         gitRebaseSync: false,
         reactFileManager: false,
         inventory: false,
+        supplyChainSecurity: true,
       });
     });
 
@@ -557,6 +559,9 @@ describe('SQLiteSettingsRepository', () => {
         gitRebaseSync: false,
         reactFileManager: false,
         inventory: false,
+        // When settings is initialized without featureFlags, the mapper writes 0 for all
+        // flags (including supplyChainSecurity), so load-back returns false across the board.
+        supplyChainSecurity: false,
       });
     });
 
@@ -573,6 +578,7 @@ describe('SQLiteSettingsRepository', () => {
         gitRebaseSync: false,
         reactFileManager: false,
         inventory: false,
+        supplyChainSecurity: true,
       };
       settings.updatedAt = new Date('2025-01-02T00:00:00Z');
       await repository.update(settings);
@@ -587,6 +593,7 @@ describe('SQLiteSettingsRepository', () => {
         gitRebaseSync: false,
         reactFileManager: false,
         inventory: false,
+        supplyChainSecurity: true,
       });
     });
 
@@ -601,6 +608,7 @@ describe('SQLiteSettingsRepository', () => {
         gitRebaseSync: false,
         reactFileManager: false,
         inventory: false,
+        supplyChainSecurity: true,
       };
 
       await repository.initialize(settings);

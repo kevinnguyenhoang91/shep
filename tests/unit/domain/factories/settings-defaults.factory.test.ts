@@ -314,7 +314,7 @@ describe('createDefaultSettings', () => {
       expect(settings.featureFlags).toBeDefined();
     });
 
-    it('should default feature flags with envDeploy enabled', () => {
+    it('should default feature flags with envDeploy and supplyChainSecurity enabled', () => {
       const settings = createDefaultSettings();
       expect(settings.featureFlags).toEqual({
         skills: false,
@@ -325,6 +325,9 @@ describe('createDefaultSettings', () => {
         gitRebaseSync: false,
         reactFileManager: false,
         inventory: false,
+        // Master kill switch for the supply chain security feature —
+        // defaults to true so existing users keep the feature they already see.
+        supplyChainSecurity: true,
       });
     });
   });

@@ -204,7 +204,8 @@
         "totalFindingsLabel": "Total Findings",
         "governanceFindingsLabel": "GitHub Governance (audit-only)",
         "noFindings": "No findings",
-        "failedToEnforce": "Failed to evaluate security posture"
+        "failedToEnforce": "Failed to evaluate security posture",
+        "flagDisabledNote": "Supply chain security feature flag is off — enforce is a no-op"
       }
     },
     "feat": {
@@ -265,7 +266,7 @@
         "featuresHeading": "Recursos ({{count}})",
         "nameHeader": "NOME",
         "statusHeader": "STATUS",
-        "gatesHeader": "R P M \u2191",
+        "gatesHeader": "R P M ↑",
         "elapsedHeader": "TEMPO",
         "doneHeader": "FEITO",
         "failedToList": "Falha ao listar recursos"
