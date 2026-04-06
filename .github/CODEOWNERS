@@ -1,0 +1,16 @@
+# Default owner
+* @shep-ai/core
+
+# Architecture layers
+packages/core/src/domain/          @shep-ai/core
+packages/core/src/application/     @shep-ai/core
+packages/core/src/infrastructure/  @shep-ai/core
+src/presentation/web/              @shep-ai/core
+src/presentation/cli/              @shep-ai/core
+src/presentation/tui/              @shep-ai/core
+
+# TypeSpec models
+tsp/                               @shep-ai/core
+
+# CI/CD
+.github/                           @shep-ai/core

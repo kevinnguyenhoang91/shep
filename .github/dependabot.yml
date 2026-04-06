@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+    groups:
+      typespec:
+        patterns: ['@typespec/*', '@typespec-tools/*']
+      storybook:
+        patterns: ['@storybook/*', 'storybook']
+      testing:
+        patterns: ['vitest', '@vitest/*', 'playwright', '@playwright/*']
+      ai-sdk:
+        patterns: ['@anthropic-ai/*', 'langchain', '@langchain/*']
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
