@@ -9,6 +9,21 @@ import { computeWorktreePath } from '@shepai/core/infrastructure/services/ide-la
 import { resolve } from '@/lib/server-container';
 import type { IToolInstallerService } from '@shepai/core/application/ports/output/services/tool-installer.service';
 
+/**
+ * Rejects paths containing shell metacharacters that could enable command injection.
+ * Allows alphanumeric, path separators, dots, hyphens, underscores, spaces, colons
+ * (for Windows drive letters like C:\), and tildes.
+ */
+function assertSafePathForShell(targetPath: string): void {
+  // eslint-disable-next-line no-control-regex
+  const UNSAFE_PATTERN = /[;|&$`'"!#(){}[\]<>?\x00-\x1f\x7f]/;
+  if (UNSAFE_PATTERN.test(targetPath)) {
+    throw new Error(
+      `Path contains unsafe characters and cannot be used in a shell command: ${targetPath}`
+    );
+  }
+}
+
 // Fallback commands for the "system" terminal when no tool metadata entry exists.
 // Uses a record lookup instead of if/else to prevent the bundler from
 // tree-shaking platform branches at build time. Turbopack evaluates
@@ -47,6 +62,10 @@ export async function openShell(
     if (!existsSync(targetPath)) {
       return { success: false, error: `Path does not exist: ${targetPath}` };
     }
+
+    // Validate targetPath does not contain shell metacharacters before using it
+    // in any shell command or whitespace-split command string.
+    assertSafePathForShell(targetPath);
 
     // Try to find the terminal in tool metadata via DI container.
     // Using DI (not a direct import from tool-metadata) ensures that

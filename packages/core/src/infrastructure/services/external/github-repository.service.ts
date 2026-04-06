@@ -89,9 +89,10 @@ export class GitHubRepositoryService implements IGitHubRepositoryService {
     ];
 
     if (options?.search) {
-      // gh repo list does not have a --match flag; use jq to filter by name
-      const escaped = options.search.replace(/"/g, '\\"');
-      args.push('-q', `[.[] | select(.name | test("${escaped}"; "i"))]`);
+      // gh repo list does not have a --match flag; use jq to filter by name.
+      // Escape regex-special characters and jq metacharacters to prevent injection.
+      const sanitized = options.search.replace(/[.*+?^${}()|[\]\\"/;]/g, '\\$&');
+      args.push('-q', `[.[] | select(.name | test("${sanitized}"; "i"))]`);
     }
 
     try {
