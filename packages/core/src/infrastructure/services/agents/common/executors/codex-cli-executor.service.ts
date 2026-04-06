@@ -23,7 +23,7 @@ import type {
   AgentExecutionUsage,
   AgentExecutionStreamEvent,
 } from '../../../../../application/ports/output/agents/agent-executor.interface.js';
-import type { SpawnFunction } from '../types.js';
+import { MAX_STDERR_BUFFER_SIZE, type SpawnFunction } from '../types.js';
 import { getCurrentPhase, getLogPrefix } from '../../feature-agent/log-context.js';
 
 /** Features supported by Codex CLI */
@@ -164,7 +164,9 @@ export class CodexCliExecutorService implements IAgentExecutor {
 
         proc.stderr?.on('data', (chunk: Buffer | string) => {
           const data = chunk.toString();
-          stderr += data;
+          if (stderr.length < MAX_STDERR_BUFFER_SIZE) {
+            stderr += data;
+          }
           this.log(`stderr: ${data.trimEnd()}`);
         });
 
@@ -399,7 +401,9 @@ export class CodexCliExecutorService implements IAgentExecutor {
       });
 
       proc.stderr?.on('data', (chunk: Buffer | string) => {
-        stderr += chunk.toString();
+        if (stderr.length < MAX_STDERR_BUFFER_SIZE) {
+          stderr += chunk.toString();
+        }
       });
 
       proc.on('error', (err: Error) => {
@@ -628,6 +632,8 @@ export class CodexCliExecutorService implements IAgentExecutor {
       '--json',
       '--sandbox',
       'danger-full-access',
+      '--ask-for-approval',
+      'never',
       '--skip-git-repo-check',
       '--color',
       'never',

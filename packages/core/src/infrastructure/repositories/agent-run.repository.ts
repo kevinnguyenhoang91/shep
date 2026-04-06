@@ -157,6 +157,16 @@ export class SQLiteAgentRunRepository implements IAgentRunRepository {
     });
   }
 
+  async findByIds(ids: string[]): Promise<AgentRun[]> {
+    if (ids.length === 0) return [];
+
+    const placeholders = ids.map(() => '?').join(', ');
+    const stmt = this.db.prepare(`SELECT * FROM agent_runs WHERE id IN (${placeholders})`);
+    const rows = stmt.all(...ids) as AgentRunRow[];
+
+    return rows.map(fromDatabase);
+  }
+
   async findRunningByPid(pid: number): Promise<AgentRun[]> {
     const stmt = this.db.prepare('SELECT * FROM agent_runs WHERE pid = ? AND status = ?');
     const rows = stmt.all(pid, 'running') as AgentRunRow[];

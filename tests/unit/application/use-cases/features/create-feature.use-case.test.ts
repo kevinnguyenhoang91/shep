@@ -142,7 +142,8 @@ describe('CreateFeatureUseCase', () => {
       findByThreadId: vi.fn().mockResolvedValue(null),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updatePinnedConfig: vi.fn().mockResolvedValue(undefined),
-      findRunningByPid: vi.fn().mockResolvedValue(null),
+      findRunningByPid: vi.fn(),
+      findByIds: vi.fn().mockResolvedValue([]),
       list: vi.fn().mockResolvedValue([]),
       delete: vi.fn().mockResolvedValue(undefined),
     };

@@ -14,11 +14,11 @@
  * - Cleans up intervals on client disconnect
  */
 
+import { apiError } from '@/lib/api-error';
 import { resolve } from '@/lib/server-container';
 import type { IAgentRunRepository } from '@shepai/core/application/ports/output/agents/agent-run-repository.interface';
 import type { IPhaseTimingRepository } from '@shepai/core/application/ports/output/agents/phase-timing-repository.interface';
 import type { IInteractiveSessionRepository } from '@shepai/core/application/ports/output/repositories/interactive-session-repository.interface';
-import type { Feature, AgentRun } from '@shepai/core/domain/generated/output';
 import {
   AgentRunStatus,
   InteractiveSessionStatus,
@@ -163,17 +163,31 @@ export function GET(request: Request): Response {
 
             const features = await listFeatures.execute();
 
-            // Build current state for features with agent runs
-            const entries: { feature: Feature; run: AgentRun | null }[] = await Promise.all(
-              features.map(async (feature) => {
-                const run = feature.agentRunId
-                  ? await agentRunRepo.findById(feature.agentRunId)
-                  : null;
-                return { feature, run };
-              })
-            );
+            // Batch-fetch all agent runs and phase timings in ~3 queries
+            // instead of N individual findById + findByRunId calls per feature.
+            const runIds = features
+              .map((f) => f.agentRunId)
+              .filter((id): id is string => id != null);
 
-            for (const { feature, run } of entries) {
+            const [runs, allTimings] = await Promise.all([
+              agentRunRepo.findByIds(runIds),
+              phaseTimingRepo.findByRunIds(runIds),
+            ]);
+
+            // Build lookup maps for O(1) access
+            const runMap = new Map(runs.map((r) => [r.id, r]));
+            const timingsByRunId = new Map<string, typeof allTimings>();
+            for (const t of allTimings) {
+              let arr = timingsByRunId.get(t.agentRunId);
+              if (!arr) {
+                arr = [];
+                timingsByRunId.set(t.agentRunId, arr);
+              }
+              arr.push(t);
+            }
+
+            for (const feature of features) {
+              const run = feature.agentRunId ? (runMap.get(feature.agentRunId) ?? null) : null;
               if (!run) continue;
 
               // Apply runId filter if present
@@ -184,13 +198,9 @@ export function GET(request: Request): Response {
               if (!prev) {
                 // First time seeing this feature — seed cache, don't emit
                 const completedPhases = new Set<string>();
-                try {
-                  const timings = await phaseTimingRepo.findByRunId(run.id);
-                  for (const t of timings) {
-                    if (t.completedAt) completedPhases.add(t.phase);
-                  }
-                } catch {
-                  // Ignore timing errors
+                const timings = timingsByRunId.get(run.id) ?? [];
+                for (const t of timings) {
+                  if (t.completedAt) completedPhases.add(t.phase);
                 }
 
                 cache.set(feature.id, {
@@ -329,26 +339,22 @@ export function GET(request: Request): Response {
                 });
               }
 
-              // Check for new phase completions
-              try {
-                const timings = await phaseTimingRepo.findByRunId(run.id);
-                for (const t of timings) {
-                  if (t.completedAt && !prev.completedPhases.has(t.phase)) {
-                    prev.completedPhases.add(t.phase);
-                    emitEvent({
-                      eventType: NotificationEventType.PhaseCompleted,
-                      agentRunId: run.id,
-                      featureId: feature.id,
-                      featureName: feature.name,
-                      phaseName: t.phase,
-                      message: `Completed ${t.phase} phase`,
-                      severity: NotificationSeverity.Info,
-                      timestamp: new Date().toISOString(),
-                    });
-                  }
+              // Check for new phase completions (using batch-fetched timings)
+              const timings = timingsByRunId.get(run.id) ?? [];
+              for (const t of timings) {
+                if (t.completedAt && !prev.completedPhases.has(t.phase)) {
+                  prev.completedPhases.add(t.phase);
+                  emitEvent({
+                    eventType: NotificationEventType.PhaseCompleted,
+                    agentRunId: run.id,
+                    featureId: feature.id,
+                    featureName: feature.name,
+                    phaseName: t.phase,
+                    message: `Completed ${t.phase} phase`,
+                    severity: NotificationSeverity.Info,
+                    timestamp: new Date().toISOString(),
+                  });
                 }
-              } catch {
-                // Ignore timing errors
               }
             }
             // Poll interactive sessions for lifecycle status changes
@@ -456,11 +462,6 @@ export function GET(request: Request): Response {
       },
     });
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[SSE route] GET handler error:', error);
-    return new Response(JSON.stringify({ error: String(error) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return apiError(error);
   }
 }

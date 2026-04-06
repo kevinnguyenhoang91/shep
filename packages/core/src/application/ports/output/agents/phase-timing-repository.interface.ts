@@ -69,6 +69,14 @@ export interface IPhaseTimingRepository {
   findByRunId(agentRunId: string): Promise<PhaseTiming[]>;
 
   /**
+   * Find all phase timings for multiple agent runs in a single query.
+   *
+   * @param runIds - The agent run IDs to look up
+   * @returns Array of phase timings ordered by creation (across all runs)
+   */
+  findByRunIds(runIds: string[]): Promise<PhaseTiming[]>;
+
+  /**
    * Find all phase timings for a feature (via agent_runs join).
    *
    * @param featureId - The feature ID

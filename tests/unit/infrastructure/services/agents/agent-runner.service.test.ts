@@ -111,6 +111,7 @@ describe('AgentRunnerService', () => {
           }
         }),
       findRunningByPid: vi.fn().mockResolvedValue([]),
+      findByIds: vi.fn().mockResolvedValue([]),
       list: vi.fn().mockResolvedValue([]),
       delete: vi.fn().mockResolvedValue(undefined),
     };

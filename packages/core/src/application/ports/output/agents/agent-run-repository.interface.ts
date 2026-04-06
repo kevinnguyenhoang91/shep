@@ -76,6 +76,14 @@ export interface IAgentRunRepository {
   findRunningByPid(pid: number): Promise<AgentRun[]>;
 
   /**
+   * Find multiple agent runs by their IDs in a single query.
+   *
+   * @param ids - The agent run IDs to look up
+   * @returns Array of found agent runs (missing IDs are silently skipped)
+   */
+  findByIds(ids: string[]): Promise<AgentRun[]>;
+
+  /**
    * List all agent runs.
    *
    * @returns Array of all agent runs

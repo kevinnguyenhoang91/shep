@@ -89,6 +89,7 @@ function createMockAgentRunRepo(): IAgentRunRepository {
     findByThreadId: vi.fn(),
     updateStatus: vi.fn().mockResolvedValue(undefined),
     findRunningByPid: vi.fn(),
+    findByIds: vi.fn(),
     list: vi.fn(),
     delete: vi.fn(),
   } as unknown as IAgentRunRepository;
@@ -100,6 +101,7 @@ function createMockPhaseTimingRepo(): IPhaseTimingRepository {
     update: vi.fn().mockResolvedValue(undefined),
     updateApprovalWait: vi.fn(),
     findByRunId: vi.fn(),
+    findByRunIds: vi.fn(),
     findByFeatureId: vi.fn(),
   } as unknown as IPhaseTimingRepository;
 }

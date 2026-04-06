@@ -17,7 +17,7 @@ import type {
   AgentExecutionUsage,
   AgentExecutionStreamEvent,
 } from '../../../../../application/ports/output/agents/agent-executor.interface.js';
-import type { SpawnFunction } from '../types.js';
+import { MAX_STDERR_BUFFER_SIZE, type SpawnFunction } from '../types.js';
 import { getCurrentPhase, getLogPrefix } from '../../feature-agent/log-context.js';
 import { IS_WINDOWS } from '../../../../platform.js';
 
@@ -121,7 +121,9 @@ export class ClaudeCodeExecutorService implements IAgentExecutor {
 
       proc.stderr?.on('data', (chunk: Buffer | string) => {
         const data = chunk.toString();
-        stderr += data;
+        if (stderr.length < MAX_STDERR_BUFFER_SIZE) {
+          stderr += data;
+        }
         this.log(`stderr: ${data.trimEnd()}`);
       });
 
@@ -221,7 +223,9 @@ export class ClaudeCodeExecutorService implements IAgentExecutor {
     });
 
     proc.stderr?.on('data', (chunk: Buffer | string) => {
-      stderr += chunk.toString();
+      if (stderr.length < MAX_STDERR_BUFFER_SIZE) {
+        stderr += chunk.toString();
+      }
     });
 
     proc.on('error', (err: Error) => {
