@@ -11,6 +11,16 @@
             "type": "command",
             "command": ".claude/hooks/format-tsp.sh",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/architecture-validator.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/i18n-parity.sh",
+            "timeout": 10
           }
         ]
       }
