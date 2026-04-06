@@ -45,13 +45,16 @@ export async function getFeaturePhaseTimings(featureId: string): Promise<GetPhas
     const repo = resolve<IPhaseTimingRepository>('IPhaseTimingRepository');
     const phaseTimings = await repo.findByFeatureId(featureId);
 
+    const toIso = (d: Date | null | undefined): string | undefined =>
+      d instanceof Date ? d.toISOString() : d ?? undefined;
+
     const timings: PhaseTimingData[] = phaseTimings.map((t) => ({
       agentRunId: t.agentRunId,
       phase: t.phase,
-      startedAt: t.startedAt,
-      completedAt: t.completedAt,
+      startedAt: t.startedAt instanceof Date ? t.startedAt.toISOString() : t.startedAt,
+      completedAt: toIso(t.completedAt),
       durationMs: t.durationMs != null ? Number(t.durationMs) : undefined,
-      waitingApprovalAt: t.waitingApprovalAt,
+      waitingApprovalAt: toIso(t.waitingApprovalAt),
       approvalWaitMs: t.approvalWaitMs != null ? Number(t.approvalWaitMs) : undefined,
       inputTokens: t.inputTokens != null ? Number(t.inputTokens) : undefined,
       outputTokens: t.outputTokens != null ? Number(t.outputTokens) : undefined,

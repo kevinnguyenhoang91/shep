@@ -172,6 +172,9 @@
       "minimatch": "^7.x",
       "ajv": ">=8.18.0",
       "@anthropic-ai/sdk": ">=0.81.0"
+    },
+    "patchedDependencies": {
+      "@typespec-tools/emitter-typescript@0.3.0": "patches/@typespec-tools__emitter-typescript@0.3.0.patch"
     }
   },
   "packageManager": "pnpm@10.30.0",

@@ -1,0 +1,42 @@
+diff --git a/dist/emitter.js b/dist/emitter.js
+index ea7c9c50bc9d7e6e9fb017e03a89eb2613529c10..eaccdfad334236d1a553b9cb2bc3bda3ef86a074 100644
+--- a/dist/emitter.js
++++ b/dist/emitter.js
+@@ -6,16 +6,35 @@ export function isArrayType(m) {
+ }
+ export const intrinsicNameToTSType = new Map([
+     ["string", "string"],
+-    ["int32", "number"],
++    ["int8", "number"],
+     ["int16", "number"],
++    ["int32", "number"],
++    ["int64", "bigint"],
++    ["uint8", "number"],
++    ["uint16", "number"],
++    ["uint32", "number"],
++    ["uint64", "bigint"],
++    ["safeint", "number"],
++    ["integer", "number"],
+     ["float16", "number"],
+     ["float32", "number"],
+-    ["int64", "bigint"],
++    ["float64", "number"],
++    ["float", "number"],
++    ["numeric", "number"],
++    ["decimal", "number"],
++    ["decimal128", "number"],
+     ["boolean", "boolean"],
+     ["unknown", "unknown"],
+     ["null", "null"],
+     ["never", "never"],
+     ["void", "void"],
++    ["plainDate", "Date"],
++    ["plainTime", "Date"],
++    ["utcDateTime", "Date"],
++    ["offsetDateTime", "Date"],
++    ["duration", "string"],
++    ["bytes", "Uint8Array"],
++    ["url", "string"],
+ ]);
+ export class TypescriptEmitter extends CodeTypeEmitter {
+     nsByName = new Map();

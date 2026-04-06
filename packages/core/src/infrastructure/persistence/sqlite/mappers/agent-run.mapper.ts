@@ -64,10 +64,8 @@ export function toDatabase(agentRun: AgentRun): AgentRunRow {
     error: agentRun.error ?? null,
     feature_id: agentRun.featureId ?? null,
     repository_path: agentRun.repositoryPath ?? null,
-    created_at:
-      agentRun.createdAt instanceof Date ? agentRun.createdAt.getTime() : agentRun.createdAt,
-    updated_at:
-      agentRun.updatedAt instanceof Date ? agentRun.updatedAt.getTime() : agentRun.updatedAt,
+    created_at: agentRun.createdAt.getTime(),
+    updated_at: agentRun.updatedAt.getTime(),
     approval_gates: agentRun.approvalGates ? JSON.stringify(agentRun.approvalGates) : null,
     model_id: agentRun.modelId ?? null,
   };

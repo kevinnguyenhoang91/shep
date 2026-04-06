@@ -192,7 +192,7 @@ function renderNodeTiming(
   // Crashed/stopped phase - red bar with frozen duration
   else if (isRunTerminal) {
     const endTime = run?.updatedAt
-      ? new Date(run.updatedAt as string | number).getTime()
+      ? (run.updatedAt instanceof Date ? run.updatedAt : new Date(run.updatedAt)).getTime()
       : Date.now();
     const elapsedMs = Math.max(0, endTime - new Date(t.startedAt).getTime());
     const secs = (elapsedMs / 1000).toFixed(1);

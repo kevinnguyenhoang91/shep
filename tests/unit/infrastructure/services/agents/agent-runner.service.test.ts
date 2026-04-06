@@ -258,7 +258,7 @@ describe('AgentRunnerService', () => {
       expect(failedUpdate[1]).toBe(AgentRunStatus.failed);
       expect(failedUpdate[2]).toEqual(
         expect.objectContaining({
-          completedAt: expect.any(String),
+          completedAt: expect.any(Date),
           error: 'failure',
         })
       );
@@ -340,7 +340,7 @@ describe('AgentRunnerService', () => {
       expect(events[1].content).toBe('Almost done...');
     });
 
-    it('should yield mapped AgentRunEvent with string timestamps', async () => {
+    it('should yield mapped AgentRunEvent with Date timestamps', async () => {
       setupStreamingMocks([makeStreamEvent('result', 'done')]);
 
       const events: AgentRunEvent[] = [];
@@ -349,7 +349,7 @@ describe('AgentRunnerService', () => {
       }
 
       expect(events).toHaveLength(1);
-      expect(typeof events[0].timestamp).toBe('string');
+      expect(events[0].timestamp).toBeInstanceOf(Date);
     });
 
     it('should create pending and running status before streaming', async () => {

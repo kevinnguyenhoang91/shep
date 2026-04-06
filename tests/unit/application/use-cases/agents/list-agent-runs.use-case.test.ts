@@ -83,8 +83,8 @@ describe('ListAgentRunsUseCase', () => {
     mockRepo.list = vi
       .fn()
       .mockResolvedValue([
-        createMockAgentRun({ id: 'run-old', createdAt: '2025-01-01T08:00:00Z' }),
-        createMockAgentRun({ id: 'run-new', createdAt: '2025-01-01T12:00:00Z' }),
+        createMockAgentRun({ id: 'run-old', createdAt: new Date('2025-01-01T08:00:00Z') }),
+        createMockAgentRun({ id: 'run-new', createdAt: new Date('2025-01-01T12:00:00Z') }),
       ]);
 
     const result = await useCase.execute();

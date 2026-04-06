@@ -43,7 +43,7 @@ function toDatabase(timing: PhaseTiming): PhaseTimingRow {
     id: timing.id,
     agent_run_id: timing.agentRunId,
     phase: timing.phase,
-    started_at: timing.startedAt instanceof Date ? timing.startedAt.getTime() : timing.startedAt,
+    started_at: timing.startedAt.getTime(),
     completed_at: timing.completedAt instanceof Date ? timing.completedAt.getTime() : null,
     duration_ms: timing.durationMs != null ? Number(timing.durationMs) : null,
     waiting_approval_at:
@@ -63,8 +63,8 @@ function toDatabase(timing: PhaseTiming): PhaseTimingRow {
     duration_api_ms: timing.durationApiMs != null ? Number(timing.durationApiMs) : null,
     exit_code: timing.exitCode ?? null,
     error_message: timing.errorMessage ?? null,
-    created_at: timing.createdAt instanceof Date ? timing.createdAt.getTime() : timing.createdAt,
-    updated_at: timing.updatedAt instanceof Date ? timing.updatedAt.getTime() : timing.updatedAt,
+    created_at: timing.createdAt.getTime(),
+    updated_at: timing.updatedAt.getTime(),
   };
 }
 
