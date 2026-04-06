@@ -168,6 +168,10 @@ function createTestRow(overrides: Partial<SettingsRow> = {}): SettingsRow {
     fab_position_swapped: 0,
     skill_injection_enabled: 0,
     skill_injection_skills: null,
+    telegram_enabled: 0,
+    telegram_bot_token: null,
+    telegram_authorized_user_id: null,
+    telegram_authorized_user_label: null,
     ...overrides,
   };
 }

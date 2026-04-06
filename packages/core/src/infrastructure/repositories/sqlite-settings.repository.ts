@@ -74,7 +74,9 @@ export class SQLiteSettingsRepository implements ISettingsRepository {
         interactive_agent_max_concurrent_sessions,
         auto_archive_delay_minutes,
         stage_timeout_fast_implement_ms,
-        fab_position_swapped
+        fab_position_swapped,
+        telegram_enabled, telegram_bot_token,
+        telegram_authorized_user_id, telegram_authorized_user_label
       ) VALUES (
         @id, @created_at, @updated_at,
         @model_analyze, @model_requirements, @model_plan, @model_implement, @model_default,
@@ -106,7 +108,9 @@ export class SQLiteSettingsRepository implements ISettingsRepository {
         @interactive_agent_max_concurrent_sessions,
         @auto_archive_delay_minutes,
         @stage_timeout_fast_implement_ms,
-        @fab_position_swapped
+        @fab_position_swapped,
+        @telegram_enabled, @telegram_bot_token,
+        @telegram_authorized_user_id, @telegram_authorized_user_label
       )
     `);
 
@@ -220,7 +224,11 @@ export class SQLiteSettingsRepository implements ISettingsRepository {
         interactive_agent_max_concurrent_sessions = @interactive_agent_max_concurrent_sessions,
         auto_archive_delay_minutes = @auto_archive_delay_minutes,
         stage_timeout_fast_implement_ms = @stage_timeout_fast_implement_ms,
-        fab_position_swapped = @fab_position_swapped
+        fab_position_swapped = @fab_position_swapped,
+        telegram_enabled = @telegram_enabled,
+        telegram_bot_token = @telegram_bot_token,
+        telegram_authorized_user_id = @telegram_authorized_user_id,
+        telegram_authorized_user_label = @telegram_authorized_user_label
       WHERE id = @id
     `);
 

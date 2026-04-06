@@ -38,6 +38,7 @@ import "../../common/enums/editor.tsp";
 import "../../common/enums/language.tsp";
 import "../../common/enums/notification.tsp";
 import "../../common/enums/terminal.tsp";
+import "./telegram-integration.tsp";
 
 /**
  * Model Configuration
@@ -817,4 +818,13 @@ model Settings extends BaseEntity {
    */
   @doc("FAB layout configuration (optional, defaults applied at runtime)")
   fabLayout?: FabLayoutConfig;
+
+  /**
+   * Telegram bot integration configuration.
+   * When enabled, Shep runs a Telegram bot so the authorized user can
+   * interact with Shep from their phone. Optional for backward
+   * compatibility with pre-migration databases.
+   */
+  @doc("Telegram bot integration configuration (optional, disabled by default)")
+  telegramIntegration?: TelegramIntegrationConfig;
 }

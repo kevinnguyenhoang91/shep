@@ -18,6 +18,7 @@ import {
   Timer,
   MessageSquare,
   LayoutGrid,
+  Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -41,6 +42,7 @@ import {
 import { getEditorTypeIcon } from '@/components/common/editor-type-icons';
 import { AgentModelPicker } from '@/components/features/settings/AgentModelPicker';
 import { LanguageSettingsSection } from '@/components/features/settings/language-settings-section';
+import { TelegramIntegrationSection } from '@/components/features/settings/telegram-integration-section';
 import { TimeoutSlider } from '@/components/features/settings/timeout-slider';
 import type {
   Settings,
@@ -76,6 +78,7 @@ const SECTIONS = [
   { id: 'feature-flags', labelKey: 'settings.sections.flags', icon: Flag },
   { id: 'interactive-agent', labelKey: 'settings.sections.chat', icon: MessageSquare },
   { id: 'fab-layout', labelKey: 'settings.sections.layout', icon: LayoutGrid },
+  { id: 'telegram', labelKey: 'settings.sections.telegram', icon: Send },
   { id: 'database', labelKey: 'settings.sections.database', icon: Database },
 ] as const;
 
@@ -1744,6 +1747,14 @@ export function SettingsPageClient({
             />
           </SettingsSection>
           <SectionHint>{t('settings.fabLayout.hint')}</SectionHint>
+        </div>
+
+        {/* ── Telegram ── */}
+        <div
+          id="section-telegram"
+          className="grid scroll-mt-18 grid-cols-1 gap-x-5 rounded-lg lg:grid-cols-[1fr_280px]"
+        >
+          <TelegramIntegrationSection telegramIntegration={settings.telegramIntegration} />
         </div>
 
         {/* ── Database ── */}

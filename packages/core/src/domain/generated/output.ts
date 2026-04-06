@@ -689,6 +689,28 @@ export type FabLayoutConfig = {
 };
 
 /**
+ * Telegram bot integration configuration
+ */
+export type TelegramIntegrationConfig = {
+  /**
+   * Whether the Telegram bot is enabled (default: false)
+   */
+  enabled: boolean;
+  /**
+   * Telegram bot token from @BotFather (optional until enabled)
+   */
+  botToken?: string;
+  /**
+   * Authorized Telegram user ID as a decimal string (optional until enabled)
+   */
+  authorizedUserId?: string;
+  /**
+   * Display label for the authorized user (optional)
+   */
+  authorizedUserLabel?: string;
+};
+
+/**
  * Global Shep platform settings (singleton)
  */
 export type Settings = BaseEntity & {
@@ -736,6 +758,10 @@ export type Settings = BaseEntity & {
    * FAB layout configuration (optional, defaults applied at runtime)
    */
   fabLayout?: FabLayoutConfig;
+  /**
+   * Telegram bot integration configuration (optional, disabled by default)
+   */
+  telegramIntegration?: TelegramIntegrationConfig;
 };
 export enum TaskState {
   Todo = 'Todo',

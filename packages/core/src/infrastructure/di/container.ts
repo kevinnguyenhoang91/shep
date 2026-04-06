@@ -65,6 +65,14 @@ import type { IPhaseTimingRepository } from '../../application/ports/output/agen
 import type { IFeatureAgentProcessService } from '../../application/ports/output/agents/feature-agent-process.interface.js';
 import type { ISpecInitializerService } from '../../application/ports/output/services/spec-initializer.interface.js';
 import type { INotificationService } from '../../application/ports/output/services/notification-service.interface.js';
+import type { ITelegramBotService } from '../../application/ports/output/services/telegram-bot-service.interface.js';
+import { TelegramBotService } from '../services/telegram/telegram-bot.service.js';
+import {
+  TestTelegramConnectionUseCase,
+  SendTelegramMessageUseCase,
+  StartTelegramBotUseCase,
+  StopTelegramBotUseCase,
+} from '../../application/use-cases/telegram/index.js';
 import { AgentExecutorFactory } from '../services/agents/common/agent-executor-factory.service.js';
 import { AgentExecutorProvider } from '../services/agents/common/agent-executor-provider.service.js';
 import { StructuredAgentCallerService } from '../services/agents/common/structured-agent-caller.service.js';
@@ -362,6 +370,10 @@ export async function initializeContainer(): Promise<typeof container> {
     },
   });
 
+  // Telegram bot integration (HTTP adapter, single process-wide instance so
+  // start()/stop() lifecycle state survives across resolves).
+  container.registerSingleton<ITelegramBotService>('ITelegramBotService', TelegramBotService);
+
   // Register use cases (singletons for performance)
   container.registerSingleton(InitializeSettingsUseCase);
   container.registerSingleton(LoadSettingsUseCase);
@@ -418,6 +430,12 @@ export async function initializeContainer(): Promise<typeof container> {
   container.registerSingleton(RebaseFeatureOnMainUseCase);
   container.registerSingleton(GetBranchSyncStatusUseCase);
   container.registerSingleton(AutoResolveMergedBranchesUseCase);
+
+  // Telegram use cases
+  container.registerSingleton(TestTelegramConnectionUseCase);
+  container.registerSingleton(SendTelegramMessageUseCase);
+  container.registerSingleton(StartTelegramBotUseCase);
+  container.registerSingleton(StopTelegramBotUseCase);
 
   // Session repositories (per-AgentType string tokens)
   container.register(`IAgentSessionRepository:${AgentType.ClaudeCode}`, {
@@ -525,6 +543,20 @@ export async function initializeContainer(): Promise<typeof container> {
   });
   container.register('UpdateSettingsUseCase', {
     useFactory: (c) => c.resolve(UpdateSettingsUseCase),
+  });
+
+  // Telegram string aliases for web server actions
+  container.register('TestTelegramConnectionUseCase', {
+    useFactory: (c) => c.resolve(TestTelegramConnectionUseCase),
+  });
+  container.register('SendTelegramMessageUseCase', {
+    useFactory: (c) => c.resolve(SendTelegramMessageUseCase),
+  });
+  container.register('StartTelegramBotUseCase', {
+    useFactory: (c) => c.resolve(StartTelegramBotUseCase),
+  });
+  container.register('StopTelegramBotUseCase', {
+    useFactory: (c) => c.resolve(StopTelegramBotUseCase),
   });
   container.register('CompleteWebOnboardingUseCase', {
     useFactory: (c) => c.resolve(CompleteWebOnboardingUseCase),

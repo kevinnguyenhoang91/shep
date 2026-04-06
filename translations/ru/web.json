@@ -15,7 +15,8 @@
       "flags": "Флаги",
       "chat": "Чат",
       "layout": "Расположение",
-      "database": "База данных"
+      "database": "База данных",
+      "telegram": "Telegram"
     },
     "language": {
       "title": "Язык",

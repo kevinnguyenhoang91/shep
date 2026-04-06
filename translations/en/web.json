@@ -15,7 +15,8 @@
       "flags": "Flags",
       "chat": "Chat",
       "layout": "Layout",
-      "database": "Database"
+      "database": "Database",
+      "telegram": "Telegram"
     },
     "language": {
       "title": "Language",
@@ -269,7 +270,7 @@
     "deleteSubFeatures": "Delete sub-features",
     "closePullRequest": "Close pull request",
     "cancel": "Cancel",
-    "deleting": "Deleting\u2026",
+    "deleting": "Deleting…",
     "delete": "Delete"
   },
   "rejectFeedback": {
@@ -278,25 +279,25 @@
     "ariaLabel": "Rejection feedback",
     "placeholder": "Describe what needs to change...",
     "cancel": "Cancel",
-    "rejecting": "Rejecting\u2026",
+    "rejecting": "Rejecting…",
     "confirmReject": "Confirm Reject"
   },
   "emptyState": {
     "addProject": "Add a project",
     "addProjectDescription": "Add your project folder to unlock feature creation.",
-    "addProjectDescriptionLine2": "Describe what you need \u2014 Shep handles the rest.",
-    "checkingSetup": "Checking setup\u2026",
+    "addProjectDescriptionLine2": "Describe what you need — Shep handles the rest.",
+    "checkingSetup": "Checking setup…",
     "ready": "{{label}} ready",
     "notInstalled": "{{label}} not installed",
     "reCheck": "Re-check",
     "needsAuth": "{{label}} needs authentication",
     "open": "Open {{label}}",
-    "checking": "Checking {{label}}\u2026",
+    "checking": "Checking {{label}}…",
     "notFound": "{{label}} not found",
     "docs": "Docs",
-    "opening": "Opening\u2026",
+    "opening": "Opening…",
     "chooseFolder": "Choose a Folder",
-    "folderHint": "Any folder works \u2014 git will be initialized automatically if needed.",
+    "folderHint": "Any folder works — git will be initialized automatically if needed.",
     "orUseCli": "or use the CLI",
     "copyCommands": "Copy commands",
     "git": "Git",
@@ -305,7 +306,7 @@
     "githubCliRequired": "Required for pull requests"
   },
   "welcome": {
-    "loadingAgents": "Loading agents\u2026",
+    "loadingAgents": "Loading agents…",
     "chooseAgent": "Choose your agent",
     "pickModel": "Pick a model",
     "selectAgentSubtitle": "Select the AI coding agent you want Shep to use.",
@@ -353,11 +354,11 @@
     "stopDevServer": "Stop Dev Server",
     "startDevServer": "Start Dev Server",
     "retryDevServer": "Retry Dev Server",
-    "starting": "Starting\u2026",
+    "starting": "Starting…",
     "retry": "Retry",
     "start": "Start",
     "failed": "Failed",
-    "deleting": "Deleting\u2026",
+    "deleting": "Deleting…",
     "addFeature": "Add feature",
     "reviewRequirements": "Review Requirements",
     "reviewTechnicalPlan": "Review Technical Plan",
@@ -596,7 +597,7 @@
     "addRepository": "Add Repository"
   },
   "modelPicker": {
-    "searchPlaceholder": "Search or type a model ID\u2026"
+    "searchPlaceholder": "Search or type a model ID…"
   },
   "skills": {
     "searchPlaceholder": "Search skills..."

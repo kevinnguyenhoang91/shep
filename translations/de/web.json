@@ -15,7 +15,8 @@
       "flags": "Flags",
       "chat": "Chat",
       "layout": "Layout",
-      "database": "Datenbank"
+      "database": "Datenbank",
+      "telegram": "Telegram"
     },
     "language": {
       "title": "Sprache",

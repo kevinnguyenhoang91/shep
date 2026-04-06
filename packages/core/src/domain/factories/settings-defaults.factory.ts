@@ -234,6 +234,7 @@ export function createDefaultSettings(): Settings {
     notifications,
     workflow,
     featureFlags,
+    telegramIntegration: { enabled: false },
     onboardingComplete: false,
     createdAt: now,
     updatedAt: now,

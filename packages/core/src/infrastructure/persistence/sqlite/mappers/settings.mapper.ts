@@ -138,6 +138,12 @@ export interface SettingsRow {
   // Skill injection config (added in migration 051)
   skill_injection_enabled: number;
   skill_injection_skills: string | null;
+
+  // Telegram integration config (added in migration 055)
+  telegram_enabled: number;
+  telegram_bot_token: string | null;
+  telegram_authorized_user_id: string | null;
+  telegram_authorized_user_label: string | null;
 }
 
 /**
@@ -265,6 +271,12 @@ export function toDatabase(settings: Settings): SettingsRow {
     skill_injection_skills: settings.workflow.skillInjection?.skills?.length
       ? JSON.stringify(settings.workflow.skillInjection.skills)
       : null,
+
+    // Telegram integration config (default: disabled, no credentials)
+    telegram_enabled: settings.telegramIntegration?.enabled ? 1 : 0,
+    telegram_bot_token: settings.telegramIntegration?.botToken ?? null,
+    telegram_authorized_user_id: settings.telegramIntegration?.authorizedUserId ?? null,
+    telegram_authorized_user_label: settings.telegramIntegration?.authorizedUserLabel ?? null,
   };
 }
 
@@ -443,6 +455,18 @@ export function fromDatabase(row: SettingsRow): Settings {
     // FabLayoutConfig (INTEGER 0/1 → boolean)
     fabLayout: {
       swapPosition: (row.fab_position_swapped ?? 0) !== 0,
+    },
+
+    // TelegramIntegrationConfig (INTEGER 0/1 → boolean, TEXT → optional fields)
+    telegramIntegration: {
+      enabled: (row.telegram_enabled ?? 0) === 1,
+      ...(row.telegram_bot_token !== null && { botToken: row.telegram_bot_token }),
+      ...(row.telegram_authorized_user_id !== null && {
+        authorizedUserId: row.telegram_authorized_user_id,
+      }),
+      ...(row.telegram_authorized_user_label !== null && {
+        authorizedUserLabel: row.telegram_authorized_user_label,
+      }),
     },
 
     // Onboarding (INTEGER → boolean)

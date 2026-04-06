@@ -36,6 +36,9 @@ properties:
   fabLayout:
     $ref: FabLayoutConfig.yaml
     description: FAB layout configuration (optional, defaults applied at runtime)
+  telegramIntegration:
+    $ref: TelegramIntegrationConfig.yaml
+    description: Telegram bot integration configuration (optional, disabled by default)
 required:
   - models
   - user
