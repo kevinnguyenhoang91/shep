@@ -8,6 +8,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { apiError } from '@/lib/api-error';
 import { resolve } from '@/lib/server-container';
 import type { IInteractiveSessionService } from '@shepai/core/application/ports/output/services/interactive-session-service.interface';
 
@@ -26,11 +27,6 @@ export async function GET(): Promise<NextResponse> {
 
     return NextResponse.json(result);
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[GET /api/interactive/chat/turn-statuses]', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
+    return apiError(error);
   }
 }

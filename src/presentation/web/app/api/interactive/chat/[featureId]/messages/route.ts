@@ -12,6 +12,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { apiError } from '@/lib/api-error';
 import { resolve } from '@/lib/server-container';
 import type { SendInteractiveMessageUseCase } from '@shepai/core/application/use-cases/interactive/send-interactive-message.use-case';
 import type { GetInteractiveChatStateUseCase } from '@shepai/core/application/use-cases/interactive/get-interactive-chat-state.use-case';
@@ -63,14 +64,9 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     return NextResponse.json({ message }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message.includes('concurrent session limit')) {
-      return NextResponse.json({ error: error.message }, { status: 429 });
+      return apiError(error, 429, 'Concurrent session limit reached');
     }
-    // eslint-disable-next-line no-console
-    console.error('[POST /api/interactive/chat/:featureId/messages]', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
+    return apiError(error);
   }
 }
 
@@ -86,12 +82,7 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[DELETE /api/interactive/chat/:featureId/messages]', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
+    return apiError(error);
   }
 }
 
@@ -103,11 +94,6 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 
     return NextResponse.json(chatState);
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[GET /api/interactive/chat/:featureId/messages]', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
+    return apiError(error);
   }
 }

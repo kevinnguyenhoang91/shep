@@ -20,7 +20,9 @@ export async function GET(
         });
         controller.enqueue(encoder.encode(`event: done\ndata: ${JSON.stringify(status)}\n\n`));
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Installation failed';
+        // eslint-disable-next-line no-console
+        console.error('[API Error]', error);
+        const message = 'Installation failed';
         controller.enqueue(
           encoder.encode(
             `event: done\ndata: ${JSON.stringify({ status: 'error', toolName: id, errorMessage: message })}\n\n`

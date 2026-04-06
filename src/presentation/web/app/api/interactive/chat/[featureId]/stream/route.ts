@@ -11,6 +11,7 @@
  */
 
 import type { NextRequest } from 'next/server';
+import { apiError } from '@/lib/api-error';
 import { resolve } from '@/lib/server-container';
 import type { IInteractiveSessionService } from '@shepai/core/application/ports/output/services/interactive-session-service.interface';
 
@@ -97,11 +98,6 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
       },
     });
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[GET /api/interactive/chat/:featureId/stream]', error);
-    return new Response(JSON.stringify({ error: String(error) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return apiError(error);
   }
 }

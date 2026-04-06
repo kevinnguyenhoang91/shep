@@ -11,7 +11,11 @@ export async function POST(): Promise<NextResponse> {
     const files: FileAttachment[] | null = service.pickFiles();
     return NextResponse.json({ files, cancelled: files === null });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to open file dialog';
-    return NextResponse.json({ files: null, cancelled: false, error: message }, { status: 500 });
+    // eslint-disable-next-line no-console
+    console.error('[API Error]', error);
+    return NextResponse.json(
+      { files: null, cancelled: false, error: 'Failed to open file dialog' },
+      { status: 500 }
+    );
   }
 }

@@ -8,6 +8,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { apiError } from '@/lib/api-error';
 import { resolve } from '@/lib/server-container';
 import type { StartInteractiveSessionUseCase } from '@shepai/core/application/use-cases/interactive/start-interactive-session.use-case';
 import { ConcurrentSessionLimitError } from '@shepai/core/domain/errors/concurrent-session-limit.error';
@@ -45,11 +46,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { status: 429 }
       );
     }
-    // eslint-disable-next-line no-console
-    console.error('[POST /api/interactive/sessions]', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
+    return apiError(error);
   }
 }

@@ -11,6 +11,7 @@
  * - Cleans up EventEmitter subscription on client disconnect
  */
 
+import { apiError } from '@/lib/api-error';
 import { resolve } from '@/lib/server-container';
 import type {
   IDeploymentService,
@@ -102,11 +103,6 @@ export function GET(request: Request): Response {
       },
     });
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[SSE route] GET /api/deployment-logs error:', error);
-    return new Response(JSON.stringify({ error: String(error) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return apiError(error);
   }
 }

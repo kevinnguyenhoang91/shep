@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { apiError } from '@/lib/api-error';
 import { resolve } from '@/lib/server-container';
 import type { ListRepositoriesUseCase } from '@shepai/core/application/use-cases/repositories/list-repositories.use-case';
 import type { ListFeaturesUseCase } from '@shepai/core/application/use-cases/features/list-features.use-case';
@@ -73,8 +74,6 @@ export async function GET() {
     cache = { data: sessionsByPath, createdAt: Date.now() };
     return NextResponse.json({ sessionsByPath });
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[API] GET /api/sessions-batch error:', error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return apiError(error);
   }
 }

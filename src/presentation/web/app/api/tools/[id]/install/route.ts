@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { apiError } from '@/lib/api-error';
 import { resolve } from '@/lib/server-container';
 import type { InstallToolUseCase } from '@shepai/core/application/use-cases/tools/install-tool.use-case';
 import type { ToolInstallationStatus } from '@shepai/core/domain/generated/output';
@@ -26,7 +27,6 @@ export async function POST(
 
     return NextResponse.json({ status });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to install tool';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(error, 500, 'Failed to install tool');
   }
 }

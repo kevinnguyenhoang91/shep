@@ -6,6 +6,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { apiError } from '@/lib/api-error';
 import { resolve } from '@/lib/server-container';
 import type { StopInteractiveSessionUseCase } from '@shepai/core/application/use-cases/interactive/stop-interactive-session.use-case';
 
@@ -23,11 +24,6 @@ export async function POST(_request: NextRequest, { params }: RouteParams): Prom
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[POST /api/interactive/chat/:featureId/stop]', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
+    return apiError(error);
   }
 }

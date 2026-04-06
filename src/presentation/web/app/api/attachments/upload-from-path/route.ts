@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { apiError } from '@/lib/api-error';
 import { readFile } from 'fs/promises';
 import { extname, basename } from 'path';
 import { resolve as resolvePath } from 'path';
@@ -130,7 +131,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       createdAt: attachment.createdAt,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Upload failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(error, 500, 'Upload failed');
   }
 }

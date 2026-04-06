@@ -410,6 +410,7 @@
   },
   "chat": {
     "shepChat": "Shep Chat",
+    "closeChat": "Close chat",
     "writeMessage": "Write a message...",
     "attachFiles": "Attach files",
     "forceStopAgent": "Force stop agent process",

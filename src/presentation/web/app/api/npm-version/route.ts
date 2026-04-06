@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { apiError } from '@/lib/api-error';
 
 const CACHE_TTL_MS = 5 * 60_000; // 5 minutes
 let cachedVersion: { latest: string | null; fetchedAt: number } | null = null;
@@ -22,7 +23,6 @@ export async function GET(): Promise<NextResponse> {
     cachedVersion = { latest, fetchedAt: Date.now() };
     return NextResponse.json({ latest });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to check npm version';
-    return NextResponse.json({ error: message }, { status: 502 });
+    return apiError(error, 502, 'Failed to check npm version');
   }
 }

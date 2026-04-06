@@ -411,6 +411,7 @@ export function GlobalChatPopup() {
         <Button
           size="icon"
           onClick={toggle}
+          aria-label={isOpen ? t('chat.closeChat') : t('chat.shepChat')}
           className={cn(
             'relative h-14 w-14 rounded-full shadow-lg',
             'transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95',

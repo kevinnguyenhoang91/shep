@@ -410,6 +410,7 @@
   },
   "chat": {
     "shepChat": "צ'אט Shep",
+    "closeChat": "סגור צ'אט",
     "writeMessage": "כתוב הודעה...",
     "attachFiles": "צירוף קבצים",
     "forceStopAgent": "עצירת סוכן בכוח",

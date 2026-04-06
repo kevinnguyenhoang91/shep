@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { apiError } from '@/lib/api-error';
 import { resolve } from '@/lib/server-container';
 import type {
   LaunchToolUseCase,
@@ -32,7 +33,6 @@ export async function POST(
         return NextResponse.json({ error: result.message }, { status: 500 });
     }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to launch tool';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(error, 500, 'Failed to launch tool');
   }
 }

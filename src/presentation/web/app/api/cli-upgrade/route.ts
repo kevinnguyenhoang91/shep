@@ -25,7 +25,9 @@ export async function POST(): Promise<Response> {
           return;
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Upgrade failed';
+        // eslint-disable-next-line no-console
+        console.error('[API Error]', error);
+        const message = 'Upgrade failed';
         controller.enqueue(
           encoder.encode(
             `event: done\ndata: ${JSON.stringify({ status: 'error', currentVersion: '', latestVersion: null, errorMessage: message })}\n\n`

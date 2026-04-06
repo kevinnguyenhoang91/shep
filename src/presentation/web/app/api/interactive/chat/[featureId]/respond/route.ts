@@ -9,6 +9,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { apiError } from '@/lib/api-error';
 import { resolve } from '@/lib/server-container';
 import type { RespondToInteractionUseCase } from '@shepai/core/application/use-cases/interactive/respond-to-interaction.use-case';
 
@@ -37,10 +38,9 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const status = message.includes('No pending interaction') ? 409 : 500;
-    // eslint-disable-next-line no-console
-    console.error('[POST /api/interactive/chat/:featureId/respond]', error);
-    return NextResponse.json({ error: message }, { status });
+    if (error instanceof Error && error.message.includes('No pending interaction')) {
+      return apiError(error, 409, 'No pending interaction');
+    }
+    return apiError(error);
   }
 }

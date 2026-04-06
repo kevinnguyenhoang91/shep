@@ -410,6 +410,7 @@
   },
   "chat": {
     "shepChat": "محادثة Shep",
+    "closeChat": "إغلاق المحادثة",
     "writeMessage": "اكتب رسالة...",
     "attachFiles": "إرفاق ملفات",
     "forceStopAgent": "إيقاف الوكيل إجبارياً",

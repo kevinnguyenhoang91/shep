@@ -12,6 +12,7 @@
  * - Cleans up watchers/intervals on client disconnect
  */
 
+import { apiError } from '@/lib/api-error';
 import { resolve } from '@/lib/server-container';
 import type { IFeatureRepository } from '@shepai/core/application/ports/output/repositories/feature-repository.interface';
 import { join } from 'node:path';
@@ -189,11 +190,6 @@ export async function GET(request: Request): Promise<Response> {
       },
     });
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[SSE route] GET /api/feature-logs error:', error);
-    return new Response(JSON.stringify({ error: String(error) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return apiError(error);
   }
 }
