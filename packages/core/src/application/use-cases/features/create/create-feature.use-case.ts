@@ -33,7 +33,7 @@ import type { IRepositoryRepository } from '../../../ports/output/repositories/r
 import type { IGitPrService } from '../../../ports/output/services/git-pr-service.interface.js';
 import type { IAgentValidator } from '../../../ports/output/agents/agent-validator.interface.js';
 import type { ISkillInjectorService } from '../../../ports/output/services/skill-injector.interface.js';
-import { getSettings } from '../../../../infrastructure/services/settings.service.js';
+import type { ISettingsReader } from '../../../ports/output/services/settings-reader.interface.js';
 import { createDefaultSettings } from '../../../../domain/factories/settings-defaults.factory.js';
 import { POST_IMPLEMENTATION } from '../../../../domain/lifecycle-gates.js';
 import { AttachmentStorageService } from '../../../../infrastructure/services/attachment-storage.service.js';
@@ -67,7 +67,9 @@ export class CreateFeatureUseCase {
     @inject('IAgentValidator')
     private readonly agentValidator: IAgentValidator,
     @inject('ISkillInjectorService')
-    private readonly skillInjector: ISkillInjectorService
+    private readonly skillInjector: ISkillInjectorService,
+    @inject('ISettingsReader')
+    private readonly settingsReader: ISettingsReader
   ) {}
 
   /**
@@ -198,7 +200,7 @@ export class CreateFeatureUseCase {
     await this.featureRepo.create(feature);
 
     // Create agent run record (pending state — agent not spawned yet)
-    const settings = getSettings();
+    const settings = this.settingsReader.getSettings();
     const agentRun = {
       id: runId,
       agentType: (input.agentType as typeof settings.agent.type) ?? settings.agent.type,
@@ -309,7 +311,7 @@ export class CreateFeatureUseCase {
     }
 
     // Inject curated skills into the worktree (opt-in, guarded by settings or CLI flag)
-    const settings = getSettings();
+    const settings = this.settingsReader.getSettings();
     const shouldInject = input.injectSkills ?? settings.workflow.skillInjection?.enabled ?? false;
     let injectedSkillNames: string[] | undefined;
     const skillConfig =

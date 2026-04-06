@@ -1,8 +1,8 @@
 'use server';
 
 import { resolve } from '@/lib/server-container';
+import type { ISettingsReader } from '@shepai/core/application/ports/output/services/settings-reader.interface';
 import {
-  getSettings,
   resetSettings,
   initializeSettings,
 } from '@shepai/core/infrastructure/services/settings.service';
@@ -24,7 +24,8 @@ export async function updateModel(model: string): Promise<{ ok: boolean; error?:
   }
 
   try {
-    const currentSettings = getSettings();
+    const settingsReader = resolve<ISettingsReader>('ISettingsReader');
+    const currentSettings = settingsReader.getSettings();
     const updatedSettings = {
       ...currentSettings,
       models: { default: model.trim() },

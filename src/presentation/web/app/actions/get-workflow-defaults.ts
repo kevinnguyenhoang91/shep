@@ -1,6 +1,7 @@
 'use server';
 
-import { getSettings } from '@shepai/core/infrastructure/services/settings.service';
+import { resolve } from '@/lib/server-container';
+import type { ISettingsReader } from '@shepai/core/application/ports/output/services/settings-reader.interface';
 
 export interface WorkflowDefaults {
   approvalGates: {
@@ -18,7 +19,8 @@ export interface WorkflowDefaults {
 }
 
 export async function getWorkflowDefaults(): Promise<WorkflowDefaults> {
-  const settings = getSettings();
+  const settingsReader = resolve<ISettingsReader>('ISettingsReader');
+  const settings = settingsReader.getSettings();
   const { workflow } = settings;
 
   return {

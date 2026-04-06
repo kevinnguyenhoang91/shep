@@ -1,7 +1,7 @@
 'use server';
 
 import { isAbsolute } from 'node:path';
-import { getSettings } from '@shepai/core/infrastructure/services/settings.service';
+import type { ISettingsReader } from '@shepai/core/application/ports/output/services/settings-reader.interface';
 import type { LaunchIdeUseCase } from '@shepai/core/application/use-cases/ide/launch-ide.use-case';
 import { resolve } from '@/lib/server-container';
 
@@ -19,8 +19,8 @@ export async function openIde(
     return { success: false, error: 'repositoryPath must be an absolute path' };
   }
 
-  const settings = getSettings();
-  const editor = settings.environment.defaultEditor;
+  const settingsReader = resolve<ISettingsReader>('ISettingsReader');
+  const editor = settingsReader.getSettings().environment.defaultEditor;
 
   const useCase = resolve<LaunchIdeUseCase>('LaunchIdeUseCase');
   const result = await useCase.execute({

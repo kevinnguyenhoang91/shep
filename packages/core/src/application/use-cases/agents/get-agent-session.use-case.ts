@@ -8,7 +8,7 @@
 
 import { injectable, inject } from 'tsyringe';
 import type { AgentSession, AgentType } from '../../../domain/generated/output.js';
-import { getSettings } from '../../../infrastructure/services/settings.service.js';
+import type { ISettingsReader } from '../../ports/output/services/settings-reader.interface.js';
 import { AgentSessionRepositoryRegistry } from '../../services/agents/agent-session-repository.registry.js';
 import { SessionNotFoundError } from '../../../domain/errors/session-not-found.error.js';
 
@@ -25,7 +25,9 @@ export interface GetAgentSessionInput {
 export class GetAgentSessionUseCase {
   constructor(
     @inject(AgentSessionRepositoryRegistry)
-    private readonly registry: AgentSessionRepositoryRegistry
+    private readonly registry: AgentSessionRepositoryRegistry,
+    @inject('ISettingsReader')
+    private readonly settingsReader: ISettingsReader
   ) {}
 
   async execute(input: GetAgentSessionInput): Promise<AgentSession> {
@@ -43,6 +45,6 @@ export class GetAgentSessionUseCase {
   }
 
   private resolveAgentType(agentType?: AgentType): AgentType {
-    return agentType ?? getSettings().agent.type;
+    return agentType ?? this.settingsReader.getSettings().agent.type;
   }
 }

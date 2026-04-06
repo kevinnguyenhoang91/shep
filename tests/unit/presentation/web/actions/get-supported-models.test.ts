@@ -2,16 +2,18 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockGetSettings = vi.fn();
-const mockResolve = vi.fn();
 const mockGetSupportedModels = vi.fn();
+const mockSettingsReader = {
+  getSettings: vi.fn(),
+  hasSettings: vi.fn().mockReturnValue(true),
+};
 
-vi.mock('@shepai/core/infrastructure/services/settings.service', () => ({
-  getSettings: mockGetSettings,
-}));
+const mockResolve = vi.fn((_token: string): any => {
+  throw new Error('must configure mockResolve in beforeEach');
+});
 
 vi.mock('@/lib/server-container', () => ({
-  resolve: mockResolve,
+  resolve: (token: string) => mockResolve(token),
 }));
 
 const { getSupportedModels } = await import(
@@ -21,11 +23,16 @@ const { getSupportedModels } = await import(
 describe('getSupportedModels server action', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolve.mockReturnValue({ getSupportedModels: mockGetSupportedModels });
+    mockSettingsReader.getSettings.mockReturnValue({ agent: { type: 'claude-code' } });
+    mockResolve.mockImplementation((token: string) => {
+      if (token === 'ISettingsReader') return mockSettingsReader;
+      if (token === 'IAgentExecutorFactory') return { getSupportedModels: mockGetSupportedModels };
+      throw new Error(`Unknown token: ${token}`);
+    });
   });
 
   it('calls getSupportedModels with the configured agent type', async () => {
-    mockGetSettings.mockReturnValue({ agent: { type: 'claude-code' } });
+    mockSettingsReader.getSettings.mockReturnValue({ agent: { type: 'claude-code' } });
     mockGetSupportedModels.mockReturnValue(['claude-opus-4-6', 'claude-sonnet-4-6']);
 
     const result = await getSupportedModels();
@@ -35,7 +42,7 @@ describe('getSupportedModels server action', () => {
   });
 
   it('resolves IAgentExecutorFactory from the container', async () => {
-    mockGetSettings.mockReturnValue({ agent: { type: 'gemini-cli' } });
+    mockSettingsReader.getSettings.mockReturnValue({ agent: { type: 'gemini-cli' } });
     mockGetSupportedModels.mockReturnValue(['gemini-2.5-pro']);
 
     await getSupportedModels();
@@ -44,8 +51,16 @@ describe('getSupportedModels server action', () => {
   });
 
   it('returns empty array when settings are not initialized', async () => {
-    mockGetSettings.mockImplementation(() => {
-      throw new Error('Settings not initialized');
+    mockResolve.mockImplementation((token: string) => {
+      if (token === 'ISettingsReader') {
+        return {
+          getSettings: () => {
+            throw new Error('Settings not initialized');
+          },
+          hasSettings: () => false,
+        };
+      }
+      throw new Error('Should not resolve other tokens');
     });
 
     const result = await getSupportedModels();
@@ -54,8 +69,8 @@ describe('getSupportedModels server action', () => {
   });
 
   it('returns empty array when factory resolve fails', async () => {
-    mockGetSettings.mockReturnValue({ agent: { type: 'claude-code' } });
-    mockResolve.mockImplementation(() => {
+    mockResolve.mockImplementation((token: string) => {
+      if (token === 'ISettingsReader') return mockSettingsReader;
       throw new Error('DI container not available');
     });
 
@@ -65,7 +80,7 @@ describe('getSupportedModels server action', () => {
   });
 
   it('passes gemini-cli agent type to factory correctly', async () => {
-    mockGetSettings.mockReturnValue({ agent: { type: 'gemini-cli' } });
+    mockSettingsReader.getSettings.mockReturnValue({ agent: { type: 'gemini-cli' } });
     mockGetSupportedModels.mockReturnValue(['gemini-3.1-pro', 'gemini-3-flash']);
 
     const result = await getSupportedModels();
@@ -75,7 +90,7 @@ describe('getSupportedModels server action', () => {
   });
 
   it('passes cursor agent type to factory correctly', async () => {
-    mockGetSettings.mockReturnValue({ agent: { type: 'cursor' } });
+    mockSettingsReader.getSettings.mockReturnValue({ agent: { type: 'cursor' } });
     mockGetSupportedModels.mockReturnValue(['claude-opus-4-6', 'gpt-5.4-high']);
 
     const result = await getSupportedModels();

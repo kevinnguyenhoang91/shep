@@ -2,9 +2,16 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockGetSettings = vi.fn();
-vi.mock('@shepai/core/infrastructure/services/settings.service', () => ({
-  getSettings: mockGetSettings,
+const mockSettingsReader = {
+  getSettings: vi.fn(),
+  hasSettings: vi.fn().mockReturnValue(true),
+};
+
+vi.mock('@/lib/server-container', () => ({
+  resolve: (token: string) => {
+    if (token === 'ISettingsReader') return mockSettingsReader;
+    throw new Error(`Unknown token: ${token}`);
+  },
 }));
 
 const { getWorkflowDefaults } = await import(
@@ -17,7 +24,7 @@ describe('getWorkflowDefaults server action', () => {
   });
 
   it('maps workflow settings to drawer defaults', async () => {
-    mockGetSettings.mockReturnValue({
+    mockSettingsReader.getSettings.mockReturnValue({
       workflow: {
         openPrOnImplementationComplete: true,
         approvalGateDefaults: {
@@ -53,7 +60,7 @@ describe('getWorkflowDefaults server action', () => {
   });
 
   it('returns all false when workflow defaults are all false', async () => {
-    mockGetSettings.mockReturnValue({
+    mockSettingsReader.getSettings.mockReturnValue({
       workflow: {
         openPrOnImplementationComplete: false,
         approvalGateDefaults: {
@@ -89,7 +96,7 @@ describe('getWorkflowDefaults server action', () => {
   });
 
   it('maps pushOnImplementationComplete to push field', async () => {
-    mockGetSettings.mockReturnValue({
+    mockSettingsReader.getSettings.mockReturnValue({
       workflow: {
         openPrOnImplementationComplete: false,
         approvalGateDefaults: {
@@ -112,7 +119,7 @@ describe('getWorkflowDefaults server action', () => {
   });
 
   it('maps openPrOnImplementationComplete to openPr field', async () => {
-    mockGetSettings.mockReturnValue({
+    mockSettingsReader.getSettings.mockReturnValue({
       workflow: {
         openPrOnImplementationComplete: true,
         approvalGateDefaults: {

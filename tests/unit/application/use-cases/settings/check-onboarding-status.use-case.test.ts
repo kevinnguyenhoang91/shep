@@ -1,39 +1,35 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-// Mock the settings service module
-vi.mock('@/infrastructure/services/settings.service.js', () => ({
-  getSettings: vi.fn(),
-}));
+import 'reflect-metadata';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 import { CheckOnboardingStatusUseCase } from '@/application/use-cases/settings/check-onboarding-status.use-case.js';
-import { getSettings } from '@/infrastructure/services/settings.service.js';
-
-const mockGetSettings = vi.mocked(getSettings);
+import type { ISettingsReader } from '@/application/ports/output/services/settings-reader.interface.js';
+import type { Settings } from '@/domain/generated/output.js';
 
 describe('CheckOnboardingStatusUseCase', () => {
   let useCase: CheckOnboardingStatusUseCase;
+  let mockSettingsReader: ISettingsReader;
+
+  function createUseCase(onboardingComplete: boolean): CheckOnboardingStatusUseCase {
+    mockSettingsReader = {
+      getSettings: () => ({ onboardingComplete }) as Settings,
+      hasSettings: () => true,
+    };
+    return new CheckOnboardingStatusUseCase(mockSettingsReader);
+  }
 
   beforeEach(() => {
-    useCase = new CheckOnboardingStatusUseCase();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    useCase = createUseCase(false);
   });
 
   it('should return { isComplete: true } when onboardingComplete is true', async () => {
-    mockGetSettings.mockReturnValue({ onboardingComplete: true } as any);
-
+    useCase = createUseCase(true);
     const result = await useCase.execute();
-
     expect(result).toEqual({ isComplete: true });
   });
 
   it('should return { isComplete: false } when onboardingComplete is false', async () => {
-    mockGetSettings.mockReturnValue({ onboardingComplete: false } as any);
-
+    useCase = createUseCase(false);
     const result = await useCase.execute();
-
     expect(result).toEqual({ isComplete: false });
   });
 });

@@ -62,3 +62,4 @@ export type {
 export type { ISkillInjectorService, SkillInjectionResult } from './skill-injector.interface.js';
 export type { IProcessMonitorService } from './process-monitor.interface.js';
 export type { IFileSystemService } from './file-system.interface.js';
+export type { ISettingsReader } from './settings-reader.interface.js';

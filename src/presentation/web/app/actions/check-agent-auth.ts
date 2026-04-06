@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { IS_WINDOWS } from '@shepai/core/infrastructure/platform';
-import { getSettings } from '@shepai/core/infrastructure/services/settings.service';
+import type { ISettingsReader } from '@shepai/core/application/ports/output/services/settings-reader.interface';
 import { resolve } from '@/lib/server-container';
 import type { ListToolsUseCase } from '@shepai/core/application/use-cases/tools/list-tools.use-case';
 
@@ -139,7 +139,8 @@ function tier2AuthVerify(agentType: string, binaryName: string): Promise<boolean
 export async function checkAgentAuth(): Promise<AgentAuthStatus> {
   let agentType: string;
   try {
-    agentType = getSettings().agent.type;
+    const settingsReader = resolve<ISettingsReader>('ISettingsReader');
+    agentType = settingsReader.getSettings().agent.type;
   } catch {
     return {
       agentType: 'unknown',

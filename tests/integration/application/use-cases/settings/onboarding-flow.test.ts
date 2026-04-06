@@ -22,6 +22,7 @@ import {
   type CompleteOnboardingInput,
 } from '@/application/use-cases/settings/complete-onboarding.use-case.js';
 import { initializeSettings, resetSettings } from '@/infrastructure/services/settings.service.js';
+import { SettingsReaderAdapter } from '@/infrastructure/services/settings-reader.adapter.js';
 import { AgentType, AgentAuthMethod } from '@/domain/generated/output.js';
 
 describe('Onboarding flow (integration)', () => {
@@ -62,7 +63,7 @@ describe('Onboarding flow (integration)', () => {
     initializeSettings(settings);
 
     // Fresh settings → onboarding should be incomplete
-    const checkUseCase = new CheckOnboardingStatusUseCase();
+    const checkUseCase = new CheckOnboardingStatusUseCase(new SettingsReaderAdapter());
     const { isComplete } = await checkUseCase.execute();
 
     expect(isComplete).toBe(false);
@@ -83,7 +84,7 @@ describe('Onboarding flow (integration)', () => {
     initializeSettings(updated);
 
     // Now onboarding should be complete
-    const checkUseCase = new CheckOnboardingStatusUseCase();
+    const checkUseCase = new CheckOnboardingStatusUseCase(new SettingsReaderAdapter());
     const { isComplete } = await checkUseCase.execute();
 
     expect(isComplete).toBe(true);
@@ -106,7 +107,7 @@ describe('Onboarding flow (integration)', () => {
     initializeSettings(reloaded!);
 
     // Second run should see onboarding as complete (wizard must NOT appear)
-    const checkUseCase = new CheckOnboardingStatusUseCase();
+    const checkUseCase = new CheckOnboardingStatusUseCase(new SettingsReaderAdapter());
     const { isComplete } = await checkUseCase.execute();
 
     expect(isComplete).toBe(true);

@@ -1,7 +1,7 @@
 'use server';
 
 import { resolve } from '@/lib/server-container';
-import { getSettings } from '@shepai/core/infrastructure/services/settings.service';
+import type { ISettingsReader } from '@shepai/core/application/ports/output/services/settings-reader.interface';
 import type { IAgentExecutorFactory } from '@shepai/core/application/ports/output/agents/agent-executor-factory.interface';
 
 /**
@@ -15,8 +15,8 @@ import type { IAgentExecutorFactory } from '@shepai/core/application/ports/outpu
  */
 export async function getSupportedModels(): Promise<string[]> {
   try {
-    const settings = getSettings();
-    const agentType = settings.agent.type;
+    const settingsReader = resolve<ISettingsReader>('ISettingsReader');
+    const agentType = settingsReader.getSettings().agent.type;
     const factory = resolve<IAgentExecutorFactory>('IAgentExecutorFactory');
     return factory.getSupportedModels(agentType);
   } catch (_error: unknown) {

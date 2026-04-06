@@ -2,20 +2,25 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockGetSettings = vi.fn();
+const mockSettingsReader = {
+  getSettings: vi.fn(),
+  hasSettings: vi.fn().mockReturnValue(true),
+};
 const mockResetSettings = vi.fn();
 const mockInitializeSettings = vi.fn();
-const mockResolve = vi.fn();
 const mockExecute = vi.fn();
 
 vi.mock('@shepai/core/infrastructure/services/settings.service', () => ({
-  getSettings: mockGetSettings,
   resetSettings: mockResetSettings,
   initializeSettings: mockInitializeSettings,
 }));
 
 vi.mock('@/lib/server-container', () => ({
-  resolve: mockResolve,
+  resolve: (token: string) => {
+    if (token === 'ISettingsReader') return mockSettingsReader;
+    if (token === 'UpdateSettingsUseCase') return { execute: mockExecute };
+    throw new Error(`Unknown token: ${token}`);
+  },
 }));
 
 const { updateModel } = await import(
@@ -31,8 +36,7 @@ const baseSettings = {
 describe('updateModel server action', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetSettings.mockReturnValue(baseSettings);
-    mockResolve.mockReturnValue({ execute: mockExecute });
+    mockSettingsReader.getSettings.mockReturnValue(baseSettings);
     mockExecute.mockResolvedValue(undefined);
   });
 
@@ -57,9 +61,11 @@ describe('updateModel server action', () => {
   });
 
   it('resolves UpdateSettingsUseCase from the DI container', async () => {
+    // The resolve mock is called with string tokens; verifying by checking
+    // that execute was called (which means UpdateSettingsUseCase was resolved).
     await updateModel('claude-opus-4-6');
 
-    expect(mockResolve).toHaveBeenCalledWith('UpdateSettingsUseCase');
+    expect(mockExecute).toHaveBeenCalled();
   });
 
   it('returns error when model is empty string', async () => {

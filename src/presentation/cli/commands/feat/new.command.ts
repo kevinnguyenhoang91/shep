@@ -122,7 +122,7 @@ export function createNewCommand(): Command {
 
         // First-run onboarding gate — only for interactive terminals
         if (process.stdin.isTTY) {
-          const { isComplete } = await new CheckOnboardingStatusUseCase().execute();
+          const { isComplete } = await container.resolve(CheckOnboardingStatusUseCase).execute();
           if (!isComplete) {
             await onboardingWizard();
           }

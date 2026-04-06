@@ -45,6 +45,8 @@ import type { IProcessMonitorService } from '../../../application/ports/output/s
 import { ProcessMonitorService } from '../../services/process/process-monitor.service.js';
 import type { IFileSystemService } from '../../../application/ports/output/services/file-system.interface.js';
 import { FileSystemService } from '../../services/filesystem/file-system.service.js';
+import type { ISettingsReader } from '../../../application/ports/output/services/settings-reader.interface.js';
+import { SettingsReaderAdapter } from '../../services/settings-reader.adapter.js';
 
 export function registerServices(container: DependencyContainer, db: Database.Database): void {
   // Register external dependencies as tokens
@@ -124,4 +126,7 @@ export function registerServices(container: DependencyContainer, db: Database.Da
     ProcessMonitorService
   );
   container.registerSingleton<IFileSystemService>('IFileSystemService', FileSystemService);
+
+  // Settings reader — port interface wrapping the globalThis singleton
+  container.registerSingleton<ISettingsReader>('ISettingsReader', SettingsReaderAdapter);
 }

@@ -1,6 +1,7 @@
 'use server';
 
-import { getSettings } from '@shepai/core/infrastructure/services/settings.service';
+import { resolve } from '@/lib/server-container';
+import type { ISettingsReader } from '@shepai/core/application/ports/output/services/settings-reader.interface';
 
 /**
  * Check whether onboarding has been completed.
@@ -8,7 +9,8 @@ import { getSettings } from '@shepai/core/infrastructure/services/settings.servi
  */
 export async function isAgentSetupComplete(): Promise<boolean> {
   try {
-    return getSettings().onboardingComplete;
+    const settingsReader = resolve<ISettingsReader>('ISettingsReader');
+    return settingsReader.getSettings().onboardingComplete;
   } catch {
     return false;
   }
