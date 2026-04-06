@@ -170,7 +170,6 @@
     ],
     "overrides": {
       "minimatch": "^7.x",
-      "ajv": ">=8.18.0",
       "@anthropic-ai/sdk": ">=0.81.0"
     },
     "patchedDependencies": {
