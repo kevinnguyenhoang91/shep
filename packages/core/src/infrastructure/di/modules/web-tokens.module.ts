@@ -54,6 +54,9 @@ import { CompleteWebOnboardingUseCase } from '../../../application/use-cases/set
 
 import { UpgradeCliUseCase } from '../../../application/use-cases/upgrade/upgrade-cli.use-case.js';
 
+// Notification use cases
+import { PollAgentEventsUseCase } from '../../../application/use-cases/notifications/poll-agent-events.use-case.js';
+
 // Interactive use cases
 import { StartInteractiveSessionUseCase } from '../../../application/use-cases/interactive/start-interactive-session.use-case.js';
 import { SendInteractiveMessageUseCase } from '../../../application/use-cases/interactive/send-interactive-message.use-case.js';
@@ -189,6 +192,11 @@ export function registerWebTokens(container: DependencyContainer): void {
   // Upgrade use cases
   container.register('UpgradeCliUseCase', {
     useFactory: (c) => c.resolve(UpgradeCliUseCase),
+  });
+
+  // Notification use cases (transient — each resolve creates a fresh instance)
+  container.register('PollAgentEventsUseCase', {
+    useFactory: (c) => c.resolve(PollAgentEventsUseCase),
   });
 
   // Interactive use cases

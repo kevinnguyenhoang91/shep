@@ -7,6 +7,9 @@
 // CLI helpers
 export * from './cli/index.js';
 
+// Shared test factories
+export * from './factories/index.js';
+
 // Future: TUI helpers
 // export * from './tui/index.js';
 

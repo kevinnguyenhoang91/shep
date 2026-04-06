@@ -66,6 +66,9 @@ import { ListGitHubRepositoriesUseCase } from '../../../application/use-cases/re
 import { ListGitHubOrganizationsUseCase } from '../../../application/use-cases/repositories/list-github-organizations.use-case.js';
 import { SyncRepositoryMainUseCase } from '../../../application/use-cases/repositories/sync-repository-main.use-case.js';
 
+// Notification use cases
+import { PollAgentEventsUseCase } from '../../../application/use-cases/notifications/poll-agent-events.use-case.js';
+
 // Upgrade use cases
 import { UpgradeCliUseCase } from '../../../application/use-cases/upgrade/upgrade-cli.use-case.js';
 
@@ -147,6 +150,9 @@ export function registerUseCases(container: DependencyContainer): void {
   container.registerSingleton(ListGitHubRepositoriesUseCase);
   container.registerSingleton(ListGitHubOrganizationsUseCase);
   container.registerSingleton(SyncRepositoryMainUseCase);
+
+  // Notifications (transient — each SSE connection needs its own instance with fresh caches)
+  container.register(PollAgentEventsUseCase, { useClass: PollAgentEventsUseCase });
 
   // Upgrade
   container.registerSingleton(UpgradeCliUseCase);
