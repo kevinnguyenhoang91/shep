@@ -1,6 +1,7 @@
 === Feature-Specific Unit Test Results ===
-Test run date: 2026-04-07T13:50:18Z
+Test run date: 2026-04-07T13:55:00Z
 Branch: feat/feature-dependency-rebase
+Command: pnpm test:unit -- (4 feature-specific test files)
 
 === ReparentFeatureUseCase (19 tests) ===
 File: tests/unit/use-cases/features/reparent-feature.use-case.test.ts
@@ -24,12 +25,13 @@ Coverage: task-8, task-9, task-10, task-11, task-14 (canvas reparenting flow)
 
 === SUMMARY ===
 Feature-specific tests: 4 files, 72 tests - ALL PASSED
+Full unit suite (this run): 383 files, 5402 tests passed
 
 --- Detailed Test Output (vitest run, ANSI stripped) ---
 
  RUN  v4.0.18 /Users/arielshadkhan/.shep/repos/fbfd7efb528913ed/wt/feat-feature-dependency-rebase
 
- ✓  node  tests/unit/infrastructure/services/git/git-pr.service.rebase-on-branch.test.ts (13 tests) 4ms
+ ✓  node  tests/unit/infrastructure/services/git/git-pr.service.rebase-on-branch.test.ts (13 tests) 12ms
    ✓ should throw GIT_ERROR when worktree is dirty
    ✓ should fetch the target branch before rebasing
    ✓ should checkout the feature branch before rebasing
@@ -44,7 +46,7 @@ Feature-specific tests: 4 files, 72 tests - ALL PASSED
    ✓ should still throw REBASE_CONFLICT even if getConflictedFiles fails
    ✓ should execute steps in correct order: dirty check → fetch → checkout → rebase
 
- ✓  node  tests/unit/use-cases/features/reparent-feature.use-case.test.ts (19 tests) 6ms
+ ✓  node  tests/unit/use-cases/features/reparent-feature.use-case.test.ts (19 tests) 19ms
    ✓ should successfully reparent a feature under a new parent
    ✓ should reject self-reparent
    ✓ should reject direct cycle (A→B, try to reparent A under B)
@@ -65,7 +67,7 @@ Feature-specific tests: 4 files, 72 tests - ALL PASSED
    ✓ should propagate errors from repository.update
    ✓ should handle deeply nested ancestor chains in cycle detection
 
- ✓  node  tests/unit/application/use-cases/features/check-and-unblock-features-rebase.test.ts (16 tests) 12ms
+ ✓  node  tests/unit/application/use-cases/features/check-and-unblock-features-rebase.test.ts (16 tests) 25ms
    ✓ should rebase child branch onto parent branch before spawning agent
    ✓ should use parent branch name as target for rebaseOnBranch
    ✓ should call stashPop after successful rebase
@@ -83,12 +85,7 @@ Feature-specific tests: 4 files, 72 tests - ALL PASSED
    ✓ should isolate failures per child
    ✓ should respect 5-minute timeout per child rebase
 
- Test Files  3 passed (3)
-      Tests  48 passed (48)
-   Start at  13:50:18
-   Duration  202ms
-
- ✓  web  tests/unit/presentation/web/components/features/control-center/control-center-integration.test.tsx (24 tests) 172ms
+ ✓  web  tests/unit/presentation/web/components/features/control-center/control-center-integration.test.tsx (24 tests) 582ms
    ✓ handleConnect calls reparentFeature with valid feature-to-feature connection
    ✓ handleConnect rejects non-feature-to-feature connections
    ✓ handleConnect rejects self-connections
@@ -103,8 +100,12 @@ Feature-specific tests: 4 files, 72 tests - ALL PASSED
    ✓ reparentFeature unparent sets parentNodeId to undefined
    ... (all 24 tests passed)
 
- Test Files  1 passed (1)
-      Tests  24 passed (24)
-   Duration  1.37s
+ Test Files  4 passed (4)
+      Tests  72 passed (72)
 
 === TOTAL FEATURE-SPECIFIC TESTS: 72 passed (72) ===
+
+=== FULL UNIT SUITE (this run) ===
+ Test Files  383 passed (383)
+      Tests  5402 passed (5402)
+   Duration  46.76s
