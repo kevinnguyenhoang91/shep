@@ -49,6 +49,7 @@ function makeFeature(overrides?: Partial<Feature>): Feature {
     ciWatchEnabled: true,
     enableEvidence: false,
     commitEvidence: false,
+    injectSkills: false,
     approvalGates: { allowPrd: false, allowPlan: false, allowMerge: false },
     agentRunId: 'run-001',
     specPath: '/repo/.shep/specs/001-test-feature',
