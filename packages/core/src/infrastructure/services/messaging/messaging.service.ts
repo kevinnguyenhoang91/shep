@@ -118,16 +118,15 @@ export class MessagingService implements IMessagingService {
     const { config } = this.deps;
     if (!config.enabled || !config.gatewayUrl || !config.deviceId) return false;
 
-    const telegramReady = !!(
-      config.telegram?.paired &&
-      config.telegram.routeId &&
-      config.telegram.chatId
-    );
-    const whatsappReady = !!(
-      config.whatsapp?.paired &&
-      config.whatsapp.routeId &&
-      config.whatsapp.chatId
-    );
+    // The tunnel must start as soon as a route exists — not only after the
+    // user is fully paired. The auto-confirm flow requires this: the daemon
+    // needs to be receiving tunnel.request frames in order to see the
+    // inbound `/pair <code>` message from the user's first DM and call
+    // ConfirmMessagingPairingUseCase. If we gated on `paired && chatId`
+    // the user could never complete pairing without a manual chatId entry
+    // in the UI.
+    const telegramReady = !!config.telegram?.routeId;
+    const whatsappReady = !!config.whatsapp?.routeId;
     return telegramReady || whatsappReady;
   }
 

@@ -20,16 +20,39 @@ export interface TunnelConnectedFrame {
   at?: string;
 }
 
+/**
+ * Client → server: claim one or more routes on the live tunnel.
+ *
+ * The gateway's frame shape (see
+ * internal/gateway/integrations_tunnel.go:handleTunnelActivate) expects
+ * a `routes` array of route_id strings (or objects with `route_id`), NOT
+ * a single `route_id` field. An earlier Shep build sent the singular form
+ * and the gateway silently ignored it, which is why no routes were ever
+ * activated and every public webhook returned 503.
+ */
 export interface TunnelActivateFrame {
   type: 'tunnel.activate';
+  request_id?: string;
+  routes: string[];
+}
+
+/**
+ * Server → client: per-route activation results.
+ *
+ * Again the real gateway returns a `results` array (one entry per route),
+ * not a flat `{ route_id, ok }` pair.
+ */
+export interface TunnelActivateResultEntry {
   route_id: string;
+  status: string;
+  /** Present when status === "rejected". */
+  error?: { code: string; message: string };
 }
 
 export interface TunnelActivateResultFrame {
   type: 'tunnel.activate.result';
-  route_id: string;
-  ok: boolean;
-  error?: string;
+  request_id?: string;
+  results: TunnelActivateResultEntry[];
 }
 
 export interface TunnelRequestFrame {

@@ -69,7 +69,18 @@ function connectedFrame(deviceId = 'dev-1'): TunnelConnectedFrame {
 }
 
 function activateResultFrame(routeId: string, ok = true): TunnelActivateResultFrame {
-  return { type: 'tunnel.activate.result', route_id: routeId, ok };
+  return {
+    type: 'tunnel.activate.result',
+    results: [
+      ok
+        ? { route_id: routeId, status: 'active' }
+        : {
+            route_id: routeId,
+            status: 'rejected',
+            error: { code: 'route_not_found', message: 'Route not found' },
+          },
+    ],
+  };
 }
 
 describe('MessagingTunnelAdapter', () => {
@@ -125,7 +136,7 @@ describe('MessagingTunnelAdapter', () => {
     expect(fakeWs.url.startsWith('wss://gw.example.com/')).toBe(true);
   });
 
-  it('sends tunnel.activate for each configured route after tunnel.connected', async () => {
+  it('sends a single batched tunnel.activate with all routes after tunnel.connected', async () => {
     buildAdapter(['route-telegram', 'route-whatsapp']);
     const p = adapter.connect();
     setImmediate(() => fakeWs.emitOpen());
@@ -134,9 +145,11 @@ describe('MessagingTunnelAdapter', () => {
     fakeWs.emitFrame(connectedFrame());
 
     const sent = fakeWs.parseSent() as TunnelActivateFrame[];
-    expect(sent).toHaveLength(2);
-    expect(sent[0]).toMatchObject({ type: 'tunnel.activate', route_id: 'route-telegram' });
-    expect(sent[1]).toMatchObject({ type: 'tunnel.activate', route_id: 'route-whatsapp' });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      type: 'tunnel.activate',
+      routes: ['route-telegram', 'route-whatsapp'],
+    });
   });
 
   it('marks routes activated after tunnel.activate.result ok', async () => {

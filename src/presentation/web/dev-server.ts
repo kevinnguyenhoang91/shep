@@ -40,6 +40,7 @@ import {
   initializeAutoArchiveWatcher,
   getAutoArchiveWatcher,
 } from '@/infrastructure/services/auto-archive/auto-archive-watcher.service.js';
+import type { IMessagingService } from '@/application/ports/output/services/messaging-service.interface.js';
 
 const DEFAULT_PORT = 3000;
 
@@ -109,6 +110,27 @@ async function main() {
     // Start auto-archive watcher for completed features
     initializeAutoArchiveWatcher(featureRepo);
     getAutoArchiveWatcher().start();
+
+    // Optionally start the messaging remote-control service.
+    // Dev mode skips this by default because it opens a persistent
+    // WebSocket tunnel to the gateway and is not something every
+    // developer wants running on every `pnpm dev:web` invocation.
+    // Opt in with SHEP_ENABLE_MESSAGING=1.
+    if (process.env.SHEP_ENABLE_MESSAGING === '1') {
+      try {
+        const messagingService = container.resolve<IMessagingService>('IMessagingService');
+        if (messagingService.isConfigured()) {
+          await messagingService.start();
+          console.log('[dev-server] messaging remote control started');
+        } else {
+          console.log(
+            '[dev-server] SHEP_ENABLE_MESSAGING=1 but messaging is not configured yet — pair a platform in Settings first'
+          );
+        }
+      } catch (err) {
+        console.warn('[dev-server] failed to start messaging service:', err);
+      }
+    }
   } catch (error) {
     console.warn('[dev-server] DI initialization failed — features will be empty:', error);
   }
@@ -171,6 +193,12 @@ async function main() {
         getAutoArchiveWatcher().stop();
       } catch {
         /* not initialized */
+      }
+      try {
+        const messagingService = container.resolve<IMessagingService>('IMessagingService');
+        await messagingService.stop();
+      } catch {
+        /* not initialized or not running */
       }
       server.closeAllConnections();
       await Promise.all([

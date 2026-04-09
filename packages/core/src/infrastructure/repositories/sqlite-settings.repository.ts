@@ -74,7 +74,15 @@ export class SQLiteSettingsRepository implements ISettingsRepository {
         interactive_agent_max_concurrent_sessions,
         auto_archive_delay_minutes,
         stage_timeout_fast_implement_ms,
-        fab_position_swapped
+        fab_position_swapped,
+        messaging_enabled, messaging_gateway_url, messaging_device_id,
+        messaging_gateway_client_id, messaging_debounce_ms, messaging_chat_buffer_ms,
+        messaging_telegram_enabled, messaging_telegram_paired, messaging_telegram_chat_id,
+        messaging_telegram_route_id, messaging_telegram_route_token, messaging_telegram_public_url,
+        messaging_telegram_bot_token, messaging_telegram_pending_code, messaging_telegram_pending_expires_at,
+        messaging_whatsapp_enabled, messaging_whatsapp_paired, messaging_whatsapp_chat_id,
+        messaging_whatsapp_route_id, messaging_whatsapp_route_token, messaging_whatsapp_public_url,
+        messaging_whatsapp_bot_token, messaging_whatsapp_pending_code, messaging_whatsapp_pending_expires_at
       ) VALUES (
         @id, @created_at, @updated_at,
         @model_analyze, @model_requirements, @model_plan, @model_implement, @model_default,
@@ -106,7 +114,15 @@ export class SQLiteSettingsRepository implements ISettingsRepository {
         @interactive_agent_max_concurrent_sessions,
         @auto_archive_delay_minutes,
         @stage_timeout_fast_implement_ms,
-        @fab_position_swapped
+        @fab_position_swapped,
+        @messaging_enabled, @messaging_gateway_url, @messaging_device_id,
+        @messaging_gateway_client_id, @messaging_debounce_ms, @messaging_chat_buffer_ms,
+        @messaging_telegram_enabled, @messaging_telegram_paired, @messaging_telegram_chat_id,
+        @messaging_telegram_route_id, @messaging_telegram_route_token, @messaging_telegram_public_url,
+        @messaging_telegram_bot_token, @messaging_telegram_pending_code, @messaging_telegram_pending_expires_at,
+        @messaging_whatsapp_enabled, @messaging_whatsapp_paired, @messaging_whatsapp_chat_id,
+        @messaging_whatsapp_route_id, @messaging_whatsapp_route_token, @messaging_whatsapp_public_url,
+        @messaging_whatsapp_bot_token, @messaging_whatsapp_pending_code, @messaging_whatsapp_pending_expires_at
       )
     `);
 
@@ -220,7 +236,31 @@ export class SQLiteSettingsRepository implements ISettingsRepository {
         interactive_agent_max_concurrent_sessions = @interactive_agent_max_concurrent_sessions,
         auto_archive_delay_minutes = @auto_archive_delay_minutes,
         stage_timeout_fast_implement_ms = @stage_timeout_fast_implement_ms,
-        fab_position_swapped = @fab_position_swapped
+        fab_position_swapped = @fab_position_swapped,
+        messaging_enabled = @messaging_enabled,
+        messaging_gateway_url = @messaging_gateway_url,
+        messaging_device_id = @messaging_device_id,
+        messaging_gateway_client_id = @messaging_gateway_client_id,
+        messaging_debounce_ms = @messaging_debounce_ms,
+        messaging_chat_buffer_ms = @messaging_chat_buffer_ms,
+        messaging_telegram_enabled = @messaging_telegram_enabled,
+        messaging_telegram_paired = @messaging_telegram_paired,
+        messaging_telegram_chat_id = @messaging_telegram_chat_id,
+        messaging_telegram_route_id = @messaging_telegram_route_id,
+        messaging_telegram_route_token = @messaging_telegram_route_token,
+        messaging_telegram_public_url = @messaging_telegram_public_url,
+        messaging_telegram_bot_token = @messaging_telegram_bot_token,
+        messaging_telegram_pending_code = @messaging_telegram_pending_code,
+        messaging_telegram_pending_expires_at = @messaging_telegram_pending_expires_at,
+        messaging_whatsapp_enabled = @messaging_whatsapp_enabled,
+        messaging_whatsapp_paired = @messaging_whatsapp_paired,
+        messaging_whatsapp_chat_id = @messaging_whatsapp_chat_id,
+        messaging_whatsapp_route_id = @messaging_whatsapp_route_id,
+        messaging_whatsapp_route_token = @messaging_whatsapp_route_token,
+        messaging_whatsapp_public_url = @messaging_whatsapp_public_url,
+        messaging_whatsapp_bot_token = @messaging_whatsapp_bot_token,
+        messaging_whatsapp_pending_code = @messaging_whatsapp_pending_code,
+        messaging_whatsapp_pending_expires_at = @messaging_whatsapp_pending_expires_at
       WHERE id = @id
     `);
 

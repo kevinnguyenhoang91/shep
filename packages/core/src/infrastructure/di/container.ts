@@ -717,22 +717,17 @@ export async function initializeContainer(): Promise<typeof container> {
       return new Proxy({} as IMessagingService, {
         get: (_target, prop) => {
           if (prop === 'isConfigured') {
-            // isConfigured is synchronous — check settings directly
+            // isConfigured is synchronous — check settings directly.
+            // A route is enough: the tunnel must start in pending-pairing
+            // state so the daemon can receive the user's `/pair <code>`
+            // message and auto-confirm via the tunnel.
             return () => {
               try {
                 const settings = getSettings();
                 const mc = settings.messaging;
                 if (!mc?.enabled || !mc?.gatewayUrl || !mc?.deviceId) return false;
-                const telegramReady = !!(
-                  mc.telegram?.paired &&
-                  mc.telegram.routeId &&
-                  mc.telegram.chatId
-                );
-                const whatsappReady = !!(
-                  mc.whatsapp?.paired &&
-                  mc.whatsapp.routeId &&
-                  mc.whatsapp.chatId
-                );
+                const telegramReady = !!mc.telegram?.routeId;
+                const whatsappReady = !!mc.whatsapp?.routeId;
                 return telegramReady || whatsappReady;
               } catch {
                 return false;

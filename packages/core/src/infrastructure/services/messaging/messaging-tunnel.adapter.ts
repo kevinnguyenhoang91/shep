@@ -196,15 +196,23 @@ export class MessagingTunnelAdapter {
   }
 
   private handleConnected(_frame: TunnelConnectedFrame): void {
-    // Auto-activate every configured route.
-    for (const routeId of this.deps.routeIds) {
-      this.sendFrame({ type: 'tunnel.activate', route_id: routeId } satisfies TunnelActivateFrame);
-    }
+    // Auto-activate every configured route. The gateway expects a single
+    // batched frame with a `routes` array — sending one-at-a-time with
+    // `route_id` is silently ignored.
+    if (this.deps.routeIds.length === 0) return;
+    this.sendFrame({
+      type: 'tunnel.activate',
+      routes: [...this.deps.routeIds],
+    } satisfies TunnelActivateFrame);
   }
 
   private handleActivateResult(frame: TunnelActivateResultFrame): void {
-    if (frame.ok) {
-      this.activatedRoutes.add(frame.route_id);
+    // Gateway returns "active" for newly-activated routes. Treat any
+    // non-rejected status as success to be forward-compatible.
+    for (const entry of frame.results ?? []) {
+      if (entry.status && entry.status !== 'rejected') {
+        this.activatedRoutes.add(entry.route_id);
+      }
     }
   }
 
