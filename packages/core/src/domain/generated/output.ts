@@ -11,11 +11,11 @@ export type BaseEntity = {
   /**
    * Timestamp when this entity was created (read-only, set by system)
    */
-  createdAt: Date;
+  createdAt: any;
   /**
    * Timestamp when this entity was last updated (read-only, set by system)
    */
-  updatedAt: Date;
+  updatedAt: any;
 };
 
 /**
@@ -25,7 +25,7 @@ export type SoftDeletableEntity = BaseEntity & {
   /**
    * Timestamp when this entity was soft-deleted (null if not deleted)
    */
-  deletedAt?: Date;
+  deletedAt?: any;
 };
 
 /**
@@ -799,7 +799,7 @@ export type TimelineEvent = BaseEntity & {
   /**
    * Timestamp when this event occurred (read-only, set by system)
    */
-  timestamp: Date;
+  timestamp: any;
 };
 export enum PlanState {
   Requirements = 'Requirements',
@@ -822,11 +822,11 @@ export type GanttTask = {
   /**
    * Scheduled start time for the task
    */
-  start: Date;
+  start: any;
   /**
    * Scheduled end time for the task
    */
-  end: Date;
+  end: any;
   /**
    * IDs of tasks that this task depends on (must complete before this task can start)
    */
@@ -848,11 +848,11 @@ export type GanttViewData = {
   /**
    * Start date of the overall work plan (left boundary of the chart)
    */
-  startDate: Date;
+  startDate: any;
   /**
    * End date of the overall work plan (right boundary of the chart)
    */
-  endDate: Date;
+  endDate: any;
 };
 
 /**
@@ -1027,7 +1027,7 @@ export type Attachment = {
   /**
    * Timestamp when the attachment was created
    */
-  createdAt: Date;
+  createdAt: any;
   /**
    * Optional user notes or annotations for this attachment
    */
@@ -1289,7 +1289,7 @@ export type RejectionFeedbackEntry = {
   /**
    * When the rejection occurred
    */
-  timestamp: Date;
+  timestamp: any;
   /**
    * File attachment paths included with the rejection feedback
    */
@@ -1666,7 +1666,7 @@ export type Tool = BaseEntity & {
   /**
    * Tool installation timestamp
    */
-  installedAt?: Date;
+  installedAt?: any;
 };
 export enum NotificationEventType {
   AgentStarted = 'agent_started',
@@ -1723,7 +1723,7 @@ export type NotificationEvent = {
   /**
    * When the event occurred
    */
-  timestamp: Date;
+  timestamp: any;
 };
 
 /**
@@ -1879,7 +1879,7 @@ export type AgentInstance = {
   /**
    * Timestamp when this agent instance was created
    */
-  createdAt: Date;
+  createdAt: any;
 };
 
 /**
@@ -1955,7 +1955,7 @@ export type FeatureAgent = {
   /**
    * Timestamp when this feature agent was created
    */
-  createdAt: Date;
+  createdAt: any;
 };
 
 /**
@@ -1973,7 +1973,7 @@ export type LocalDeployAgent = {
   /**
    * Timestamp when this deployment agent was created
    */
-  createdAt: Date;
+  createdAt: any;
 };
 export enum PortProtocol {
   TCP = 'TCP',
@@ -2028,7 +2028,7 @@ export type DeploySkill = {
   /**
    * Timestamp when the deployment skill was created
    */
-  createdAt: Date;
+  createdAt: any;
 };
 export enum DeploymentState {
   Booting = 'Booting',
@@ -2059,11 +2059,11 @@ export type Deployment = {
   /**
    * Timestamp when the deployment was created
    */
-  createdAt: Date;
+  createdAt: any;
   /**
    * Timestamp when the deployment was stopped (only present when state is Stopped)
    */
-  stoppedAt?: Date;
+  stoppedAt?: any;
 };
 export enum AgentRunStatus {
   pending = 'pending',
@@ -2114,15 +2114,15 @@ export type AgentRun = BaseEntity & {
   /**
    * Last heartbeat timestamp for crash detection (optional)
    */
-  lastHeartbeat?: Date;
+  lastHeartbeat?: any;
   /**
    * Execution start timestamp (optional)
    */
-  startedAt?: Date;
+  startedAt?: any;
   /**
    * Execution completion timestamp (optional)
    */
-  completedAt?: Date;
+  completedAt?: any;
   /**
    * Error message if execution failed (optional)
    */
@@ -2160,7 +2160,7 @@ export type AgentRunEvent = {
   /**
    * Event timestamp
    */
-  timestamp: Date;
+  timestamp: any;
 };
 
 /**
@@ -2176,6 +2176,8 @@ export type AgentDefinition = {
    */
   description: string;
 };
+export type float = any;
+export type float64 = float;
 
 /**
  * Execution record for a single agent graph node. Tracks timing, prompt, token usage, and outcome.
@@ -2192,11 +2194,11 @@ export type PhaseTiming = BaseEntity & {
   /**
    * When the phase started executing
    */
-  startedAt: Date;
+  startedAt: any;
   /**
    * When the phase finished executing (null if still running)
    */
-  completedAt?: Date;
+  completedAt?: any;
   /**
    * Duration in milliseconds (computed on completion)
    */
@@ -2204,7 +2206,7 @@ export type PhaseTiming = BaseEntity & {
   /**
    * When the phase started waiting for user approval (null if no approval needed)
    */
-  waitingApprovalAt?: Date;
+  waitingApprovalAt?: any;
   /**
    * Duration in milliseconds the phase waited for user approval (null if no approval needed)
    */
@@ -2240,7 +2242,7 @@ export type PhaseTiming = BaseEntity & {
   /**
    * Estimated cost in USD for this phase execution
    */
-  costUsd?: number;
+  costUsd?: float64;
   /**
    * Number of agentic turns (tool-call round-trips) in this phase
    */
@@ -2368,7 +2370,7 @@ export type AgentSessionMessage = {
   /**
    * Timestamp when the message was recorded
    */
-  timestamp: Date;
+  timestamp: any;
 };
 
 /**
@@ -2398,11 +2400,11 @@ export type AgentSession = BaseEntity & {
   /**
    * Timestamp of the first message in the session (optional)
    */
-  firstMessageAt?: Date;
+  firstMessageAt?: any;
   /**
    * Timestamp of the most recent message in the session (optional)
    */
-  lastMessageAt?: Date;
+  lastMessageAt?: any;
 };
 export enum InteractiveSessionStatus {
   booting = 'booting',
@@ -2426,15 +2428,15 @@ export type InteractiveSession = BaseEntity & {
   /**
    * Timestamp when the agent process was spawned
    */
-  startedAt: Date;
+  startedAt: any;
   /**
    * Timestamp when the session ended (null if still active)
    */
-  stoppedAt?: Date;
+  stoppedAt?: any;
   /**
    * Timestamp of last user message or agent stdout activity
    */
-  lastActivityAt: Date;
+  lastActivityAt: any;
 };
 export enum InteractiveMessageRole {
   user = 'user',

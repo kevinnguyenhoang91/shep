@@ -6,8 +6,6 @@ import { getAllAgentModels } from '@/app/actions/get-all-agent-models';
 import type { AgentModelGroup } from '@/app/actions/get-all-agent-models';
 import { updateAgentAndModel } from '@/app/actions/update-agent-and-model';
 import { getAgentTypeIcon } from '@/components/common/feature-node/agent-type-icons';
-import { AgentAvailabilityBadge } from '@/components/features/settings/AgentAvailabilityBadge';
-import { useAgentAvailability } from '@/hooks/use-agent-availability';
 import { getModelMeta } from '@/lib/model-metadata';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -142,9 +140,6 @@ export function AgentModelPicker({
   const agentLabel = groups.find((g) => g.agentType === agentType)?.label ?? agentType;
   const modelName = model ? getModelMeta(model).displayName || model : null;
 
-  const agentTypes = React.useMemo(() => groups.map((g) => g.agentType), [groups]);
-  const availability = useAgentAvailability(agentTypes);
-
   const activeGroup = drillAgent ? groups.find((g) => g.agentType === drillAgent) : null;
 
   return (
@@ -216,12 +211,7 @@ export function AgentModelPicker({
                     }}
                   >
                     <GroupIcon className="h-4 w-4 shrink-0" />
-                    <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
-                      <span>{group.label}</span>
-                      {availability[group.agentType] ? (
-                        <AgentAvailabilityBadge status={availability[group.agentType].status} />
-                      ) : null}
-                    </span>
+                    <span className="flex-1 text-start">{group.label}</span>
                     {isActive && !hasModels ? (
                       <Check className="text-primary h-3.5 w-3.5 shrink-0" />
                     ) : null}

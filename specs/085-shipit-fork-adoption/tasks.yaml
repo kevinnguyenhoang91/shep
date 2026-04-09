@@ -264,18 +264,8 @@ tasks:
     tdd: null
     estimatedEffort: L
 
-  - id: task-18
-    title: Add agent availability badges to picker
-    description: Hook for auth detection, badge component, integration into AgentModelPicker
-    state: Done
-    dependencies: []
-    acceptanceCriteria:
-      - useAgentAvailability hook with caching
-      - AgentAvailabilityBadge component (4 states)
-      - Storybook story
-      - Integrated into picker dropdown
-    tdd: null
-    estimatedEffort: M
+  # task-18 (Add agent availability badges to picker) was omitted from scope:
+  # purely visual feature, not a fix. Reverted before merge.
 
   # === P2 Testing/DX ===
   - id: task-19
@@ -447,8 +437,9 @@ openQuestions: []
 content: |
   ## Summary
 
-  ShipIt fork adoption — 31 tasks across 7 phases. 27 tasks completed, 4 remaining
-  (OIDC publishers + 3 dependency upgrades as separate PRs).
+  ShipIt fork adoption — 30 tasks across 7 phases (task-18 omitted: visual-only
+  feature, not a fix). 26 tasks completed, 4 remaining (OIDC publishers + 3
+  dependency upgrades as separate PRs).
 
   ## Acceptance Checklist
 
