@@ -9,6 +9,7 @@ import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
 
 import { IS_WINDOWS } from '../../platform.js';
+import { createSafeExecFileFn } from '../../services/exec/windows-safe-exec.js';
 
 import type { IAgentValidator } from '../../../application/ports/output/agents/agent-validator.interface.js';
 import { AgentValidatorService } from '../../services/agents/common/agent-validator.service.js';
@@ -49,14 +50,15 @@ import type { ISettingsReader } from '../../../application/ports/output/services
 import { SettingsReaderAdapter } from '../../services/settings-reader.adapter.js';
 
 export function registerServices(container: DependencyContainer, db: Database.Database): void {
-  // Register external dependencies as tokens
-  // On Windows, agent CLIs ship as .cmd/.ps1 scripts (e.g. cursor's `agent.cmd`).
-  // execFile without shell: true cannot resolve .cmd extensions, causing ENOENT.
+  // Register external dependencies as tokens.
+  // On Windows, agent CLIs ship as .cmd/.ps1 scripts (e.g. cursor's `agent.cmd`),
+  // so we need `shell: true` to resolve them. Because shell:true makes Node hand
+  // args to cmd.exe unquoted, args containing whitespace (e.g. a commit message
+  // like "Initial commit") get re-split and break commands. `createSafeExecFileFn`
+  // wraps the base execFile so every arg is quoted for cmd.exe before the shell
+  // sees it.
   const execFileAsync = promisify(execFile);
-  const execFn = IS_WINDOWS
-    ? (file: string, args: string[], options?: object) =>
-        execFileAsync(file, args, { ...options, shell: true, windowsHide: true })
-    : execFileAsync;
+  const execFn = createSafeExecFileFn(execFileAsync, IS_WINDOWS);
   container.registerInstance('ExecFunction', execFn);
 
   // Register services (singletons via @injectable + token)
