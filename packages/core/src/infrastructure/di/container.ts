@@ -119,6 +119,7 @@ import { ConfirmMessagingPairingUseCase } from '../../application/use-cases/mess
 import { DisconnectMessagingUseCase } from '../../application/use-cases/messaging/disconnect-messaging.use-case.js';
 import type { IGatewayClient } from '../../application/ports/output/services/gateway-client.interface.js';
 import { HttpGatewayClient } from '../services/messaging/http-gateway.client.js';
+import { StubGatewayClient } from '../services/messaging/stub-gateway.client.js';
 import { ConfigureAgentUseCase } from '../../application/use-cases/agents/configure-agent.use-case.js';
 import { ValidateAgentAuthUseCase } from '../../application/use-cases/agents/validate-agent-auth.use-case.js';
 import { RunAgentUseCase } from '../../application/use-cases/agents/run-agent.use-case.js';
@@ -458,9 +459,15 @@ export async function initializeContainer(): Promise<typeof container> {
   container.registerSingleton(UpdateSettingsUseCase);
   container.registerSingleton(CompleteOnboardingUseCase);
   container.registerSingleton(CompleteWebOnboardingUseCase);
-  container.register<IGatewayClient>('IGatewayClient', {
-    useFactory: () => new HttpGatewayClient(),
-  });
+  if (process.env.SHEP_MOCK_GATEWAY === '1') {
+    container.register<IGatewayClient>('IGatewayClient', {
+      useFactory: () => new StubGatewayClient(),
+    });
+  } else {
+    container.register<IGatewayClient>('IGatewayClient', {
+      useFactory: () => new HttpGatewayClient(),
+    });
+  }
   container.registerSingleton(BeginMessagingPairingUseCase);
   container.registerSingleton(ConfirmMessagingPairingUseCase);
   container.registerSingleton(DisconnectMessagingUseCase);
