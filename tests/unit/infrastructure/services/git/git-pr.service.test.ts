@@ -1070,6 +1070,164 @@ describe('GitPrService', () => {
     });
   });
 
+  describe('localMergeSquash', () => {
+    it('should perform squash merge successfully', async () => {
+      vi.mocked(mockExec)
+        .mockRejectedValueOnce(new Error('no merge')) // merge --abort (pre-cleanup, no merge in progress)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // reset --hard HEAD (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // clean -fd (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // checkout baseBranch
+        .mockResolvedValueOnce({ stdout: 'Squash commit\n', stderr: '' }) // merge --squash
+        .mockResolvedValueOnce({ stdout: 'M file.txt\n', stderr: '' }) // status --porcelain
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // commit --file
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }); // branch -d
+
+      await service.localMergeSquash('/repo', 'feat/test', 'main', 'merge commit msg');
+
+      expect(mockExec).toHaveBeenCalledWith('git', ['merge', '--squash', 'feat/test'], {
+        cwd: '/repo',
+      });
+    });
+
+    it('should detect conflict from stdout and throw MERGE_CONFLICT', async () => {
+      // git merge --squash writes CONFLICT to stdout, not stderr
+      const mergeError = Object.assign(
+        new Error('Command failed: git merge --squash feat/test\n'),
+        {
+          stdout:
+            'Auto-merging f.txt\nCONFLICT (content): Merge conflict in f.txt\n' +
+            'Squash commit -- not updating HEAD\n' +
+            'Automatic merge failed; fix conflicts and then commit the result.\n',
+          stderr: '',
+        }
+      );
+
+      vi.mocked(mockExec)
+        .mockRejectedValueOnce(new Error('no merge')) // merge --abort (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // reset --hard HEAD (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // clean -fd (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // checkout baseBranch
+        .mockRejectedValueOnce(mergeError) // merge --squash (conflict)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }); // merge --abort (post-merge cleanup)
+
+      await expect(service.localMergeSquash('/repo', 'feat/test', 'main', 'msg')).rejects.toThrow(
+        expect.objectContaining({
+          code: GitPrErrorCode.MERGE_CONFLICT,
+          message: expect.stringContaining('CONFLICT'),
+        })
+      );
+    });
+
+    it('should abort merge on failure to leave repo clean', async () => {
+      const mergeError = Object.assign(
+        new Error('Command failed: git merge --squash feat/test\n'),
+        { stdout: '', stderr: 'some error\n' }
+      );
+
+      vi.mocked(mockExec)
+        .mockRejectedValueOnce(new Error('no merge')) // merge --abort (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // reset --hard HEAD (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // clean -fd (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // checkout baseBranch
+        .mockRejectedValueOnce(mergeError) // merge --squash
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }); // merge --abort (post-merge cleanup)
+
+      await expect(service.localMergeSquash('/repo', 'feat/test', 'main', 'msg')).rejects.toThrow(
+        GitPrError
+      );
+
+      // Verify merge --abort was called (both pre-cleanup and post-merge)
+      expect(mockExec).toHaveBeenCalledWith('git', ['merge', '--abort'], { cwd: '/repo' });
+    });
+
+    it('should fall back to reset --merge if merge --abort fails', async () => {
+      const mergeError = Object.assign(
+        new Error('Command failed: git merge --squash feat/test\n'),
+        { stdout: '', stderr: '' }
+      );
+
+      vi.mocked(mockExec)
+        .mockRejectedValueOnce(new Error('no merge')) // merge --abort (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // reset --hard HEAD (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // clean -fd (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // checkout baseBranch
+        .mockRejectedValueOnce(mergeError) // merge --squash
+        .mockRejectedValueOnce(new Error('no merge')) // merge --abort (post-merge) fails
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }); // reset --merge
+
+      await expect(service.localMergeSquash('/repo', 'feat/test', 'main', 'msg')).rejects.toThrow(
+        GitPrError
+      );
+
+      // Verify reset --merge was called after merge --abort failed
+      expect(mockExec).toHaveBeenCalledWith('git', ['reset', '--merge'], { cwd: '/repo' });
+    });
+
+    it('should reset tracked files before checkout', async () => {
+      vi.mocked(mockExec)
+        .mockRejectedValueOnce(new Error('no merge')) // merge --abort (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // reset --hard HEAD (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // clean -fd (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // checkout baseBranch
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // merge --squash
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // status --porcelain (empty)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }); // branch -d
+
+      await service.localMergeSquash('/repo', 'feat/test', 'main', 'msg');
+
+      // Verify reset --hard HEAD was called before checkout
+      const calls = vi.mocked(mockExec).mock.calls;
+      const resetIdx = calls.findIndex(
+        (c) => c[0] === 'git' && c[1][0] === 'reset' && c[1][1] === '--hard'
+      );
+      const checkoutIdx = calls.findIndex((c) => c[0] === 'git' && c[1][0] === 'checkout');
+      expect(resetIdx).toBeLessThan(checkoutIdx);
+      expect(mockExec).toHaveBeenCalledWith('git', ['reset', '--hard', 'HEAD'], { cwd: '/repo' });
+    });
+
+    it('should clean stale merge state before checkout to prevent index errors', async () => {
+      // Simulates the case where a previous merge left the repo in a merge state.
+      // Without pre-cleanup, git checkout would fail with
+      // "you need to resolve your current index first".
+      vi.mocked(mockExec)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // merge --abort (succeeds — stale merge present)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // reset --hard HEAD (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // clean -fd (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // checkout baseBranch (now succeeds)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // merge --squash
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // status --porcelain (empty)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }); // branch -d
+
+      await service.localMergeSquash('/repo', 'feat/test', 'main', 'msg');
+
+      // Verify merge --abort was called BEFORE checkout
+      const calls = vi.mocked(mockExec).mock.calls;
+      const abortIdx = calls.findIndex(
+        (c) => c[0] === 'git' && c[1][0] === 'merge' && c[1][1] === '--abort'
+      );
+      const checkoutIdx = calls.findIndex((c) => c[0] === 'git' && c[1][0] === 'checkout');
+      expect(abortIdx).toBeLessThan(checkoutIdx);
+    });
+
+    it('should fetch and pull when hasRemote=true', async () => {
+      vi.mocked(mockExec)
+        .mockRejectedValueOnce(new Error('no merge')) // merge --abort (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // reset --hard HEAD (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // clean -fd (pre-cleanup)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // fetch origin
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // checkout baseBranch
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // pull origin baseBranch
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // merge --squash
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // status --porcelain (empty)
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }); // branch -d
+
+      await service.localMergeSquash('/repo', 'feat/test', 'main', 'msg', true);
+
+      expect(mockExec).toHaveBeenCalledWith('git', ['fetch', 'origin'], { cwd: '/repo' });
+      expect(mockExec).toHaveBeenCalledWith('git', ['pull', 'origin', 'main'], { cwd: '/repo' });
+    });
+  });
+
   describe('createGitHubRepo', () => {
     it('should extract the repo URL from gh repo create stdout', async () => {
       vi.mocked(mockExec).mockResolvedValueOnce({

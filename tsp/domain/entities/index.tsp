@@ -27,3 +27,4 @@ import "./tool.tsp";
 import "./notification-event.tsp";
 import "./repository.tsp";
 import "./messaging.tsp";
+import "./application.tsp";
