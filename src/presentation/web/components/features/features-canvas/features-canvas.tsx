@@ -12,9 +12,11 @@ import { FeatureNode } from '@/components/common/feature-node';
 import type { FeatureNodeType, FeatureNodeData } from '@/components/common/feature-node';
 import { RepositoryNode } from '@/components/common/repository-node';
 import type { RepositoryNodeType, RepositoryNodeData } from '@/components/common/repository-node';
+import { ApplicationNode } from '@/components/common/application-node/application-node';
+import type { ApplicationNodeType } from '@/components/common/application-node/application-node-config';
 import { DependencyEdge } from './dependency-edge';
 
-export type CanvasNodeType = FeatureNodeType | RepositoryNodeType;
+export type CanvasNodeType = FeatureNodeType | RepositoryNodeType | ApplicationNodeType;
 
 export interface FeaturesCanvasProps {
   nodes: CanvasNodeType[];
@@ -30,6 +32,8 @@ export interface FeaturesCanvasProps {
   onCanvasDrag?: () => void;
   onMoveEnd?: OnMoveEnd;
   toolbar?: React.ReactNode;
+  /** Show the toolbar even when the canvas is empty (e.g. empty workspace). Defaults to true. */
+  showToolbarOnEmpty?: boolean;
   emptyState?: React.ReactNode;
 }
 
@@ -49,6 +53,7 @@ export function FeaturesCanvas({
   onCanvasDrag,
   onMoveEnd,
   toolbar,
+  showToolbarOnEmpty = true,
   emptyState,
 }: FeaturesCanvasProps) {
   const { t } = useTranslation('web');
@@ -56,6 +61,7 @@ export function FeaturesCanvas({
     () => ({
       featureNode: FeatureNode,
       repositoryNode: RepositoryNode,
+      applicationNode: ApplicationNode,
     }),
     []
   );
@@ -170,7 +176,7 @@ export function FeaturesCanvas({
           color="#b8bcc4"
           className="dark:[&_circle]:!fill-white/[0.1]"
         />
-        {!isEmpty && toolbar ? (
+        {toolbar && !isEmpty ? (
           <Panel position="top-right" className="!me-3 !mt-3">
             {toolbar}
           </Panel>
@@ -185,6 +191,12 @@ export function FeaturesCanvas({
         >
           <div className="pointer-events-auto h-full w-full">{overlayContent}</div>
         </div>
+      ) : null}
+      {/* Toolbar rendered above the empty-state overlay so the workspace
+          selector remains usable while an empty workspace is shown.
+          Hidden when showToolbarOnEmpty is false (welcome prompt screen). */}
+      {toolbar && isEmpty && showToolbarOnEmpty ? (
+        <div className="pointer-events-auto absolute end-3 top-3 z-20">{toolbar}</div>
       ) : null}
     </div>
   );

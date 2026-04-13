@@ -3,6 +3,7 @@ import type {
   Repository,
   AgentRun,
   SecurityMode,
+  Application,
 } from '@shepai/core/domain/generated/output';
 import { AgentRunStatus } from '@shepai/core/domain/generated/output';
 import {
@@ -45,6 +46,8 @@ export interface BuildGraphNodesOptions {
   repoGitStatus?: Map<string, 'loading' | 'ready' | 'not-a-repo'>;
   /** Global security mode from settings (omitted or Disabled means no badge) */
   securityMode?: SecurityMode;
+  /** Application entities to render as independent nodes */
+  applications?: Application[];
 }
 
 export function buildGraphNodes(
@@ -147,6 +150,26 @@ export function buildGraphNodes(
           type: 'dependencyEdge',
         });
       }
+    }
+  }
+
+  // Add application nodes (independent — no edges)
+  if (options?.applications) {
+    for (const app of options.applications) {
+      const appNodeId = `app-${app.id}`;
+      nodes.push({
+        id: appNodeId,
+        type: 'applicationNode',
+        position: { x: 0, y: 0 },
+        data: {
+          id: app.id,
+          name: app.name,
+          description: app.description,
+          status: app.status,
+          repositoryPath: normalizePath(app.repositoryPath),
+          additionalPathCount: app.additionalPaths?.length ?? 0,
+        },
+      });
     }
   }
 

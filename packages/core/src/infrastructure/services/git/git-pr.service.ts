@@ -27,7 +27,7 @@ import { join } from 'node:path';
 import yaml from 'js-yaml';
 import { PrStatus } from '../../../domain/generated/output.js';
 import type { ExecFunction } from './worktree.service.js';
-import { applyPrBranding } from './pr-branding.js';
+import { applyPrBranding, applyCommitBranding } from './pr-branding.js';
 
 @injectable()
 export class GitPrService implements IGitPrService {
@@ -252,6 +252,25 @@ export class GitPrService implements IGitPrService {
     hasRemote = false
   ): Promise<void> {
     try {
+      // Clean up any stale merge/rebase state and dirty index BEFORE checkout.
+      // A previous failed merge may have left the repo in a merge state, causing
+      // "you need to resolve your current index first" on checkout.
+      try {
+        await this.execFile('git', ['merge', '--abort'], { cwd });
+      } catch {
+        // No merge in progress — expected, non-fatal
+      }
+      try {
+        await this.execFile('git', ['reset', '--hard', 'HEAD'], { cwd });
+      } catch {
+        // Reset failure is non-fatal
+      }
+      try {
+        await this.execFile('git', ['clean', '-fd'], { cwd });
+      } catch {
+        // Clean failure is non-fatal
+      }
+
       // Fetch latest from remote if available
       if (hasRemote) {
         try {
@@ -273,25 +292,62 @@ export class GitPrService implements IGitPrService {
         }
       }
 
-      // Clean untracked files that may conflict with the merge (e.g. files created
-      // by a prior agent call that leaked into the original repo directory)
+      // Squash merge the feature branch.
+      // git merge --squash writes conflict info to STDOUT (not stderr), so the
+      // error.message from execFile won't contain "CONFLICT". We must check
+      // error.stdout to detect conflicts and include it in diagnostics.
       try {
-        await this.execFile('git', ['clean', '-fd'], { cwd });
-      } catch {
-        // Clean failure is non-fatal
-      }
+        await this.execFile('git', ['merge', '--squash', featureBranch], { cwd });
+      } catch (mergeError: unknown) {
+        // Abort the in-progress merge to leave the repo clean
+        try {
+          await this.execFile('git', ['merge', '--abort'], { cwd });
+        } catch {
+          // merge --abort may fail if there's no merge in progress; non-fatal
+          try {
+            await this.execFile('git', ['reset', '--merge'], { cwd });
+          } catch {
+            // Last-resort cleanup; non-fatal
+          }
+        }
 
-      // Squash merge the feature branch
-      await this.execFile('git', ['merge', '--squash', featureBranch], { cwd });
+        // Check stdout for CONFLICT text (git merge --squash puts it there, not stderr)
+        const stdout = (mergeError as { stdout?: string })?.stdout ?? '';
+        const stderr = (mergeError as { stderr?: string })?.stderr ?? '';
+        const combined = `${stdout}\n${stderr}`;
+        const mergeMsg = mergeError instanceof Error ? mergeError.message : String(mergeError);
+
+        if (
+          combined.includes('CONFLICT') ||
+          combined.includes('conflict') ||
+          mergeMsg.includes('CONFLICT') ||
+          mergeMsg.includes('conflict')
+        ) {
+          throw new GitPrError(
+            `Merge conflict while squash-merging ${featureBranch} into ${baseBranch}: ${combined.trim()}`,
+            GitPrErrorCode.MERGE_CONFLICT,
+            mergeError instanceof Error ? mergeError : undefined
+          );
+        }
+
+        // Include stdout in the error for better diagnostics
+        const detail = combined.trim() || mergeMsg;
+        throw new GitPrError(
+          `Local squash merge failed: ${detail}`,
+          GitPrErrorCode.GIT_ERROR,
+          mergeError instanceof Error ? mergeError : undefined
+        );
+      }
 
       // Commit the squash merge (skip if nothing to commit — branches may be equivalent)
       const { stdout: status } = await this.execFile('git', ['status', '--porcelain'], { cwd });
       if (status.trim().length > 0) {
         // Write commit message to a temp file to avoid shell splitting on Windows
         // (DI-injected execFile uses shell: true on Windows, which splits on spaces)
+        const brandedMessage = applyCommitBranding(commitMessage);
         const msgFile = join(tmpdir(), `shep-merge-msg-${Date.now()}.txt`);
         try {
-          writeFileSync(msgFile, commitMessage, 'utf8');
+          writeFileSync(msgFile, brandedMessage, 'utf8');
           await this.execFile('git', ['commit', '--file', msgFile], { cwd });
         } finally {
           try {
@@ -309,15 +365,11 @@ export class GitPrService implements IGitPrService {
         // Branch deletion failure is non-fatal (branch may have already been deleted)
       }
     } catch (error) {
+      // Re-throw GitPrErrors as-is (already properly classified above)
+      if (error instanceof GitPrError) throw error;
+
       const message = error instanceof Error ? error.message : String(error);
       const cause = error instanceof Error ? error : undefined;
-      if (message.includes('CONFLICT') || message.includes('conflict')) {
-        throw new GitPrError(
-          `Merge conflict while squash-merging ${featureBranch} into ${baseBranch}: ${message}`,
-          GitPrErrorCode.MERGE_CONFLICT,
-          cause
-        );
-      }
       throw new GitPrError(
         `Local squash merge failed: ${message}`,
         GitPrErrorCode.GIT_ERROR,
@@ -834,6 +886,20 @@ export class GitPrService implements IGitPrService {
   async addRemote(cwd: string, remoteName: string, remoteUrl: string): Promise<void> {
     try {
       await this.execFile('git', ['remote', 'add', remoteName, remoteUrl], { cwd });
+    } catch {
+      // Remote may already exist (e.g. gh repo clone auto-adds upstream for forks)
+      // — update its URL instead of failing.
+      try {
+        await this.execFile('git', ['remote', 'set-url', remoteName, remoteUrl], { cwd });
+      } catch (setUrlError) {
+        throw this.parseGitError(setUrlError);
+      }
+    }
+  }
+
+  async pull(cwd: string): Promise<void> {
+    try {
+      await this.execFile('git', ['pull'], { cwd });
     } catch (error) {
       throw this.parseGitError(error);
     }

@@ -12,8 +12,11 @@ vi.mock(
   }
 );
 
-import { buildCommitPushPrPrompt } from '@/infrastructure/services/agents/feature-agent/nodes/prompts/merge-prompts.js';
-import { PR_BRANDING } from '@/infrastructure/services/git/pr-branding.js';
+import {
+  buildCommitPushPrPrompt,
+  buildLocalSquashMergePrompt,
+} from '@/infrastructure/services/agents/feature-agent/nodes/prompts/merge-prompts.js';
+import { PR_BRANDING, COMMIT_CO_AUTHOR } from '@/infrastructure/services/git/pr-branding.js';
 import { readSpecFile } from '@/infrastructure/services/agents/feature-agent/nodes/node-helpers.js';
 import type { FeatureAgentState } from '@/infrastructure/services/agents/feature-agent/state.js';
 
@@ -183,6 +186,17 @@ describe('buildCommitPushPrPrompt', () => {
     expect(prompt).not.toContain(PR_BRANDING);
   });
 
+  it('should include Shep Bot co-author trailer in commit instructions', () => {
+    const prompt = buildCommitPushPrPrompt(baseState(), 'feat/test', 'main');
+    expect(prompt).toContain(COMMIT_CO_AUTHOR);
+    expect(prompt).toContain('Shep Bot');
+  });
+
+  it('should instruct NOT to include Claude co-author trailer', () => {
+    const prompt = buildCommitPushPrPrompt(baseState(), 'feat/test', 'main');
+    expect(prompt).toContain('Do NOT include any other Co-Authored-By trailer');
+  });
+
   it('should instruct agent to modify source code when rejection feedback exists', () => {
     const specWithRejection = [
       'name: Test Feature',
@@ -197,5 +211,104 @@ describe('buildCommitPushPrPrompt', () => {
     expect(prompt).toContain('MUST modify source code');
     expect(prompt).not.toContain('Do NOT modify any source code files');
     expect(prompt).toContain('rename the phase name');
+  });
+});
+
+describe('buildLocalSquashMergePrompt', () => {
+  it('should include repository path', () => {
+    const prompt = buildLocalSquashMergePrompt(
+      '/tmp/repo',
+      'feat/test',
+      'main',
+      'feat: squash merge feat/test into main',
+      'CONFLICT in .gitignore'
+    );
+    expect(prompt).toContain('/tmp/repo');
+  });
+
+  it('should include branch names', () => {
+    const prompt = buildLocalSquashMergePrompt(
+      '/tmp/repo',
+      'feat/my-branch',
+      'develop',
+      'feat: squash merge',
+      'CONFLICT'
+    );
+    expect(prompt).toContain('feat/my-branch');
+    expect(prompt).toContain('develop');
+  });
+
+  it('should include conflict details', () => {
+    const conflictDetails =
+      'CONFLICT (content): Merge conflict in .gitignore\nCONFLICT (content): Merge conflict in package.json';
+    const prompt = buildLocalSquashMergePrompt(
+      '/tmp/repo',
+      'feat/test',
+      'main',
+      'feat: squash merge',
+      conflictDetails
+    );
+    expect(prompt).toContain('CONFLICT (content): Merge conflict in .gitignore');
+    expect(prompt).toContain('CONFLICT (content): Merge conflict in package.json');
+  });
+
+  it('should include commit message', () => {
+    const prompt = buildLocalSquashMergePrompt(
+      '/tmp/repo',
+      'feat/test',
+      'main',
+      'feat: squash merge feat/test into main',
+      'CONFLICT'
+    );
+    expect(prompt).toContain('feat: squash merge feat/test into main');
+  });
+
+  it('should instruct checkout, merge, and conflict resolution steps', () => {
+    const prompt = buildLocalSquashMergePrompt(
+      '/tmp/repo',
+      'feat/test',
+      'main',
+      'feat: squash merge',
+      'CONFLICT'
+    );
+    expect(prompt).toContain('git checkout main');
+    expect(prompt).toContain('git merge --squash feat/test');
+    expect(prompt).toContain('git commit');
+    expect(prompt).toContain('git branch -d feat/test');
+  });
+
+  it('should include Shep Bot co-author trailer in squash merge commit instruction', () => {
+    const prompt = buildLocalSquashMergePrompt(
+      '/tmp/repo',
+      'feat/test',
+      'main',
+      'feat: squash merge',
+      'CONFLICT'
+    );
+    expect(prompt).toContain(COMMIT_CO_AUTHOR);
+  });
+
+  it('should forbid pushing', () => {
+    const prompt = buildLocalSquashMergePrompt(
+      '/tmp/repo',
+      'feat/test',
+      'main',
+      'feat: squash merge',
+      'CONFLICT'
+    );
+    expect(prompt).toContain('Do NOT push');
+  });
+
+  it('should be deterministic (same input = same output)', () => {
+    const args = [
+      '/tmp/repo',
+      'feat/test',
+      'main',
+      'feat: squash merge',
+      'CONFLICT in .gitignore',
+    ] as const;
+    const prompt1 = buildLocalSquashMergePrompt(...args);
+    const prompt2 = buildLocalSquashMergePrompt(...args);
+    expect(prompt1).toBe(prompt2);
   });
 });

@@ -251,6 +251,7 @@ export type ModelConfiguration = {
 };
 export enum Language {
   English = 'en',
+  Ukrainian = 'uk',
   Russian = 'ru',
   Portuguese = 'pt',
   Spanish = 'es',
@@ -515,6 +516,10 @@ export enum AgentType {
   Aider = 'aider',
   Continue = 'continue',
   Cursor = 'cursor',
+  Cline = 'cline',
+  OpenRouter = 'openrouter',
+  TogetherAi = 'together-ai',
+  Ollama = 'ollama',
   Dev = 'dev',
 }
 export enum AgentAuthMethod {
@@ -2014,6 +2019,57 @@ export type EffectivePolicySnapshot = {
    */
   actionDispositions: ActionDispositionEntry[];
 };
+export enum ApplicationStatus {
+  Idle = 'Idle',
+  Active = 'Active',
+  Error = 'Error',
+}
+
+/**
+ * A persistent AI-powered application workspace
+ */
+export type Application = SoftDeletableEntity & {
+  /**
+   * Human-readable application name
+   */
+  name: string;
+  /**
+   * URL-friendly identifier (unique)
+   */
+  slug: string;
+  /**
+   * Original user prompt / purpose description
+   */
+  description: string;
+  /**
+   * Absolute path to the primary repository
+   */
+  repositoryPath: string;
+  /**
+   * Additional linked repository/directory paths (JSON array)
+   */
+  additionalPaths: string[];
+  /**
+   * Chosen agent executor type override
+   */
+  agentType?: string;
+  /**
+   * Chosen model override
+   */
+  modelOverride?: string;
+  /**
+   * Current application status
+   */
+  status: ApplicationStatus;
+  /**
+   * Whether the initial setup workflow has completed successfully
+   */
+  setupComplete: boolean;
+  /**
+   * Persistent agent SDK session ID — set once on first session boot, never changes
+   */
+  agentSessionId?: string;
+};
 
 /**
  * Single installation suggestion for a tool
@@ -2726,6 +2782,67 @@ export type InteractiveMessage = BaseEntity & {
    * Full message content (finalised after streaming for assistant messages)
    */
   content: string;
+  /**
+   * Optional workflow step ID this message was produced for
+   */
+  stepId?: string;
+};
+export enum WorkflowStepStatus {
+  pending = 'pending',
+  running = 'running',
+  done = 'done',
+  failed = 'failed',
+  interrupted = 'interrupted',
+}
+
+/**
+ * A persisted step of a multi-step workflow executed inside an interactive session
+ */
+export type WorkflowStep = BaseEntity & {
+  /**
+   * Parent interactive session id
+   */
+  sessionId: string;
+  /**
+   * Polymorphic scope key: matches InteractiveMessage.featureId
+   */
+  featureId: string;
+  /**
+   * Logical workflow id (e.g. 'application-creation-v1')
+   */
+  workflowId: string;
+  /**
+   * Stable key inside the workflow (e.g. 'scaffold', 'deps')
+   */
+  stepKey: string;
+  /**
+   * Order of this step within the workflow, starting at 0
+   */
+  stepIndex: number;
+  /**
+   * Non-technical title shown to the user
+   */
+  title: string;
+  /**
+   * Non-technical subtitle shown to the user
+   */
+  description: string;
+  /**
+   * Current lifecycle status
+   */
+  status: WorkflowStepStatus;
+  /**
+   * When the step transitioned to running
+   */
+  startedAt?: any;
+  /**
+   * When the step transitioned to done/failed/interrupted
+   */
+  finishedAt?: any;
+  /**
+   * JSON blob with summary, details, error — populated when done/failed
+   */
+  metadata?: string;
 };
 
 /**

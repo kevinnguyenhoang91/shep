@@ -13,7 +13,7 @@ import yaml from 'js-yaml';
 import { EvidenceType, type Evidence } from '@/domain/generated/output.js';
 import { readSpecFile, buildResumeContext } from '../node-helpers.js';
 import type { FeatureAgentState } from '../../state.js';
-import { PR_BRANDING } from './pr-branding.js';
+import { PR_BRANDING, COMMIT_CO_AUTHOR } from './pr-branding.js';
 
 /**
  * Extract merge-phase rejection feedback from spec.yaml.
@@ -160,7 +160,9 @@ export function buildCommitPushPrPrompt(
 3. Write a conventional commit message based on the actual diff content
    - Use the format: \`feat(<scope>): <description>\` or \`fix(<scope>): <description>\`
    - The commit message should summarize what actually changed, not be generic
-   - Run \`git commit -m "<your message>"\``);
+   - MUST include the co-author trailer: \`${COMMIT_CO_AUTHOR}\`
+   - Run: \`git commit -m "<your message>" -m "" -m "${COMMIT_CO_AUTHOR}"\`
+   - Do NOT include any other Co-Authored-By trailer (e.g. Claude) — only the Shep Bot trailer above`);
 
   // Step 2: Local verification before push (conditional)
   if (shouldPush) {
@@ -209,11 +211,82 @@ ${evidenceSection}
 ## Constraints
 
 - Write a meaningful conventional commit message derived from the actual diff — do NOT use generic messages
+- Every commit MUST include the co-author trailer: \`${COMMIT_CO_AUTHOR}\` — do NOT include any other Co-Authored-By trailer
 ${rejectionSection ? '- You MUST modify source code files to address the rejection feedback above BEFORE committing' : '- Do NOT modify any source code files — only perform git operations'}
 ${!state.commitSpecs ? '- Do NOT commit the `specs/` directory — it must stay untracked. If you accidentally staged it, run `git reset -- specs/` before committing' : ''}
 - Do NOT amend existing commits
 - Do NOT run \`git pull\`, \`git rebase\`, or \`git merge\` — this is a fresh branch, push it directly
 - If there are no changes to commit, skip the commit step and report that no changes were found`;
+}
+
+/**
+ * Build a prompt for agent-based local squash merge with conflict resolution.
+ *
+ * Used as a fallback when the programmatic localMergeSquash encounters merge
+ * conflicts. The agent resolves conflicts using its full coding capabilities,
+ * then commits and cleans up.
+ *
+ * @param repositoryPath - Path to the original repository (not worktree)
+ * @param featureBranch - Branch to squash-merge from
+ * @param baseBranch - Target branch (e.g. main)
+ * @param commitMessage - Commit message for the squash merge commit
+ * @param conflictDetails - Stdout/stderr from the failed merge attempt describing the conflicts
+ */
+export function buildLocalSquashMergePrompt(
+  repositoryPath: string,
+  featureBranch: string,
+  baseBranch: string,
+  commitMessage: string,
+  conflictDetails: string
+): string {
+  return `You are resolving merge conflicts for a local squash merge.
+
+## Context
+
+A programmatic \`git merge --squash\` of \`${featureBranch}\` into \`${baseBranch}\` failed due to merge conflicts.
+The repo has already been cleaned up (merge aborted). You need to perform the merge manually, resolving all conflicts.
+
+## Conflict Details
+
+\`\`\`
+${conflictDetails}
+\`\`\`
+
+## Working Directory
+
+${repositoryPath}
+
+## Instructions
+
+Follow these steps EXACTLY:
+
+1. Make sure you are on the \`${baseBranch}\` branch:
+   \`git checkout ${baseBranch}\`
+
+2. Start the squash merge:
+   \`git merge --squash ${featureBranch}\`
+
+3. Resolve ALL merge conflicts:
+   - For each conflicted file, open it and resolve the conflict markers (\`<<<<<<<\`, \`=======\`, \`>>>>>>>\`)
+   - Choose the correct resolution by understanding what both sides intended
+   - For lock files (package-lock.json, yarn.lock, pnpm-lock.yaml), accept the feature branch version and regenerate if possible, or accept theirs
+   - For config files (.gitignore, tsconfig.json, etc.), merge both sides' additions
+   - Stage each resolved file: \`git add <file>\`
+
+4. After ALL conflicts are resolved, commit with the Shep Bot co-author trailer:
+   \`git commit -m "${commitMessage.replace(/"/g, '\\"')}" -m "" -m "${COMMIT_CO_AUTHOR}"\`
+
+5. Delete the feature branch:
+   \`git branch -d ${featureBranch}\` (non-fatal if it fails)
+
+## Constraints
+
+- Work in the repository at: ${repositoryPath}
+- Do NOT push — this is a local-only operation
+- Do NOT modify any source code beyond resolving conflicts
+- Do NOT create new files
+- If a conflict cannot be resolved confidently, prefer the feature branch version (theirs in squash context)
+- Ensure the final commit has no conflict markers remaining`;
 }
 
 /**
@@ -248,14 +321,16 @@ ${failureLogs}
 1. Analyze the CI failure logs above to diagnose the root cause
 2. Apply a targeted fix to resolve the failure — change only what is necessary
 3. Stage all changes: \`git add -A\`
-4. Commit with this exact conventional commit message format:
-   \`fix(ci): attempt ${attemptNumber}/${maxAttempts} — <short description of what you fixed>\`
+4. Commit with this exact conventional commit message format and the Shep Bot co-author trailer:
+   \`git commit -m "fix(ci): attempt ${attemptNumber}/${maxAttempts} — <short description of what you fixed>" -m "" -m "${COMMIT_CO_AUTHOR}"\`
 5. Push the fix to the branch: \`git push origin ${branch}\`
 
 ## Constraints
 
 - Fix ONLY the issue(s) causing the CI failure — do not refactor unrelated code
 - The commit message MUST start with \`fix(ci): attempt ${attemptNumber}/${maxAttempts} — \`
+- The commit MUST include the co-author trailer: \`${COMMIT_CO_AUTHOR}\`
+- Do NOT include any other Co-Authored-By trailer (e.g. Claude) — only the Shep Bot trailer
 - Do NOT create a new branch — push directly to \`${branch}\`
 - If the failure is unclear, make your best diagnosis and explain your reasoning in the commit message`;
 }
