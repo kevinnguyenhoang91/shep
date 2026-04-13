@@ -324,6 +324,23 @@ import { GetModuleProgressUseCase } from '../../application/use-cases/analytics/
 import { GetAiCycleSummaryUseCase } from '../../application/use-cases/analytics/get-ai-cycle-summary.use-case.js';
 import { GetAiProjectHealthUseCase } from '../../application/use-cases/analytics/get-ai-project-health.use-case.js';
 
+// Plugin use cases
+import { AddPluginUseCase } from '../../application/use-cases/plugins/add-plugin.use-case.js';
+import { RemovePluginUseCase } from '../../application/use-cases/plugins/remove-plugin.use-case.js';
+import { ListPluginsUseCase } from '../../application/use-cases/plugins/list-plugins.use-case.js';
+import { EnablePluginUseCase } from '../../application/use-cases/plugins/enable-plugin.use-case.js';
+import { DisablePluginUseCase } from '../../application/use-cases/plugins/disable-plugin.use-case.js';
+import { ConfigurePluginUseCase } from '../../application/use-cases/plugins/configure-plugin.use-case.js';
+import { CheckPluginHealthUseCase } from '../../application/use-cases/plugins/check-plugin-health.use-case.js';
+import { GetPluginCatalogUseCase } from '../../application/use-cases/plugins/get-plugin-catalog.use-case.js';
+
+// Plugin infrastructure
+import type { IPluginRepository } from '../../application/ports/output/repositories/plugin-repository.interface.js';
+import { SQLitePluginRepository } from '../repositories/sqlite-plugin.repository.js';
+import type { IPluginHealthChecker } from '../../application/ports/output/services/plugin-health-checker.interface.js';
+import { PluginHealthCheckerService } from '../services/plugin/plugin-health-checker.service.js';
+import type { IMcpServerManager } from '../../application/ports/output/services/mcp-server-manager.interface.js';
+
 // Deployment use cases
 import { StartFeatureDeploymentUseCase } from '../../application/use-cases/deployments/start-feature-deployment.use-case.js';
 import { StartRepositoryDeploymentUseCase } from '../../application/use-cases/deployments/start-repository-deployment.use-case.js';
@@ -570,6 +587,13 @@ export async function initializeContainer(): Promise<typeof container> {
     },
   });
 
+  container.register<IPluginRepository>('IPluginRepository', {
+    useFactory: (c) => {
+      const database = c.resolve<Database.Database>('Database');
+      return new SQLitePluginRepository(database);
+    },
+  });
+
   // Register external dependencies as tokens
   // On Windows, agent CLIs ship as .cmd/.ps1 scripts (e.g. cursor's `agent.cmd`).
   // execFile without shell: true cannot resolve .cmd extensions, causing ENOENT.
@@ -666,6 +690,23 @@ export async function initializeContainer(): Promise<typeof container> {
   deploymentService.recoverAll();
   container.registerInstance<IDeploymentService>('IDeploymentService', deploymentService);
   container.registerSingleton<IShepInstanceService>('IShepInstanceService', ShepInstanceService);
+
+  // Register plugin services
+  container.registerSingleton<IPluginHealthChecker>(
+    'IPluginHealthChecker',
+    PluginHealthCheckerService
+  );
+  // IMcpServerManager: no-op placeholder until Phase 4 implementation.
+  // RemovePluginUseCase injects it but does not call methods yet.
+  container.register<IMcpServerManager>('IMcpServerManager', {
+    useFactory: () =>
+      ({
+        startServersForFeature: () => Promise.resolve(),
+        stopServersForFeature: () => Promise.resolve(),
+        getActiveServers: () => [],
+        generateMcpConfigPath: () => Promise.resolve(null),
+      }) as IMcpServerManager,
+  });
 
   // Register agent infrastructure
   container.register<IAgentRunRepository>('IAgentRunRepository', {
@@ -840,6 +881,16 @@ export async function initializeContainer(): Promise<typeof container> {
   container.registerSingleton(DeleteApplicationUseCase);
   container.registerSingleton(ResumeApplicationWorkflowUseCase);
   container.registerSingleton(UpdateApplicationUseCase);
+
+  // Plugin use cases
+  container.registerSingleton(AddPluginUseCase);
+  container.registerSingleton(RemovePluginUseCase);
+  container.registerSingleton(ListPluginsUseCase);
+  container.registerSingleton(EnablePluginUseCase);
+  container.registerSingleton(DisablePluginUseCase);
+  container.registerSingleton(ConfigurePluginUseCase);
+  container.registerSingleton(CheckPluginHealthUseCase);
+  container.registerSingleton(GetPluginCatalogUseCase);
 
   // Deployment use cases
   container.registerSingleton(StartFeatureDeploymentUseCase);
@@ -1328,6 +1379,32 @@ export async function initializeContainer(): Promise<typeof container> {
   });
   container.register('GetModuleProgressUseCase', {
     useFactory: (c) => c.resolve(GetModuleProgressUseCase),
+  });
+
+  // Plugin use case string-token aliases for web routes
+  container.register('AddPluginUseCase', {
+    useFactory: (c) => c.resolve(AddPluginUseCase),
+  });
+  container.register('RemovePluginUseCase', {
+    useFactory: (c) => c.resolve(RemovePluginUseCase),
+  });
+  container.register('ListPluginsUseCase', {
+    useFactory: (c) => c.resolve(ListPluginsUseCase),
+  });
+  container.register('EnablePluginUseCase', {
+    useFactory: (c) => c.resolve(EnablePluginUseCase),
+  });
+  container.register('DisablePluginUseCase', {
+    useFactory: (c) => c.resolve(DisablePluginUseCase),
+  });
+  container.register('ConfigurePluginUseCase', {
+    useFactory: (c) => c.resolve(ConfigurePluginUseCase),
+  });
+  container.register('CheckPluginHealthUseCase', {
+    useFactory: (c) => c.resolve(CheckPluginHealthUseCase),
+  });
+  container.register('GetPluginCatalogUseCase', {
+    useFactory: (c) => c.resolve(GetPluginCatalogUseCase),
   });
 
   // Register interactive session infrastructure
