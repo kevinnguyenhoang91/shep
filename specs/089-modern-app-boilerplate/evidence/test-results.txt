@@ -1,0 +1,14 @@
+$ pnpm test
+> my-app@0.1.0 test
+> vitest run
+
+ RUN  v4.1.4
+
+ ✓ tests/greet.test.ts (2 tests)
+   ✓ greet > returns a greeting with the given name
+   ✓ greet > handles empty string
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  17:27:35
+   Duration  127ms (transform 16ms, setup 0ms, import 23ms, tests 2ms, environment 0ms)

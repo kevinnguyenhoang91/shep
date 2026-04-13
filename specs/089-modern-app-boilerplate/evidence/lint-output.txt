@@ -1,0 +1,5 @@
+$ pnpm lint
+> my-app@0.1.0 lint
+> eslint . --max-warnings 0 --cache
+
+(Lint completed successfully with 0 warnings and 0 errors)

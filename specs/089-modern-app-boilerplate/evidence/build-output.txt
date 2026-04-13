@@ -1,0 +1,17 @@
+$ pnpm build
+> my-app@0.1.0 build
+> tsc -p tsconfig.build.json
+
+(Build completed successfully with no errors)
+
+$ ls -la dist/
+total 48
+-rw-r--r--  88 greet.d.ts
+-rw-r--r-- 156 greet.d.ts.map
+-rw-r--r--  62 greet.js
+-rw-r--r--  46 index.d.ts
+-rw-r--r-- 104 index.d.ts.map
+-rw-r--r-- 129 index.js
+
+$ node dist/index.js
+Hello, World!
