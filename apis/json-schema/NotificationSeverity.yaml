@@ -1,9 +1,0 @@
-$schema: https://json-schema.org/draft/2020-12/schema
-$id: NotificationSeverity.yaml
-type: string
-enum:
-  - info
-  - warning
-  - success
-  - error
-description: Severity level for notification display

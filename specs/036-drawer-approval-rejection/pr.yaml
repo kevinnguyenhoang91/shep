@@ -1,9 +1,0 @@
-title: 'feat: drawer-approval-rejection'
-body: |+
-  ## Summary
-
-baseBranch: main
-headBranch: feat/drawer-approval-rejection
-labels:
-  - feature
-draft: false

@@ -1,8 +1,0 @@
-$schema: https://json-schema.org/draft/2020-12/schema
-$id: CiStatus.yaml
-type: string
-enum:
-  - Pending
-  - Success
-  - Failure
-description: CI pipeline status

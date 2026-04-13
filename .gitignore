@@ -1,40 +1,14 @@
-# =============================================================================
 # Dependencies
-# =============================================================================
 node_modules/
-.pnpm-store/
 
-# =============================================================================
 # Build outputs
-# =============================================================================
 dist/
-build/
-/web/
-.next/
-out/
 *.tsbuildinfo
 
-# =============================================================================
-# Generated files
-# =============================================================================
-# Note: src/domain/generated/ is TRACKED (TypeSpec-generated domain models)
-# Note: apis/ is TRACKED (JSON Schema files used at runtime for YAML validation)
-# These generated files are committed to ensure consistent types across environments
-*.generated.*
+# Test outputs
 coverage/
 
-# =============================================================================
-# Test outputs
-# =============================================================================
-test-results/
-playwright-report/
-playwright/.cache/
-.playwright-mcp/
-.test-artifacts/
-
-# =============================================================================
-# IDE & Editors
-# =============================================================================
+# IDE
 .idea/
 .vscode/*
 !.vscode/extensions.json
@@ -44,51 +18,18 @@ playwright/.cache/
 *.swo
 *~
 
-# Local agent-tool scratch dirs (not part of the project)
-.cline/
-.superpowers/
-
-# =============================================================================
-# OS files
-# =============================================================================
+# OS
 .DS_Store
 Thumbs.db
-Desktop.ini
 
-# =============================================================================
 # Logs
-# =============================================================================
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-# =============================================================================
-# Environment & Secrets
-# =============================================================================
+# Environment
 .env
 .env.*
 !.env.example
-*.pem
-*.key
 
-# =============================================================================
-# Package manager locks (keep pnpm-lock.yaml)
-# =============================================================================
-package-lock.json
-yarn.lock
-
-# =============================================================================
-# Misc
-# =============================================================================
+# Cache
 .cache/
 .eslintcache
-node_modules/.cache/prettier/
-.temp/
-.tmp/
-*.bak
-storybook-static/
-.worktrees/
-.plan/

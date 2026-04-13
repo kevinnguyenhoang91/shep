@@ -1,9 +1,0 @@
-$schema: https://json-schema.org/draft/2020-12/schema
-$id: EvidenceType.yaml
-type: string
-enum:
-  - Screenshot
-  - Video
-  - TestOutput
-  - TerminalRecording
-description: Type of evidence captured to prove task completion

@@ -1,7 +1,0 @@
-$schema: https://json-schema.org/draft/2020-12/schema
-$id: MessageRole.yaml
-type: string
-enum:
-  - assistant
-  - user
-description: Roles for participants in conversational interactions

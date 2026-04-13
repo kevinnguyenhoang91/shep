@@ -1,7 +1,0 @@
-$schema: https://json-schema.org/draft/2020-12/schema
-$id: AgentAuthMethod.yaml
-type: string
-enum:
-  - session
-  - token
-description: Authentication method for the AI agent

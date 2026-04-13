@@ -1,8 +1,6 @@
-/**
- * @shepai/cli - Autonomous AI Native SDLC Platform
- *
- * Automate the development cycle from idea to deploy.
- */
+import { greet } from './greet.js';
 
-export type { VersionInfo } from '@/domain/value-objects/version-info.js';
-export { DEFAULT_VERSION_INFO } from '@/domain/value-objects/version-info.js';
+const message = greet('World');
+
+// eslint-disable-next-line no-console
+console.log(message);
