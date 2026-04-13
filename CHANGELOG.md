@@ -1,3 +1,10 @@
+# [1.182.0](https://github.com/shep-ai/shep/compare/v1.181.0...v1.182.0) (2026-04-12)
+
+
+### Features
+
+* **cli:** add application management commands ([#549](https://github.com/shep-ai/shep/issues/549)) ([a7072dd](https://github.com/shep-ai/shep/commit/a7072dd092ee295b860024406f827745f1ffd182))
+
 # [1.181.0](https://github.com/shep-ai/shep/compare/v1.180.0...v1.181.0) (2026-04-12)
 
 
