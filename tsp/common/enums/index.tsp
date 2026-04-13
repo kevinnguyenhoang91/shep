@@ -18,3 +18,4 @@ import "./tool.tsp";
 import "./notification.tsp";
 import "./evidence-type.tsp";
 import "./work-item-enums.tsp";
+import "./plugin.tsp";
