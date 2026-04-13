@@ -340,6 +340,7 @@ import { SQLitePluginRepository } from '../repositories/sqlite-plugin.repository
 import type { IPluginHealthChecker } from '../../application/ports/output/services/plugin-health-checker.interface.js';
 import { PluginHealthCheckerService } from '../services/plugin/plugin-health-checker.service.js';
 import type { IMcpServerManager } from '../../application/ports/output/services/mcp-server-manager.interface.js';
+import { McpServerManagerService } from '../services/plugin/mcp-server-manager.service.js';
 
 // Deployment use cases
 import { StartFeatureDeploymentUseCase } from '../../application/use-cases/deployments/start-feature-deployment.use-case.js';
@@ -696,17 +697,9 @@ export async function initializeContainer(): Promise<typeof container> {
     'IPluginHealthChecker',
     PluginHealthCheckerService
   );
-  // IMcpServerManager: no-op placeholder until Phase 4 implementation.
-  // RemovePluginUseCase injects it but does not call methods yet.
-  container.register<IMcpServerManager>('IMcpServerManager', {
-    useFactory: () =>
-      ({
-        startServersForFeature: () => Promise.resolve(),
-        stopServersForFeature: () => Promise.resolve(),
-        getActiveServers: () => [],
-        generateMcpConfigPath: () => Promise.resolve(null),
-      }) as IMcpServerManager,
-  });
+  // SpawnFunction token for McpServerManagerService (uses child_process.spawn)
+  container.register('SpawnFunction', { useValue: spawn });
+  container.registerSingleton<IMcpServerManager>('IMcpServerManager', McpServerManagerService);
 
   // Register agent infrastructure
   container.register<IAgentRunRepository>('IAgentRunRepository', {
