@@ -88,3 +88,8 @@ export type {
   TerminalOutputListener,
   TerminalExitListener,
 } from './terminal-session-service.interface.js';
+export type { IMcpServerManager, ActiveMcpServer } from './mcp-server-manager.interface.js';
+export type {
+  IPluginHealthChecker,
+  PluginHealthResult,
+} from './plugin-health-checker.interface.js';
