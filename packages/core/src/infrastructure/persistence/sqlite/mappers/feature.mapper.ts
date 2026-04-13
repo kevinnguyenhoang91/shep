@@ -73,6 +73,8 @@ export interface FeatureRow {
   // Skill injection
   inject_skills: number;
   injected_skills: string | null;
+  // Plugin activation overrides (JSON object: {pluginName: boolean})
+  active_plugins: string | null;
   // Soft delete
   deleted_at: number | null;
   created_at: number;
@@ -141,6 +143,11 @@ export function toDatabase(feature: Feature): FeatureRow {
     // Skill injection
     inject_skills: feature.injectSkills ? 1 : 0,
     injected_skills: feature.injectedSkills?.length ? JSON.stringify(feature.injectedSkills) : null,
+    // Plugin activation overrides
+    active_plugins:
+      feature.activePlugins && Object.keys(feature.activePlugins).length > 0
+        ? JSON.stringify(feature.activePlugins)
+        : null,
     // Soft delete
     deleted_at:
       feature.deletedAt instanceof Date ? feature.deletedAt.getTime() : (feature.deletedAt ?? null),
@@ -220,6 +227,10 @@ export function fromDatabase(row: FeatureRow): Feature {
     // Skill injection
     injectSkills: row.inject_skills === 1,
     ...(row.injected_skills != null && { injectedSkills: JSON.parse(row.injected_skills) }),
+    // Plugin activation overrides
+    ...(row.active_plugins != null && {
+      activePlugins: JSON.parse(row.active_plugins) as Record<string, boolean>,
+    }),
     // Soft delete
     ...(row.deleted_at != null && { deletedAt: new Date(row.deleted_at) }),
   };

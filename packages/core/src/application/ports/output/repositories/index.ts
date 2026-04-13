@@ -10,3 +10,4 @@ export type { IRepositoryRepository } from './repository-repository.interface.js
 export type { IInteractiveSessionRepository } from './interactive-session-repository.interface.js';
 export type { IInteractiveMessageRepository } from './interactive-message-repository.interface.js';
 export type { IApplicationRepository } from './application-repository.interface.js';
+export type { IPluginRepository } from './plugin-repository.interface.js';
