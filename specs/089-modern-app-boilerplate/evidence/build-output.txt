@@ -1,17 +1,19 @@
 $ pnpm build
-> my-app@0.1.0 build
+
+> my-app@0.1.0 build /Users/arielshadkhan/.shep/repos/fbfd7efb528913ed/wt/feat-modern-app-boilerplate
 > tsc -p tsconfig.build.json
 
-(Build completed successfully with no errors)
 
 $ ls -la dist/
 total 48
--rw-r--r--  88 greet.d.ts
--rw-r--r-- 156 greet.d.ts.map
--rw-r--r--  62 greet.js
--rw-r--r--  46 index.d.ts
--rw-r--r-- 104 index.d.ts.map
--rw-r--r-- 129 index.js
+drwxr-xr-x@  8 arielshadkhan  staff  256 Apr 13 17:30 .
+drwxr-xr-x@ 24 arielshadkhan  staff  768 Apr 13 17:30 ..
+-rw-r--r--@  1 arielshadkhan  staff   88 Apr 13 17:30 greet.d.ts
+-rw-r--r--@  1 arielshadkhan  staff  156 Apr 13 17:30 greet.d.ts.map
+-rw-r--r--@  1 arielshadkhan  staff   62 Apr 13 17:30 greet.js
+-rw-r--r--@  1 arielshadkhan  staff   46 Apr 13 17:30 index.d.ts
+-rw-r--r--@  1 arielshadkhan  staff  104 Apr 13 17:30 index.d.ts.map
+-rw-r--r--@  1 arielshadkhan  staff  129 Apr 13 17:30 index.js
 
 $ node dist/index.js
 Hello, World!
