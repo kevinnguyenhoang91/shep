@@ -1,6 +1,7 @@
 import { resolve } from '@/lib/server-container';
 import type { ListFeaturesUseCase } from '@shepai/core/application/use-cases/features/list-features.use-case';
 import type { ListRepositoriesUseCase } from '@shepai/core/application/use-cases/repositories/list-repositories.use-case';
+import type { ListPluginsUseCase } from '@shepai/core/application/use-cases/plugins/list-plugins.use-case';
 import { getSettings } from '@shepai/core/infrastructure/services/settings.service';
 import { getWorkflowDefaults } from '@/app/actions/get-workflow-defaults';
 import { getViewerPermission } from '@/app/actions/get-viewer-permission';
@@ -18,15 +19,17 @@ export default async function CreateDrawerPage({ searchParams }: CreateDrawerPag
 
   const listFeatures = resolve<ListFeaturesUseCase>('ListFeaturesUseCase');
   const listRepos = resolve<ListRepositoriesUseCase>('ListRepositoriesUseCase');
+  const listPlugins = resolve<ListPluginsUseCase>('ListPluginsUseCase');
   const settings = getSettings();
 
-  const [features, repositories, workflowDefaults, viewerPerm] = await Promise.all([
+  const [features, repositories, workflowDefaults, viewerPerm, plugins] = await Promise.all([
     listFeatures.execute(),
     listRepos.execute().catch(() => []),
     getWorkflowDefaults().catch(() => undefined),
     repo
       ? getViewerPermission(repo).catch(() => ({ canPushDirectly: false }))
       : Promise.resolve({ canPushDirectly: false }),
+    listPlugins.execute().catch(() => []),
   ]);
 
   const featureOptions = features
@@ -37,6 +40,12 @@ export default async function CreateDrawerPage({ searchParams }: CreateDrawerPag
     id: r.id,
     name: r.name,
     path: r.path,
+  }));
+
+  const installedPlugins = plugins.map((p) => ({
+    name: p.name,
+    displayName: p.displayName ?? p.name,
+    enabled: p.enabled,
   }));
 
   return (
@@ -50,6 +59,7 @@ export default async function CreateDrawerPage({ searchParams }: CreateDrawerPag
       currentAgentType={settings.agent.type}
       currentModel={settings.models.default}
       canPushDirectly={viewerPerm.canPushDirectly}
+      installedPlugins={installedPlugins}
     />
   );
 }

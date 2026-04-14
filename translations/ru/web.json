@@ -250,7 +250,8 @@
     "sessions": "Сессии",
     "tools": "Инструменты",
     "skills": "Навыки",
-    "applications": "Applications"
+    "applications": "Applications",
+    "plugins": "Плагины"
   },
   "sidebar": {
     "features": "Функции",

@@ -52,6 +52,8 @@ interface CreateFeatureInput {
   rebaseBeforeBranch?: boolean;
   /** Inject curated skills into the feature worktree. */
   injectSkills?: boolean;
+  /** Per-feature plugin activation overrides (plugin name -> enabled/disabled). */
+  activePlugins?: Record<string, boolean>;
 }
 
 export async function createFeature(
@@ -77,6 +79,7 @@ export async function createFeature(
     model,
     rebaseBeforeBranch,
     injectSkills,
+    activePlugins,
   } = input;
 
   if (!description?.trim()) {
@@ -117,6 +120,7 @@ export async function createFeature(
       ...(model ? { model } : {}),
       ...(rebaseBeforeBranch != null ? { rebaseBeforeBranch } : {}),
       ...(injectSkills != null ? { injectSkills } : {}),
+      ...(activePlugins && Object.keys(activePlugins).length > 0 ? { activePlugins } : {}),
     });
 
     // Phase 2 (background): metadata generation, worktree, spec, agent spawn
@@ -143,6 +147,7 @@ export async function createFeature(
           ...(sessionId ? { sessionId } : {}),
           ...(rebaseBeforeBranch != null ? { rebaseBeforeBranch } : {}),
           ...(injectSkills != null ? { injectSkills } : {}),
+          ...(activePlugins && Object.keys(activePlugins).length > 0 ? { activePlugins } : {}),
         },
         shouldSpawn
       )

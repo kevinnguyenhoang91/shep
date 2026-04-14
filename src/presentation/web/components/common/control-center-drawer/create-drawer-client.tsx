@@ -20,6 +20,7 @@ export interface CreateDrawerClientProps {
   currentAgentType?: string;
   currentModel?: string;
   canPushDirectly?: boolean;
+  installedPlugins?: { name: string; displayName: string; enabled: boolean }[];
 }
 
 export function CreateDrawerClient({
@@ -32,6 +33,7 @@ export function CreateDrawerClient({
   currentAgentType,
   currentModel,
   canPushDirectly,
+  installedPlugins,
 }: CreateDrawerClientProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,6 +112,7 @@ export function CreateDrawerClient({
       currentAgentType={currentAgentType}
       currentModel={currentModel}
       canPushDirectly={canPushDirectly}
+      installedPlugins={installedPlugins}
     />
   );
 }

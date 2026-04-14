@@ -250,7 +250,8 @@
     "sessions": "Sesiones",
     "tools": "Herramientas",
     "skills": "Habilidades",
-    "applications": "Applications"
+    "applications": "Applications",
+    "plugins": "Complementos"
   },
   "sidebar": {
     "features": "Funcionalidades",
