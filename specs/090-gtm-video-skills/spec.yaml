@@ -1,0 +1,121 @@
+name: gtm-video-skills
+number: 90
+branch: "feat/090-gtm-video-skills"
+oneLiner: "Add GTM and video creation skills (Remotion + promo repo) to default skill injection"
+summary: >
+  Extend Shep's default skill injection configuration to include Remotion video creation skills
+  (from remotion-dev/skills) and GTM marketing skills (from shep-ai/promo). This enables feature
+  agents to generate go-to-market materials like demo videos, social media content, and marketing
+  copy as evidence artifacts during feature development.
+phase: Analysis
+sizeEstimate: S
+
+relatedFeatures: []
+
+technologies:
+  - "Remotion (React-based video creation framework)"
+  - "npx skills add (Claude Code skill installer)"
+  - "TypeScript"
+  - "Settings defaults factory"
+  - "Skill injection service"
+
+relatedLinks:
+  - title: "remotion-dev/skills — Remotion agent skill for video creation in React"
+    url: "https://github.com/remotion-dev/skills"
+  - title: "shep-ai/promo — Shep promotion and GTM materials repository"
+    url: "https://github.com/shep-ai/promo"
+  - title: "Remotion documentation"
+    url: "https://www.remotion.dev/docs"
+
+openQuestions: []
+
+content: |
+  ## Problem Statement
+
+  Shep's skill injection system currently ships with 8 default skills focused on code quality,
+  architecture, and UI development (architecture-reviewer, cross-validate-artifacts, mermaid-diagrams,
+  react-flow, shadcn-ui, tsp-model, vercel-react-best-practices, frontend-design). There are no
+  skills for creating go-to-market (GTM) materials such as demo videos, social media content,
+  ad copy, or marketing collateral.
+
+  Two external skill sources are available and ready to integrate:
+
+  1. **remotion-dev/skills** — A Remotion skill (\"remotion-best-practices\") that provides
+     comprehensive guidance for creating videos in React using Remotion. Covers animations,
+     transitions, audio, captions, 3D content, charts, text animations, and more. Installable
+     via `npx skills add remotion-dev/skills`.
+
+  2. **shep-ai/promo** — The Shep promotion repository containing 11 GTM-focused skills:
+     ai-social-media-content, brand-messaging-architecture, copywriting, devrel-content,
+     github-presence, landing-page-copy, product-hunt-launch, product-launch,
+     social-media-management, storybrand-messaging, and video-script. These cover the full GTM
+     lifecycle from messaging strategy to social media execution.
+
+  Adding these skills to Shep's default injection configuration means feature agents working on
+  GTM tasks will automatically have the knowledge and patterns needed to produce marketing
+  materials as evidence artifacts.
+
+  ## Codebase Analysis
+
+  ### Project Structure
+
+  The skill injection system spans three layers of the Clean Architecture:
+
+  - **Domain** (`tsp/domain/entities/settings.tsp`) — Defines `SkillSourceType` enum (Local/Remote),
+    `SkillSource` model, and `SkillInjectionConfig` model with enabled flag and skills array
+  - **Domain factories** (`packages/core/src/domain/factories/settings-defaults.factory.ts`) —
+    Contains the default `SkillInjectionConfig` with 8 pre-configured remote skills
+  - **Infrastructure** (`packages/core/src/infrastructure/services/skill-injector.service.ts`) —
+    The `SkillInjectorService` that handles local copying and remote `npx skills add` installation
+
+  ### Architecture Patterns
+
+  Skills are configured as `SkillSource` entries in the settings defaults factory. Each entry
+  specifies a `name`, `type` (Remote), `source` (GitHub org/repo), and optional `remoteSkillName`.
+  During feature creation, the `SkillInjectorService` iterates the skills array and runs
+  `npx skills add <source> --yes [--skill <name>]` for each remote skill.
+
+  The existing pattern is straightforward — adding new skills means appending `SkillSource`
+  objects to the `skills` array in `settings-defaults.factory.ts`.
+
+  ### Relevant Technologies
+
+  - **npx skills add** — The Claude Code skill installer CLI. Accepts `org/repo` as source
+    and optional `--skill <name>` to install a specific skill from a multi-skill repo.
+  - **Remotion** — React-based video creation framework. The remotion-dev/skills repo packages
+    Remotion best practices as a Claude Code agent skill.
+  - **shep-ai/promo** — Contains 11 marketing skills installable via `npx skills add shep-ai/promo`.
+
+  ## Affected Areas
+
+  | Area | Impact | Reasoning |
+  | ---- | ------ | --------- |
+  | `packages/core/src/domain/factories/settings-defaults.factory.ts` | High | Add new SkillSource entries to the default skills array |
+  | `tests/unit/domain/factories/settings-defaults.factory.test.ts` | Medium | Update test assertions for new default skill count |
+  | `tests/unit/infrastructure/services/skill-injector.service.test.ts` | Low | Existing tests cover the injection mechanism; new skills use the same Remote type pattern |
+
+  ## Success Criteria
+
+  - [ ] Remotion skill (remotion-best-practices) added to default skill injection config
+  - [ ] Key GTM skills from shep-ai/promo added to default skill injection config
+  - [ ] Existing unit tests updated to reflect new skill count
+  - [ ] All tests pass (`pnpm test:unit`)
+  - [ ] Type check passes (`pnpm typecheck`)
+
+  ## Dependencies
+
+  - **remotion-dev/skills** GitHub repo must remain publicly accessible
+  - **shep-ai/promo** GitHub repo must remain publicly accessible
+  - Both repos must be compatible with `npx skills add` (they are — both contain `.claude/skills/` directories)
+  - No new npm dependencies required — the existing `SkillInjectorService` handles remote installation
+
+  ## Size Estimate
+
+  **S** — This is a configuration-only change. The entire implementation is adding SkillSource
+  entries to an existing array in `settings-defaults.factory.ts` and updating test assertions.
+  No new domain models, no new services, no UI changes, no migrations. The skill injection
+  infrastructure already fully supports remote skills from arbitrary GitHub repos.
+
+  ---
+
+  _Generated by feature agent — proceed with research_
