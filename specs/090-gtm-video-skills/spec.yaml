@@ -7,7 +7,7 @@ summary: >
   (from remotion-dev/skills) and GTM marketing skills (from shep-ai/promo). This enables feature
   agents to generate go-to-market materials like demo videos, social media content, and marketing
   copy as evidence artifacts during feature development.
-phase: Analysis
+phase: Requirements
 sizeEstimate: S
 
 relatedFeatures: []
@@ -27,7 +27,54 @@ relatedLinks:
   - title: "Remotion documentation"
     url: "https://www.remotion.dev/docs"
 
-openQuestions: []
+openQuestions:
+  - question: "Which GTM skills from shep-ai/promo should be included in the default injection set?"
+    resolved: true
+    options:
+      - option: "All 11 skills"
+        description: "Include every skill in shep-ai/promo (ai-social-media-content, brand-messaging-architecture, copywriting, devrel-content, github-presence, landing-page-copy, product-hunt-launch, product-launch, social-media-management, storybrand-messaging, video-script). Maximizes agent capability but increases injection time proportionally."
+        selected: true
+      - option: "Curated subset of 4-5 high-impact skills"
+        description: "Only include the most commonly needed skills (e.g., copywriting, product-launch, video-script, landing-page-copy). Faster injection time, but agents may lack context for some GTM tasks."
+        selected: false
+    selectionRationale: "All 11 skills should be included because the skills array is a configuration default that users can customize. Including all skills ensures comprehensive GTM coverage out of the box. The injection time cost is marginal since skill installation is parallelizable and only happens once per worktree creation. Excluding skills would create an incomplete GTM experience and force users to manually discover and add missing skills."
+    answer: "All 11 skills"
+
+  - question: "How should multi-skill repos (shep-ai/promo) be configured — one SkillSource entry per skill or one entry for the whole repo?"
+    resolved: true
+    options:
+      - option: "One entry per skill with remoteSkillName"
+        description: "Each skill gets its own SkillSource entry with source 'shep-ai/promo' and remoteSkillName set to the individual skill name. Matches the existing pattern used for shep-ai/shep skills. Each skill is independently installable and removable by users."
+        selected: true
+      - option: "Single entry for entire repo"
+        description: "One SkillSource entry with source 'shep-ai/promo' and no remoteSkillName, which installs all skills at once. Simpler configuration but users cannot selectively disable individual skills."
+        selected: false
+    selectionRationale: "One entry per skill with remoteSkillName matches the existing pattern established by the 7 shep-ai/shep skills. This gives users granular control to enable/disable individual GTM skills in their settings. The npx skills add command with --skill flag is the proven mechanism already in use."
+    answer: "One entry per skill with remoteSkillName"
+
+  - question: "Should the developer-marketing bookshelf skill from the local claude skills directory also be included?"
+    resolved: true
+    options:
+      - option: "No, only remote GitHub skills"
+        description: "Keep the default injection list limited to remote GitHub-hosted skills. The developer-marketing bookshelf is a local Claude Code skill already available in the user's environment and does not need injection into worktrees."
+        selected: true
+      - option: "Yes, include as a local skill"
+        description: "Add developer-marketing as a Local type SkillSource pointing to the .claude/skills directory. Ensures it is available in every worktree even if the user's global config differs."
+        selected: false
+    selectionRationale: "The developer-marketing skill is already present in the user's Claude Code skill environment (visible in the system prompt). It does not need to be injected into worktrees because Claude Code skills are session-level, not worktree-level. Adding it would be redundant and could cause conflicts with the existing installation."
+    answer: "No, only remote GitHub skills"
+
+  - question: "Should the remotion-dev/skills repo skill use remoteSkillName or install the entire repo?"
+    resolved: true
+    options:
+      - option: "Use remoteSkillName 'remotion-best-practices'"
+        description: "Explicitly specify the skill name via --skill flag. This is defensive and ensures only the intended skill is installed, even if the repo adds more skills later."
+        selected: true
+      - option: "Install entire repo without remoteSkillName"
+        description: "Omit remoteSkillName so all skills in the repo are installed. Currently there is only one skill, so the result is the same, but future skills would be auto-included."
+        selected: false
+    selectionRationale: "Using remoteSkillName 'remotion-best-practices' is consistent with the pattern used for all other skills. It provides explicit control and prevents unexpected skill additions if the remotion-dev/skills repo adds more skills in the future."
+    answer: "Use remoteSkillName 'remotion-best-practices'"
 
 content: |
   ## Problem Statement
@@ -55,52 +102,66 @@ content: |
   GTM tasks will automatically have the knowledge and patterns needed to produce marketing
   materials as evidence artifacts.
 
-  ## Codebase Analysis
+  ## Success Criteria
 
-  ### Project Structure
+  - [ ] Remotion skill (remotion-best-practices) added as a SkillSource entry with source
+        'remotion-dev/skills' and remoteSkillName 'remotion-best-practices'
+  - [ ] All 11 GTM skills from shep-ai/promo added as individual SkillSource entries with
+        source 'shep-ai/promo' and respective remoteSkillName values
+  - [ ] Total default skill count increases from 8 to 20 (8 existing + 1 Remotion + 11 promo)
+  - [ ] All new skills use SkillSourceType.Remote and follow the existing SkillSource pattern
+  - [ ] Unit test assertion for skill count updated from 8 to 20
+  - [ ] Unit test assertion for skill names array updated to include all 20 skill names
+  - [ ] WorkflowConfig snapshot test updated to include new skill entries
+  - [ ] All tests pass (`pnpm test:unit`)
+  - [ ] Type check passes (`pnpm typecheck`)
+  - [ ] No changes to domain models, TypeSpec definitions, or infrastructure services
 
-  The skill injection system spans three layers of the Clean Architecture:
+  ## Functional Requirements
 
-  - **Domain** (`tsp/domain/entities/settings.tsp`) — Defines `SkillSourceType` enum (Local/Remote),
-    `SkillSource` model, and `SkillInjectionConfig` model with enabled flag and skills array
-  - **Domain factories** (`packages/core/src/domain/factories/settings-defaults.factory.ts`) —
-    Contains the default `SkillInjectionConfig` with 8 pre-configured remote skills
-  - **Infrastructure** (`packages/core/src/infrastructure/services/skill-injector.service.ts`) —
-    The `SkillInjectorService` that handles local copying and remote `npx skills add` installation
+  - **FR-1**: Add a SkillSource entry for 'remotion-best-practices' with type Remote,
+    source 'remotion-dev/skills', and remoteSkillName 'remotion-best-practices' to the
+    default skills array in settings-defaults.factory.ts
+  - **FR-2**: Add 11 individual SkillSource entries for each shep-ai/promo skill
+    (ai-social-media-content, brand-messaging-architecture, copywriting, devrel-content,
+    github-presence, landing-page-copy, product-hunt-launch, product-launch,
+    social-media-management, storybrand-messaging, video-script) — each with type Remote,
+    source 'shep-ai/promo', and remoteSkillName matching the skill directory name
+  - **FR-3**: Preserve the existing 8 default skills unchanged and in their current order
+  - **FR-4**: New skills must be appended after the existing 8 skills, with Remotion skill
+    first, then shep-ai/promo skills in alphabetical order
+  - **FR-5**: Each new SkillSource entry must have remoteSkillName equal to its name field
+    (matching the convention of all existing entries)
 
-  ### Architecture Patterns
+  ## Non-Functional Requirements
 
-  Skills are configured as `SkillSource` entries in the settings defaults factory. Each entry
-  specifies a `name`, `type` (Remote), `source` (GitHub org/repo), and optional `remoteSkillName`.
-  During feature creation, the `SkillInjectorService` iterates the skills array and runs
-  `npx skills add <source> --yes [--skill <name>]` for each remote skill.
+  - **NFR-1**: No new runtime dependencies — the existing SkillInjectorService already handles
+    Remote type skills via npx; no additional packages or infrastructure changes needed
+  - **NFR-2**: No changes to the SkillSource or SkillInjectionConfig domain models — the
+    existing model fully supports the new entries without modification
+  - **NFR-3**: Backward compatibility — existing user settings that override the defaults must
+    continue to work; the factory only affects initial/default settings creation
+  - **NFR-4**: Skill naming consistency — all new skill names must use lowercase-kebab-case
+    matching the existing convention and the actual directory names in the source repos
+  - **NFR-5**: Test coverage — every new skill entry must be covered by the existing test
+    patterns (count assertion, names array assertion, type assertion, remoteSkillName assertion)
 
-  The existing pattern is straightforward — adding new skills means appending `SkillSource`
-  objects to the `skills` array in `settings-defaults.factory.ts`.
+  ## Product Questions & AI Recommendations
 
-  ### Relevant Technologies
-
-  - **npx skills add** — The Claude Code skill installer CLI. Accepts `org/repo` as source
-    and optional `--skill <name>` to install a specific skill from a multi-skill repo.
-  - **Remotion** — React-based video creation framework. The remotion-dev/skills repo packages
-    Remotion best practices as a Claude Code agent skill.
-  - **shep-ai/promo** — Contains 11 marketing skills installable via `npx skills add shep-ai/promo`.
+  | # | Question | AI Recommendation | Rationale |
+  | - | -------- | ----------------- | --------- |
+  | 1 | Which GTM skills from shep-ai/promo to include? | All 11 skills | Skills array is a user-customizable default; comprehensive coverage out of the box is preferred over forcing manual discovery |
+  | 2 | One SkillSource entry per skill or per repo? | One per skill with remoteSkillName | Matches existing pattern, gives users granular enable/disable control |
+  | 3 | Include developer-marketing bookshelf skill? | No, only remote GitHub skills | Already available as a session-level Claude Code skill; injection would be redundant |
+  | 4 | Remotion skill — use remoteSkillName or install entire repo? | Use remoteSkillName 'remotion-best-practices' | Consistent with all other entries; defensive against future repo changes |
 
   ## Affected Areas
 
   | Area | Impact | Reasoning |
   | ---- | ------ | --------- |
-  | `packages/core/src/domain/factories/settings-defaults.factory.ts` | High | Add new SkillSource entries to the default skills array |
-  | `tests/unit/domain/factories/settings-defaults.factory.test.ts` | Medium | Update test assertions for new default skill count |
-  | `tests/unit/infrastructure/services/skill-injector.service.test.ts` | Low | Existing tests cover the injection mechanism; new skills use the same Remote type pattern |
-
-  ## Success Criteria
-
-  - [ ] Remotion skill (remotion-best-practices) added to default skill injection config
-  - [ ] Key GTM skills from shep-ai/promo added to default skill injection config
-  - [ ] Existing unit tests updated to reflect new skill count
-  - [ ] All tests pass (`pnpm test:unit`)
-  - [ ] Type check passes (`pnpm typecheck`)
+  | `packages/core/src/domain/factories/settings-defaults.factory.ts` | High | Add 12 new SkillSource entries to the default skills array |
+  | `tests/unit/domain/factories/settings-defaults.factory.test.ts` | Medium | Update skill count from 8 to 20, update names array, update WorkflowConfig snapshot |
+  | `tests/unit/infrastructure/services/skill-injector.service.test.ts` | Low | No changes needed — existing tests cover the injection mechanism generically |
 
   ## Dependencies
 
@@ -111,11 +172,8 @@ content: |
 
   ## Size Estimate
 
-  **S** — This is a configuration-only change. The entire implementation is adding SkillSource
-  entries to an existing array in `settings-defaults.factory.ts` and updating test assertions.
-  No new domain models, no new services, no UI changes, no migrations. The skill injection
-  infrastructure already fully supports remote skills from arbitrary GitHub repos.
-
-  ---
-
-  _Generated by feature agent — proceed with research_
+  **S** — This is a configuration-only change. The implementation consists of:
+  1. Adding 12 SkillSource objects to an existing array in settings-defaults.factory.ts
+  2. Updating 3-4 test assertions in the existing test file
+  No new domain models, no new services, no UI changes, no migrations, no TypeSpec changes.
+  The skill injection infrastructure already fully supports remote skills from arbitrary GitHub repos.
