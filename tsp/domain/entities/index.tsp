@@ -48,3 +48,5 @@ import "./pm-project-member.tsp";
 import "./pm-audit-log.tsp";
 import "./operation-log-entry.tsp";
 import "./cluster.tsp";
+import "./cluster-repository.tsp";
+import "./cluster-application.tsp";
