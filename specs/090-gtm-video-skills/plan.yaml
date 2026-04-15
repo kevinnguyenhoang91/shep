@@ -1,0 +1,114 @@
+name: "gtm-video-skills"
+summary: >
+  Configuration-only change adding 12 new SkillSource entries (1 Remotion + 11
+  shep-ai/promo GTM skills) to the default skill injection array in
+  settings-defaults.factory.ts, then updating existing test assertions to
+  reflect the new 20-skill total. No domain models, infrastructure, or UI
+  changes required — the existing SkillInjectorService already supports
+  arbitrary remote GitHub skill repos.
+
+relatedFeatures: []
+technologies:
+  - "TypeScript"
+  - "SkillSourceType.Remote (domain enum)"
+  - "Vitest (unit testing)"
+relatedLinks:
+  - title: "remotion-dev/skills — Remotion agent skill for video creation in React"
+    url: "https://github.com/remotion-dev/skills"
+  - title: "shep-ai/promo — Shep promotion and GTM materials repository"
+    url: "https://github.com/shep-ai/promo"
+
+phases:
+  - id: phase-1
+    name: "Update tests (RED)"
+    description: "Update unit test assertions to expect 20 skills with the new names, types, and sources. Tests will fail because the factory still returns 8 skills."
+    parallel: false
+  - id: phase-2
+    name: "Add skill entries (GREEN)"
+    description: "Append 12 new SkillSource entries to the defaults factory skills array. Tests turn green."
+    parallel: false
+  - id: phase-3
+    name: "Verify and clean up (REFACTOR)"
+    description: "Run full validation (typecheck, lint, format, unit tests) and confirm all assertions pass. No structural refactoring expected — the change is additive configuration."
+    parallel: false
+
+filesToCreate: []
+
+filesToModify:
+  - "packages/core/src/domain/factories/settings-defaults.factory.ts"
+  - "tests/unit/domain/factories/settings-defaults.factory.test.ts"
+
+openQuestions: []
+
+content: |
+  ## Architecture Overview
+
+  The change is confined to the domain defaults layer. The settings-defaults
+  factory (`packages/core/src/domain/factories/settings-defaults.factory.ts`)
+  produces the initial `Settings` entity when no persisted settings exist. Its
+  `skillInjection.skills` array defines which skills the `SkillInjectorService`
+  installs into new worktrees via `npx skills add`.
+
+  No other layer is touched:
+  - **Domain models** — `SkillSource` and `SkillSourceType.Remote` already
+    support the new entries without modification (NFR-2).
+  - **Infrastructure** — `SkillInjectorService` iterates the skills array
+    generically; it has no hardcoded skill list (NFR-1).
+  - **Presentation** — The settings UI reads the skills array from the
+    persisted settings, not from the factory defaults.
+  - **Database** — Existing user settings that override defaults are unaffected;
+    the factory only runs during onboarding or when creating fresh settings
+    (NFR-3).
+
+  ## Key Design Decisions
+
+  **One entry per skill with explicit remoteSkillName.** All 8 existing entries
+  use this pattern. Each new skill gets its own SkillSource object with
+  `remoteSkillName` matching `name`. This gives users granular control to
+  enable/disable individual skills in their settings override. The alternative
+  (one entry per repo) would remove this granularity and is inconsistent with
+  the established convention.
+
+  **Append after existing 8, Remotion first, promo alphabetical.** Preserves
+  the existing entries in their current order (FR-3), minimizes diff surface,
+  and keeps the new entries scannable. The Remotion skill is placed first among
+  new entries to logically separate the video creation tool from the marketing
+  content skills (FR-4).
+
+  **All 11 promo skills included.** The skills array is a user-customizable
+  default. Including all 11 ensures comprehensive GTM coverage out of the box.
+  The injection time cost is ~12-36 seconds one-time per worktree, which is
+  acceptable. Users who don't need specific skills can remove them from their
+  settings.
+
+  **Update existing test assertions in-place.** The test file has 4 assertions
+  that reference skill count or names: (1) total skill count, (2) remote skill
+  count, (3) names array, and (4) WorkflowConfig snapshot. All need value
+  updates from 8 to 20 and the names array extended. The generic
+  `remoteSkillName === name` test already covers new entries automatically.
+
+  ## Implementation Strategy
+
+  This is a strict TDD cycle with a single RED-GREEN-REFACTOR pass:
+
+  1. **RED** — Update the test assertions first. Change `toHaveLength(8)` to
+     `toHaveLength(20)`, extend the expected names array with 12 new names,
+     and add 12 new SkillSource objects to the WorkflowConfig snapshot. Run
+     tests to confirm they fail (factory still returns 8 skills).
+
+  2. **GREEN** — Add 12 SkillSource entries to the `skills` array in
+     settings-defaults.factory.ts, appended after the existing 8. Run tests
+     to confirm they pass.
+
+  3. **REFACTOR** — Run `pnpm validate` (lint + format + typecheck) and
+     `pnpm test:unit` to confirm everything is clean. No structural
+     refactoring is expected for this additive configuration change.
+
+  ## Risk Mitigation
+
+  | Risk | Mitigation |
+  | ---- | ---------- |
+  | Typo in skill name causes silent injection failure at runtime | Each skill name is tested explicitly in the names array assertion. The SkillInjectorService also reports failed installations in SkillInjectionResult.errors. |
+  | Snapshot test drift from unrelated changes on main | The WorkflowConfig snapshot is a toEqual assertion, not a file snapshot. Merge conflicts will be immediately visible in the test file. |
+  | Breaking existing user settings | The factory only affects new/default settings creation. Persisted settings loaded from DB are never overwritten by factory defaults. |
+  | Remote repos become unavailable | Both repos are maintained by their respective teams (Remotion, Shep). The SkillInjectorService handles installation failures gracefully — failed skills are reported but do not block other installations. |

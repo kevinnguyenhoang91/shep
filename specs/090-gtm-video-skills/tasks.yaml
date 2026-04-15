@@ -1,0 +1,100 @@
+name: "gtm-video-skills"
+summary: >
+  3 tasks across 3 phases. Update test assertions (RED), add 12 skill entries
+  to the defaults factory (GREEN), then verify with full validation (REFACTOR).
+
+relatedFeatures: []
+technologies: []
+relatedLinks:
+  - title: "remotion-dev/skills — Remotion agent skill for video creation in React"
+    url: "https://github.com/remotion-dev/skills"
+  - title: "shep-ai/promo — Shep promotion and GTM materials repository"
+    url: "https://github.com/shep-ai/promo"
+
+tasks:
+  - id: task-1
+    phaseId: phase-1
+    title: "Update unit test assertions to expect 20 skills"
+    description: "Modify settings-defaults.factory.test.ts to expect 20 skills instead of 8. Update the skill count assertions, the names array, and the WorkflowConfig snapshot with all 12 new skill entries."
+    state: Todo
+    dependencies: []
+    acceptanceCriteria:
+      - "toHaveLength(8) changed to toHaveLength(20) for total skill count assertion"
+      - "toHaveLength(8) changed to toHaveLength(20) for remote skill count assertion"
+      - "Expected names array includes all 20 skill names in correct order: 8 existing + remotion-best-practices + 11 promo skills alphabetically"
+      - "WorkflowConfig snapshot includes 12 new SkillSource objects with correct name, type, source, and remoteSkillName"
+      - "Tests fail with expected count/value mismatches (RED phase confirmation)"
+    tdd:
+      red:
+        - "Change line 419: toHaveLength(8) to toHaveLength(20)"
+        - "Change line 427: toHaveLength(8) to toHaveLength(20)"
+        - "Extend names array (lines 451-460) with 12 new names: remotion-best-practices, then ai-social-media-content, brand-messaging-architecture, copywriting, devrel-content, github-presence, landing-page-copy, product-hunt-launch, product-launch, social-media-management, storybrand-messaging, video-script"
+        - "Add 12 SkillSource objects to the WorkflowConfig snapshot (lines 351-400): 1 with source remotion-dev/skills, 11 with source shep-ai/promo"
+      green:
+        - "This is the RED task — implementation happens in task-2"
+      refactor:
+        - "No refactoring needed — test values are the only change"
+    estimatedEffort: "15min"
+
+  - id: task-2
+    phaseId: phase-2
+    title: "Add 12 new SkillSource entries to settings-defaults.factory.ts"
+    description: "Append 12 new SkillSource entries to the skills array in the factory. Remotion skill first (source: remotion-dev/skills), then 11 shep-ai/promo skills in alphabetical order. Each entry uses SkillSourceType.Remote with remoteSkillName matching name."
+    state: Todo
+    dependencies:
+      - task-1
+    acceptanceCriteria:
+      - "Existing 8 skills remain unchanged and in original order"
+      - "remotion-best-practices entry added with source remotion-dev/skills"
+      - "11 shep-ai/promo entries added in alphabetical order: ai-social-media-content, brand-messaging-architecture, copywriting, devrel-content, github-presence, landing-page-copy, product-hunt-launch, product-launch, social-media-management, storybrand-messaging, video-script"
+      - "All 12 new entries use SkillSourceType.Remote"
+      - "All 12 new entries have remoteSkillName equal to name"
+      - "All unit tests pass (GREEN phase confirmation)"
+    tdd:
+      red:
+        - "Tests already failing from task-1"
+      green:
+        - "Add remotion-best-practices SkillSource entry after the frontend-design entry"
+        - "Add 11 shep-ai/promo SkillSource entries in alphabetical order after the Remotion entry"
+        - "Run pnpm test:unit to confirm all tests pass"
+      refactor:
+        - "No structural refactoring needed — entries follow the existing pattern exactly"
+    estimatedEffort: "15min"
+
+  - id: task-3
+    phaseId: phase-3
+    title: "Run full validation suite"
+    description: "Run typecheck, lint, format check, and unit tests to confirm the change is clean and complete. This is the final REFACTOR verification step."
+    state: Todo
+    dependencies:
+      - task-2
+    acceptanceCriteria:
+      - "pnpm typecheck passes with no errors"
+      - "pnpm lint passes with no errors"
+      - "pnpm format:check passes with no errors"
+      - "pnpm test:unit passes with all tests green"
+    tdd:
+      red:
+        - "N/A — validation task"
+      green:
+        - "N/A — validation task"
+      refactor:
+        - "Run pnpm validate (lint + format + typecheck)"
+        - "Run pnpm test:unit"
+        - "Fix any issues found (formatting, lint warnings, etc.)"
+    estimatedEffort: "10min"
+
+totalEstimate: "40min"
+openQuestions: []
+
+content: |
+  ## Summary
+
+  This is a single TDD cycle across 3 tasks. First, update the test file to
+  expect 20 skills instead of 8, confirming tests fail (RED). Then add 12 new
+  SkillSource entries to the factory, making tests pass (GREEN). Finally, run
+  the full validation suite to confirm everything is clean (REFACTOR).
+
+  The work is strictly sequential — tests must be updated before implementation,
+  and validation must follow implementation. No parallelism is possible or
+  needed for this S-sized configuration change.
