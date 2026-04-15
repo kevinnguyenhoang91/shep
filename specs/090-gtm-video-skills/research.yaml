@@ -1,0 +1,274 @@
+# Research Artifact (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: "gtm-video-skills"
+summary: >
+  Configuration-only change to extend the default skill injection array in
+  settings-defaults.factory.ts with 12 new SkillSource entries (1 Remotion +
+  11 shep-ai/promo GTM skills). No new libraries, domain models, or
+  infrastructure changes are needed — the existing SkillInjectorService
+  already supports arbitrary remote GitHub skill repos via npx.
+
+relatedFeatures: []
+
+technologies:
+  - "TypeScript"
+  - "SkillSourceType.Remote (domain enum)"
+  - "npx skills add (Claude Code skill installer CLI)"
+  - "Remotion (React-based video creation framework — consumed via skill, not as a dependency)"
+  - "Vitest (unit testing)"
+
+relatedLinks:
+  - title: "remotion-dev/skills — Remotion agent skill for video creation in React"
+    url: "https://github.com/remotion-dev/skills"
+  - title: "shep-ai/promo — Shep promotion and GTM materials repository"
+    url: "https://github.com/shep-ai/promo"
+  - title: "Remotion documentation"
+    url: "https://www.remotion.dev/docs"
+
+decisions:
+  - title: "Skill entry pattern — one entry per skill vs. one entry per repo"
+    chosen: "One SkillSource entry per skill with explicit remoteSkillName"
+    rejected:
+      - "One entry per repo without remoteSkillName — would install all skills in the repo at once, removing user granularity to enable/disable individual skills. Also inconsistent with the existing pattern where all 8 current entries use explicit remoteSkillName."
+    rationale: >
+      The existing settings-defaults.factory.ts defines 8 SkillSource entries,
+      each with an explicit remoteSkillName that matches the name field. This
+      pattern gives users granular control — they can remove or disable
+      individual skills in their settings override. The SkillInjectorService
+      uses the remoteSkillName to pass --skill flag to npx skills add, so each
+      skill is independently installable. Maintaining this pattern for all 12
+      new entries ensures consistency and user control.
+
+  - title: "Skill source grouping — source field values for new entries"
+    chosen: "Use 'remotion-dev/skills' for the Remotion skill and 'shep-ai/promo' for all 11 GTM skills"
+    rejected:
+      - "Fork repos into shep-ai org — unnecessary indirection; both repos are public and maintained by their respective owners. Forking would create maintenance burden for syncing upstream changes."
+      - "Use full GitHub URLs instead of org/repo shorthand — the existing pattern uses shorthand (e.g., 'shep-ai/shep', 'anthropics/claude-code') and the SkillInjectorService passes source directly to npx which expects this format."
+    rationale: >
+      The existing entries use GitHub org/repo shorthand format (e.g.,
+      'shep-ai/shep', 'anthropics/claude-code'). The SkillInjectorService
+      passes the source field directly to npx skills add as the first positional
+      argument. Using 'remotion-dev/skills' and 'shep-ai/promo' follows this
+      exact convention and requires zero infrastructure changes.
+
+  - title: "Skill ordering in the defaults array"
+    chosen: "Append after existing 8 skills: Remotion first, then 11 shep-ai/promo skills in alphabetical order"
+    rejected:
+      - "Interleave new skills alphabetically with existing ones — would break the existing test snapshot and make it harder to identify which skills are from which source repo at a glance."
+      - "Group by source repo (all shep-ai/shep, then all anthropics/claude-code, then remotion-dev, then shep-ai/promo) — would require reordering existing entries and break the current test expectations."
+    rationale: >
+      Preserving the existing 8 entries in their current order (FR-3) is a hard
+      requirement. Appending new entries after existing ones minimizes diff
+      surface and test churn. Alphabetical ordering within the shep-ai/promo
+      group provides predictable, scannable configuration. Placing Remotion
+      first among new entries (FR-4) logically separates the video creation
+      tool from the marketing content skills.
+
+  - title: "Test update strategy"
+    chosen: "Update existing test assertions in-place (count, names array, snapshot)"
+    rejected:
+      - "Add separate test blocks for new skills only — would duplicate test structure and leave stale assertions in existing tests (e.g., count would still say 8)."
+      - "Rewrite entire test suite — overkill for a configuration change; existing test patterns are well-structured and only need value updates."
+    rationale: >
+      The existing test file has four assertions that reference the skill count
+      or names: (1) toHaveLength(8) for total skills, (2) toHaveLength(8) for
+      remote skills, (3) the names array expectation, and (4) the full
+      WorkflowConfig snapshot. All four need their values updated to reflect 20
+      skills. The existing pattern of testing remoteSkillName === name for all
+      skills already covers the new entries generically. No new test blocks
+      are needed.
+
+  - title: "Domain model changes"
+    chosen: "No changes to SkillSource, SkillSourceType, or SkillInjectionConfig"
+    rejected:
+      - "Add a 'category' field to SkillSource to distinguish GTM vs. dev skills — over-engineering for this feature; skill categorization can be inferred from source repo and is not needed by the SkillInjectorService at runtime."
+      - "Add a SkillSourceType.Marketplace enum value — no marketplace exists yet; premature abstraction."
+    rationale: >
+      The existing SkillSource type (name, type, source, remoteSkillName) and
+      SkillSourceType enum (Local, Remote) fully support the new entries without
+      modification. The spec explicitly requires NFR-2: no changes to domain
+      models. All new skills are Remote type from GitHub repos, which is exactly
+      what the current model supports.
+
+openQuestions:
+  - question: "Should the developer-marketing bookshelf skill be included in worktree injection?"
+    resolved: true
+    options:
+      - option: "No — only remote GitHub skills"
+        description: "The developer-marketing skill is already available as a session-level Claude Code skill (visible in the system prompt). It does not need injection into worktrees because Claude Code skills are session-level, not worktree-level."
+        selected: true
+      - option: "Yes — include as a Local type SkillSource"
+        description: "Add developer-marketing as a Local SkillSource pointing to .claude/skills/. Would ensure availability in every worktree but risks conflicts with the existing session-level installation."
+        selected: false
+      - option: "Yes — include as a Remote type from a new GitHub repo"
+        description: "Publish the developer-marketing bookshelf to a GitHub repo and add as Remote. Would work but creates unnecessary publishing overhead for a skill that is already available."
+        selected: false
+    selectionRationale: >
+      The developer-marketing bookshelf is already present in the user's Claude
+      Code session (confirmed by its appearance in the system prompt's available
+      skills list). Claude Code skills are loaded at session level, not per
+      worktree, so injection would be redundant. Adding it could also cause
+      conflicts if the injected version differs from the session-level version.
+
+  - question: "How does adding 12 skills affect worktree creation performance?"
+    resolved: true
+    options:
+      - option: "Negligible impact — skills install in parallel"
+        description: "The SkillInjectorService iterates skills sequentially but each npx call is independent. Even sequential, each skill install takes 1-3 seconds and runs only once per worktree creation. Total added time is ~12-36 seconds for 12 new skills."
+        selected: true
+      - option: "Significant impact — needs parallelization"
+        description: "12 additional sequential npx calls could add 30+ seconds to worktree creation. Would need to refactor SkillInjectorService to use Promise.all for parallel installation."
+        selected: false
+      - option: "Deferred install — lazy injection on first agent use"
+        description: "Only install skills when the agent first requests them. Would require runtime detection of skill usage, adding complexity to the agent system."
+        selected: false
+    selectionRationale: >
+      The SkillInjectorService currently installs skills sequentially in a
+      for...of loop. While this means 12 additional skills add ~12-36 seconds
+      to worktree creation, this is a one-time cost per worktree and is
+      acceptable for an S-sized configuration change. Parallelization is a
+      valid optimization but is out of scope for this feature — it would
+      require changes to the SkillInjectorService infrastructure, which the
+      spec explicitly excludes (NFR-1, NFR-2). The existing idempotency check
+      (SKILL.md marker file) ensures skills are not re-installed on subsequent
+      runs.
+
+  - question: "Should new skill sources be validated against actual GitHub repo contents?"
+    resolved: true
+    options:
+      - option: "No — trust the spec and validate at runtime"
+        description: "The SkillInjectorService already handles installation failures gracefully (catches errors, reports them in SkillInjectionResult.errors). If a skill name is wrong, it will fail at injection time with a clear error message."
+        selected: true
+      - option: "Yes — add a CI check that validates skill sources"
+        description: "Create a CI job that runs npx skills add --dry-run for each configured skill. Would catch misconfigurations early but adds CI complexity and external dependency."
+        selected: false
+      - option: "Yes — add integration tests that verify skill installation"
+        description: "Write integration tests that actually run npx skills add. Would be thorough but slow, flaky (network-dependent), and out of scope for this S-sized feature."
+        selected: false
+    selectionRationale: >
+      The SkillInjectorService already has robust error handling — failed
+      installations are caught, logged, and reported in the
+      SkillInjectionResult.errors array without blocking other skill
+      installations. The existing unit tests for the service mock the npx calls
+      and test the error handling paths. Adding runtime validation or CI checks
+      is out of scope for this configuration-only change and would introduce
+      external dependencies into the test/CI pipeline.
+
+content: |
+  ## Technology Decisions
+
+  ### 1. Skill Entry Pattern
+
+  **Chosen:** One SkillSource entry per skill with explicit remoteSkillName
+
+  **Rejected:**
+  - One entry per repo without remoteSkillName — removes user granularity and is inconsistent with existing pattern
+
+  **Rationale:** All 8 existing entries in settings-defaults.factory.ts use explicit remoteSkillName matching the name field. The SkillInjectorService uses remoteSkillName to pass --skill flag to npx skills add. Maintaining this pattern ensures user control and consistency.
+
+  ### 2. Skill Source Grouping
+
+  **Chosen:** Use 'remotion-dev/skills' for Remotion skill, 'shep-ai/promo' for all 11 GTM skills
+
+  **Rejected:**
+  - Fork repos into shep-ai org — unnecessary maintenance burden
+  - Full GitHub URLs — existing pattern uses org/repo shorthand
+
+  **Rationale:** Matches the existing convention (e.g., 'shep-ai/shep', 'anthropics/claude-code'). The SkillInjectorService passes source directly to npx which expects this format.
+
+  ### 3. Skill Ordering
+
+  **Chosen:** Append after existing 8: Remotion first, then 11 promo skills alphabetically
+
+  **Rejected:**
+  - Interleave alphabetically with existing — breaks snapshot, harder to scan
+  - Group by source repo — requires reordering existing entries
+
+  **Rationale:** Preserves existing entries in their current order (FR-3), minimizes diff surface. Alphabetical within promo group is predictable and scannable.
+
+  ### 4. Test Update Strategy
+
+  **Chosen:** Update existing test assertions in-place
+
+  **Rejected:**
+  - Separate test blocks for new skills — duplicates structure, leaves stale assertions
+  - Full test rewrite — overkill for configuration change
+
+  **Rationale:** Four assertions need value updates: (1) skill count 8→20, (2) remote count 8→20, (3) names array, (4) WorkflowConfig snapshot. The generic remoteSkillName === name test already covers new entries.
+
+  ### 5. Domain Model Changes
+
+  **Chosen:** No changes
+
+  **Rejected:**
+  - Add 'category' field to SkillSource — over-engineering
+  - Add SkillSourceType.Marketplace — premature abstraction
+
+  **Rationale:** Existing SkillSource type fully supports new entries. Spec explicitly requires NFR-2: no domain model changes.
+
+  ## Library Analysis
+
+  | Library | Purpose | Decision | Reasoning |
+  | ------- | ------- | -------- | --------- |
+  | remotion | Video creation framework | Not a dependency | Consumed via skill instructions, not as an npm package. The remotion-best-practices skill provides Remotion guidance to agents — Shep itself does not depend on Remotion. |
+  | npx skills | Skill installer CLI | Already in use | The SkillInjectorService already uses npx skills add to install remote skills. No new dependency needed. |
+  | vitest | Unit testing | Already in use | Existing test infrastructure. Only test values need updating, not test tooling. |
+
+  ## Security Considerations
+
+  **No new security surface.** The existing SkillInjectorService validates all skill inputs:
+  - Path traversal prevention: rejects names containing `..`, `/`, or `\`
+  - Shell injection prevention: rejects sources containing shell metacharacters (`;`, `|`, `&`, `$`, backticks, `>`, `<`)
+  - Timeout protection: 30-second timeout per skill installation via AbortController
+  - Idempotency: SKILL.md marker file prevents re-installation
+
+  All new entries use the same validation paths. The source values ('remotion-dev/skills', 'shep-ai/promo') contain no special characters. Skill names are lowercase-kebab-case, passing all validation rules.
+
+  **Supply chain consideration:** Both repos are third-party GitHub repos. The remotion-dev/skills repo is maintained by the Remotion team. The shep-ai/promo repo is maintained by the Shep team. Both are trusted sources. The npx skills add command installs skill definitions (instructions/prompts), not executable code — the risk profile is equivalent to adding a CLAUDE.md file.
+
+  ## Performance Implications
+
+  **Worktree creation:** Adding 12 skills increases worktree creation time by ~12-36 seconds (each npx skills add call takes 1-3 seconds, executed sequentially). This is a one-time cost per worktree and is acceptable.
+
+  **No runtime performance impact.** Skills are static instruction files loaded by Claude Code at session start. More skills increase the agent's context window usage but do not affect Shep's runtime performance.
+
+  **Parallelization opportunity (out of scope):** The SkillInjectorService could be refactored to use Promise.all for parallel skill installation, but this is an infrastructure change explicitly excluded by NFR-1/NFR-2.
+
+  ## Architecture Notes
+
+  ### Files to Modify
+
+  1. **`packages/core/src/domain/factories/settings-defaults.factory.ts`** — Add 12 SkillSource entries to the skills array (lines 153-202). Each entry follows the exact same structure as existing entries.
+
+  2. **`tests/unit/domain/factories/settings-defaults.factory.test.ts`** — Update 4 assertions:
+     - Line 419: `.toHaveLength(8)` → `.toHaveLength(20)`
+     - Line 427: `.toHaveLength(8)` → `.toHaveLength(20)`
+     - Lines 451-460: Add 12 new skill names to the expected array
+     - Lines 336-403: Add 12 new SkillSource objects to the WorkflowConfig snapshot
+
+  ### No Files to Create
+
+  No new files, modules, services, or types are needed. This is purely a configuration defaults change.
+
+  ### Backward Compatibility
+
+  The settings-defaults.factory.ts only affects new/default settings creation. Existing user settings that override defaults are loaded from the database/config file and are not affected by changes to the factory. The factory is called during onboarding and when creating fresh settings — not on every app startup.
+
+  ### New Skill Entries (12 total)
+
+  **Remotion (1):**
+  - name: 'remotion-best-practices', type: Remote, source: 'remotion-dev/skills', remoteSkillName: 'remotion-best-practices'
+
+  **shep-ai/promo (11, alphabetical):**
+  - name: 'ai-social-media-content', type: Remote, source: 'shep-ai/promo', remoteSkillName: 'ai-social-media-content'
+  - name: 'brand-messaging-architecture', type: Remote, source: 'shep-ai/promo', remoteSkillName: 'brand-messaging-architecture'
+  - name: 'copywriting', type: Remote, source: 'shep-ai/promo', remoteSkillName: 'copywriting'
+  - name: 'devrel-content', type: Remote, source: 'shep-ai/promo', remoteSkillName: 'devrel-content'
+  - name: 'github-presence', type: Remote, source: 'shep-ai/promo', remoteSkillName: 'github-presence'
+  - name: 'landing-page-copy', type: Remote, source: 'shep-ai/promo', remoteSkillName: 'landing-page-copy'
+  - name: 'product-hunt-launch', type: Remote, source: 'shep-ai/promo', remoteSkillName: 'product-hunt-launch'
+  - name: 'product-launch', type: Remote, source: 'shep-ai/promo', remoteSkillName: 'product-launch'
+  - name: 'social-media-management', type: Remote, source: 'shep-ai/promo', remoteSkillName: 'social-media-management'
+  - name: 'storybrand-messaging', type: Remote, source: 'shep-ai/promo', remoteSkillName: 'storybrand-messaging'
+  - name: 'video-script', type: Remote, source: 'shep-ai/promo', remoteSkillName: 'video-script'
