@@ -55,6 +55,7 @@ import { registerCloudDeploy } from './modules/register-cloud-deploy.js';
 import { registerDeployment } from './modules/register-deployment.js';
 import { registerUseCases } from './modules/register-use-cases.js';
 import { registerInteractive } from './modules/register-interactive.js';
+import { registerCluster } from './modules/register-cluster.js';
 
 let _initialized = false;
 
@@ -88,6 +89,7 @@ export async function initializeContainer(): Promise<typeof container> {
   registerDeployment(container);
   registerUseCases(container);
   registerInteractive(container);
+  registerCluster(container);
 
   // ─── Eager deployment service ────────────────────────────────────────────
   // DeploymentService needs the database and calls `recoverAll()` at startup,
