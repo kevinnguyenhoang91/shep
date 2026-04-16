@@ -252,7 +252,8 @@
     "sessions": "الجلسات",
     "tools": "الأدوات",
     "skills": "المهارات",
-    "applications": "Applications"
+    "applications": "Applications",
+    "clusters": "المجموعات"
   },
   "sidebar": {
     "features": "الميزات",
@@ -620,5 +621,15 @@
     "imageNotes": "ملاحظات الصورة",
     "viewServerLogs": "عرض سجلات الخادم",
     "toggleSidebar": "تبديل الشريط الجانبي"
+  },
+  "cluster": {
+    "status": {
+      "provisioning": "جارٍ التوفير",
+      "ready": "جاهز",
+      "stopping": "جارٍ الإيقاف",
+      "stopped": "متوقف",
+      "error": "خطأ",
+      "destroying": "جارٍ التدمير"
+    }
   }
 }

@@ -252,7 +252,8 @@
     "sessions": "Сесії",
     "tools": "Інструменти",
     "skills": "Навички",
-    "applications": "Applications"
+    "applications": "Applications",
+    "clusters": "Кластери"
   },
   "sidebar": {
     "features": "Функції",
@@ -620,5 +621,15 @@
     "imageNotes": "Нотатки до зображення",
     "viewServerLogs": "Переглянути журнали сервера",
     "toggleSidebar": "Перемкнути бічну панель"
+  },
+  "cluster": {
+    "status": {
+      "provisioning": "Розгортання",
+      "ready": "Готовий",
+      "stopping": "Зупинка",
+      "stopped": "Зупинено",
+      "error": "Помилка",
+      "destroying": "Знищення"
+    }
   }
 }

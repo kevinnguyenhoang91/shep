@@ -252,7 +252,8 @@
     "sessions": "סשנים",
     "tools": "כלים",
     "skills": "כישורים",
-    "applications": "Applications"
+    "applications": "Applications",
+    "clusters": "אשכולות"
   },
   "sidebar": {
     "features": "פיצ'רים",
@@ -620,5 +621,15 @@
     "imageNotes": "הערות לתמונה",
     "viewServerLogs": "צפייה ביומני שרת",
     "toggleSidebar": "החלפת סרגל צד"
+  },
+  "cluster": {
+    "status": {
+      "provisioning": "מקצה",
+      "ready": "מוכן",
+      "stopping": "נעצר",
+      "stopped": "עצור",
+      "error": "שגיאה",
+      "destroying": "משמיד"
+    }
   }
 }

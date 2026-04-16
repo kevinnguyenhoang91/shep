@@ -252,7 +252,8 @@
     "sessions": "Сессии",
     "tools": "Инструменты",
     "skills": "Навыки",
-    "applications": "Applications"
+    "applications": "Applications",
+    "clusters": "Кластеры"
   },
   "sidebar": {
     "features": "Функции",
@@ -620,5 +621,15 @@
     "imageNotes": "Заметки к изображению",
     "viewServerLogs": "Просмотр журналов сервера",
     "toggleSidebar": "Переключить боковую панель"
+  },
+  "cluster": {
+    "status": {
+      "provisioning": "Развёртывание",
+      "ready": "Готов",
+      "stopping": "Остановка",
+      "stopped": "Остановлен",
+      "error": "Ошибка",
+      "destroying": "Уничтожение"
+    }
   }
 }

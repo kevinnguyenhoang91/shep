@@ -252,7 +252,8 @@
     "sessions": "Sessões",
     "tools": "Ferramentas",
     "skills": "Skills",
-    "applications": "Applications"
+    "applications": "Applications",
+    "clusters": "Clusters"
   },
   "sidebar": {
     "features": "Recursos",
@@ -620,5 +621,15 @@
     "imageNotes": "Notas da imagem",
     "viewServerLogs": "Ver logs do servidor",
     "toggleSidebar": "Alternar barra lateral"
+  },
+  "cluster": {
+    "status": {
+      "provisioning": "Provisionando",
+      "ready": "Pronto",
+      "stopping": "Parando",
+      "stopped": "Parado",
+      "error": "Erro",
+      "destroying": "Destruindo"
+    }
   }
 }
