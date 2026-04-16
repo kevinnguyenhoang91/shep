@@ -1,0 +1,40 @@
+feature:
+  id: "090-gtm-video-skills"
+  name: "gtm-video-skills"
+  number: 90
+  branch: "feat/090-gtm-video-skills"
+  lifecycle: "research"
+  createdAt: "2026-04-14T13:04:01Z"
+status:
+  phase: "implementation-complete"
+  progress:
+    completed: 3
+    total: 3
+    percentage: 100
+  currentTask: null
+  lastUpdated: "2026-04-16T16:21:39.235Z"
+  lastUpdatedBy: "feature-agent:implement"
+  completedPhases:
+    - "analyze"
+    - "requirements"
+    - "research"
+    - "plan"
+    - "phase-1"
+    - "phase-2"
+    - "phase-3"
+    - "evidence"
+validation:
+  lastRun: null
+  gatesPassed: []
+  autoFixesApplied: []
+tasks:
+  current: null
+  blocked: []
+  failed: []
+checkpoints:
+  - phase: "feature-created"
+    completedAt: "2026-04-14T13:04:01Z"
+    completedBy: "feature-agent"
+errors:
+  current: null
+  history: []
