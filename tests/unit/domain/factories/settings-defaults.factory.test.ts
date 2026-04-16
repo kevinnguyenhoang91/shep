@@ -398,6 +398,78 @@ describe('createDefaultSettings', () => {
               source: 'anthropics/claude-code',
               remoteSkillName: 'frontend-design',
             },
+            {
+              name: 'remotion-best-practices',
+              type: SkillSourceType.Remote,
+              source: 'remotion-dev/skills',
+              remoteSkillName: 'remotion-best-practices',
+            },
+            {
+              name: 'ai-social-media-content',
+              type: SkillSourceType.Remote,
+              source: 'shep-ai/promo',
+              remoteSkillName: 'ai-social-media-content',
+            },
+            {
+              name: 'brand-messaging-architecture',
+              type: SkillSourceType.Remote,
+              source: 'shep-ai/promo',
+              remoteSkillName: 'brand-messaging-architecture',
+            },
+            {
+              name: 'copywriting',
+              type: SkillSourceType.Remote,
+              source: 'shep-ai/promo',
+              remoteSkillName: 'copywriting',
+            },
+            {
+              name: 'devrel-content',
+              type: SkillSourceType.Remote,
+              source: 'shep-ai/promo',
+              remoteSkillName: 'devrel-content',
+            },
+            {
+              name: 'github-presence',
+              type: SkillSourceType.Remote,
+              source: 'shep-ai/promo',
+              remoteSkillName: 'github-presence',
+            },
+            {
+              name: 'landing-page-copy',
+              type: SkillSourceType.Remote,
+              source: 'shep-ai/promo',
+              remoteSkillName: 'landing-page-copy',
+            },
+            {
+              name: 'product-hunt-launch',
+              type: SkillSourceType.Remote,
+              source: 'shep-ai/promo',
+              remoteSkillName: 'product-hunt-launch',
+            },
+            {
+              name: 'product-launch',
+              type: SkillSourceType.Remote,
+              source: 'shep-ai/promo',
+              remoteSkillName: 'product-launch',
+            },
+            {
+              name: 'social-media-management',
+              type: SkillSourceType.Remote,
+              source: 'shep-ai/promo',
+              remoteSkillName: 'social-media-management',
+            },
+            {
+              name: 'storybrand-messaging',
+              type: SkillSourceType.Remote,
+              source: 'shep-ai/promo',
+              remoteSkillName: 'storybrand-messaging',
+            },
+            {
+              name: 'video-script',
+              type: SkillSourceType.Remote,
+              source: 'shep-ai/promo',
+              remoteSkillName: 'video-script',
+            },
           ],
         },
       });
@@ -415,9 +487,9 @@ describe('createDefaultSettings', () => {
       expect(settings.workflow.skillInjection!.enabled).toBe(false);
     });
 
-    it('should have 8 default skills', () => {
+    it('should have 20 default skills', () => {
       const settings = createDefaultSettings();
-      expect(settings.workflow.skillInjection!.skills).toHaveLength(8);
+      expect(settings.workflow.skillInjection!.skills).toHaveLength(20);
     });
 
     it('should have all skills as remote type', () => {
@@ -425,7 +497,7 @@ describe('createDefaultSettings', () => {
       const remoteSkills = settings.workflow.skillInjection!.skills.filter(
         (s) => s.type === SkillSourceType.Remote
       );
-      expect(remoteSkills).toHaveLength(8);
+      expect(remoteSkills).toHaveLength(20);
     });
 
     it('should have each remote skill with a remoteSkillName matching its name', () => {
@@ -458,6 +530,18 @@ describe('createDefaultSettings', () => {
         'tsp-model',
         'vercel-react-best-practices',
         'frontend-design',
+        'remotion-best-practices',
+        'ai-social-media-content',
+        'brand-messaging-architecture',
+        'copywriting',
+        'devrel-content',
+        'github-presence',
+        'landing-page-copy',
+        'product-hunt-launch',
+        'product-launch',
+        'social-media-management',
+        'storybrand-messaging',
+        'video-script',
       ]);
     });
   });
