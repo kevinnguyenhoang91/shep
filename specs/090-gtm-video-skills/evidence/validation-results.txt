@@ -1,5 +1,5 @@
 === Full Validation Suite ===
-Date: 2026-04-16T19:29:00Z
+Date: 2026-04-16T19:32:00Z
 
 --- pnpm typecheck (tsc --noEmit) ---
 Exit code: 0
@@ -9,18 +9,27 @@ No errors.
 Exit code: 0
 No warnings, no errors.
 
---- pnpm build (tsc + tsc-alias) ---
-Exit code: 0
-Build completed successfully.
-
 --- pnpm test:unit (vitest) ---
 Test Files: 461 passed (461)
 Tests:      6288 passed (6288)
-Duration:   81.55s
+Duration:   35.81s
 
 --- Settings Defaults Factory Test (isolated) ---
 Test Files: 1 passed (1)
 Tests:      36 passed (36)
-Duration:   128ms
+Duration:   120ms
+
+All 36 tests cover:
+- Return type and structure (4 tests)
+- ModelConfiguration defaults (2 tests)
+- UserProfile defaults (2 tests)
+- EnvironmentConfig defaults (4 tests)
+- SystemConfig defaults (3 tests)
+- AgentConfig defaults (5 tests)
+- NotificationPreferences defaults (4 tests)
+- FeatureFlags defaults (2 tests)
+- WorkflowConfig defaults (2 tests)
+- SkillInjectionConfig defaults (7 tests) - validates 20 skills, all Remote type, correct names
+- Complete default object (1 test)
 
 === All checks passed ===

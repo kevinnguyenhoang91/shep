@@ -1,10 +1,45 @@
 
-[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90m/Users/arielshadkhan/.shep/repos/fbfd7efb528913ed/wt/feat-gtm-video-skills[39m
+ RUN  v4.0.18 /Users/arielshadkhan/.shep/repos/fbfd7efb528913ed/wt/feat-gtm-video-skills
 
- [32m✓[39m [30m[43m node [49m[39m tests/unit/domain/factories/settings-defaults.factory.test.ts [2m([22m[2m36 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > return type and structure > should return an object with all required fields 1ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > return type and structure > should return a Settings type that matches generated types 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > return type and structure > should generate unique IDs for each call 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > return type and structure > should set createdAt and updatedAt timestamps 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > ModelConfiguration defaults > should set default model field to "claude-sonnet-4-6" 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > ModelConfiguration defaults > should match TypeSpec model defaults 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > UserProfile defaults > should set all user fields to undefined (optional fields) 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > UserProfile defaults > should return empty UserProfile object 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > EnvironmentConfig defaults > should set defaultEditor to "vscode" 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > EnvironmentConfig defaults > should set shellPreference to "bash" 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > EnvironmentConfig defaults > should set defaultCloneDirectory to homedir/repos 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > EnvironmentConfig defaults > should match TypeSpec model defaults 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > SystemConfig defaults > should set autoUpdate to true 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > SystemConfig defaults > should set logLevel to "info" 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > SystemConfig defaults > should match TypeSpec model defaults 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > AgentConfig defaults > should have agent field defined 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > AgentConfig defaults > should set agent type to claude-code 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > AgentConfig defaults > should set agent authMethod to session 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > AgentConfig defaults > should have token as undefined 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > AgentConfig defaults > should match TypeSpec model defaults 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > NotificationPreferences defaults > should have notifications field defined 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > NotificationPreferences defaults > should have all notification channels enabled (opt-out) 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > NotificationPreferences defaults > should have all notification event types enabled 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > NotificationPreferences defaults > should match TypeSpec model defaults 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > FeatureFlags defaults > should have featureFlags field defined 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > FeatureFlags defaults > should default feature flags with envDeploy enabled 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > WorkflowConfig defaults > should default workflow.defaultFastMode to true 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > WorkflowConfig defaults > should include all workflow defaults 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > SkillInjectionConfig defaults > should have skillInjection defined on workflow 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > SkillInjectionConfig defaults > should have skillInjection.enabled set to false 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > SkillInjectionConfig defaults > should have 20 default skills 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > SkillInjectionConfig defaults > should have all skills as remote type 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > SkillInjectionConfig defaults > should have each remote skill with a remoteSkillName matching its name 1ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > SkillInjectionConfig defaults > should have remote frontend-design skill with correct source and skill name 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > SkillInjectionConfig defaults > should include the expected skill names 0ms
+ ✓  node  tests/unit/domain/factories/settings-defaults.factory.test.ts > createDefaultSettings > complete default object > should return complete Settings object matching all TypeSpec defaults 0ms
 
-[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
-[2m      Tests [22m [1m[32m36 passed[39m[22m[90m (36)[39m
-[2m   Start at [22m 19:28:21
-[2m   Duration [22m 128ms[2m (transform 46ms, setup 27ms, import 32ms, tests 5ms, environment 0ms)[22m
+ Test Files  1 passed (1)
+      Tests  36 passed (36)
+   Start at  19:32:14
+   Duration  120ms (transform 42ms, setup 24ms, import 32ms, tests 5ms, environment 0ms)
 
