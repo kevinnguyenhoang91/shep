@@ -321,6 +321,7 @@ describe('createDefaultSettings', () => {
         reactFileManager: false,
         inventory: false,
         projects: false,
+        clusters: false,
       });
     });
   });

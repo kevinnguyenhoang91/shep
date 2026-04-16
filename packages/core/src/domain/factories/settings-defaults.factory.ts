@@ -223,6 +223,7 @@ export function createDefaultSettings(): Settings {
     reactFileManager: false,
     inventory: false,
     projects: false,
+    clusters: false,
   };
 
   return {

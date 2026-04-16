@@ -17,6 +17,7 @@ const defaultFeatureFlags = {
   reactFileManager: false,
   inventory: false,
   projects: false,
+  clusters: false,
 };
 
 const meta: Meta<typeof AppSidebar> = {

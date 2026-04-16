@@ -399,6 +399,7 @@ export function SettingsPageClient({
     reactFileManager: false,
     projects: false,
     inventory: false,
+    clusters: false,
   };
 
   // Language state
@@ -1798,6 +1799,18 @@ export function SettingsPageClient({
               checked={flags.projects}
               onChange={(v) => {
                 const newFlags = { ...flags, projects: v };
+                setFlags(newFlags);
+                save({ featureFlags: newFlags });
+              }}
+            />
+            <SwitchRow
+              label={t('settings.featureFlags.clusters')}
+              description={t('settings.featureFlags.clustersDescription')}
+              id="flag-clusters"
+              testId="switch-flag-clusters"
+              checked={flags.clusters}
+              onChange={(v) => {
+                const newFlags = { ...flags, clusters: v };
                 setFlags(newFlags);
                 save({ featureFlags: newFlags });
               }}

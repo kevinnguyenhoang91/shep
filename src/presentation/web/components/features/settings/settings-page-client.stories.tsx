@@ -43,6 +43,7 @@ export const AllSections: Story = {
         reactFileManager: false,
         inventory: false,
         projects: false,
+        clusters: false,
       },
     },
     shepHome: '/opt/shep',

@@ -38,6 +38,10 @@ properties:
     type: boolean
     default: false
     description: Enable Projects pages and navigation (project management)
+  clusters:
+    type: boolean
+    default: false
+    description: Enable Clusters navigation and Kubernetes cluster management in the web UI
 required:
   - skills
   - envDeploy
@@ -48,4 +52,5 @@ required:
   - reactFileManager
   - inventory
   - projects
+  - clusters
 description: Feature flag toggles for runtime feature control

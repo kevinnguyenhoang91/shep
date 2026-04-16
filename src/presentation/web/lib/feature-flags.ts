@@ -22,6 +22,7 @@ export interface FeatureFlagsState {
   reactFileManager: boolean;
   inventory: boolean;
   projects: boolean;
+  clusters: boolean;
 }
 
 export function getFeatureFlags(): FeatureFlagsState {
@@ -39,6 +40,7 @@ export function getFeatureFlags(): FeatureFlagsState {
           reactFileManager: flags.reactFileManager,
           inventory: flags.inventory,
           projects: flags.projects,
+          clusters: flags.clusters,
         };
       }
     }
@@ -59,6 +61,7 @@ export function getFeatureFlags(): FeatureFlagsState {
     reactFileManager: isEnabled(process.env.NEXT_PUBLIC_FLAG_REACT_FILE_MANAGER),
     inventory: false,
     projects: false,
+    clusters: false,
   };
 }
 
@@ -93,5 +96,8 @@ export const featureFlags = {
   },
   get projects() {
     return getFeatureFlags().projects;
+  },
+  get clusters() {
+    return getFeatureFlags().clusters;
   },
 } as const;

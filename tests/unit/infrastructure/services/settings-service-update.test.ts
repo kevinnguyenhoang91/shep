@@ -78,6 +78,7 @@ describe('updateSettings', () => {
         reactFileManager: false,
         inventory: false,
         projects: false,
+        clusters: false,
       },
     };
     updateSettings(updated);

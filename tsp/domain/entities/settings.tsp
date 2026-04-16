@@ -597,6 +597,9 @@ model FeatureFlags {
 
   @doc("Enable Projects pages and navigation (project management)")
   projects: boolean = false;
+
+  @doc("Enable Clusters navigation and Kubernetes cluster management in the web UI")
+  clusters: boolean = false;
 }
 
 /**

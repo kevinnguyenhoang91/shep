@@ -48,6 +48,7 @@ const defaultFlags = {
   reactFileManager: false,
   inventory: true,
   projects: false,
+  clusters: false,
 };
 
 function renderWithSidebar(ui: React.ReactElement) {
