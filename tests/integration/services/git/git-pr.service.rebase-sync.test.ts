@@ -132,7 +132,7 @@ describe('GitPrService — syncMain (integration)', () => {
     featureBranch = harness.featureBranch;
     dirs.push(bareDir, cloneDir);
     service = new GitPrService(makeRealExec());
-  });
+  }, 30_000);
 
   afterEach(() => {
     destroyDirs(dirs);
@@ -247,7 +247,7 @@ describe('GitPrService — rebaseOnMain (integration)', () => {
     featureBranch = harness.featureBranch;
     dirs.push(bareDir, cloneDir);
     service = new GitPrService(makeRealExec());
-  });
+  }, 30_000);
 
   afterEach(async () => {
     // Ensure no mid-rebase state before cleanup (prevents rmSync errors)
@@ -396,7 +396,7 @@ describe('GitPrService — helper methods (integration)', () => {
     featureBranch = harness.featureBranch;
     dirs.push(bareDir, cloneDir);
     service = new GitPrService(makeRealExec());
-  });
+  }, 30_000);
 
   afterEach(async () => {
     for (const dir of dirs) {
@@ -511,7 +511,7 @@ describe('GitPrService — stash (integration)', () => {
     featureBranch = harness.featureBranch;
     dirs.push(bareDir, cloneDir);
     service = new GitPrService(makeRealExec());
-  });
+  }, 30_000);
 
   afterEach(async () => {
     for (const dir of dirs) {
