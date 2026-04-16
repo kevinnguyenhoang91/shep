@@ -16,6 +16,7 @@ import {
   Settings,
   TableProperties,
   FolderKanban,
+  Server,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -178,6 +179,14 @@ export function AppSidebar({
             href="/applications"
             active={pathname === '/applications'}
           />
+          {featureFlags.clusters ? (
+            <SidebarNavItem
+              icon={Server}
+              label={t('navigation.clusters')}
+              href="/clusters"
+              active={pathname?.startsWith('/clusters') ?? false}
+            />
+          ) : null}
           <SidebarNavItem
             icon={Wrench}
             label={t('navigation.tools')}

@@ -8,7 +8,9 @@ import type { AutoResolveMergedBranchesUseCase } from '@shepai/core/application/
 import type { IAgentRunRepository } from '@shepai/core/application/ports/output/agents/agent-run-repository.interface';
 import type { DeploymentStatusEntry } from '@shepai/core/application/ports/output/services/deployment-service.interface';
 import type { ListDeploymentsUseCase } from '@shepai/core/application/use-cases/deployments/list-deployments.use-case';
-import type { Repository } from '@shepai/core/domain/generated/output';
+import type { ListClustersUseCase } from '@shepai/core/application/use-cases/clusters/list-clusters.use-case';
+import type { IClusterRepository } from '@shepai/core/application/ports/output/repositories/cluster-repository.interface';
+import type { Cluster, Repository } from '@shepai/core/domain/generated/output';
 import { getSettings } from '@shepai/core/infrastructure/services/settings.service';
 import { layoutWithDagre, getCanvasLayoutDefaults } from '@/lib/layout-with-dagre';
 import { getLanguagePreference } from '@/lib/language';
@@ -193,6 +195,23 @@ export async function getGraphData(): Promise<{
     })
   );
 
+  // Load clusters with their linked repository IDs for canvas rendering.
+  // Wrapped in try/catch so the canvas still works if clusters aren't registered.
+  let clustersWithLinks: { cluster: Cluster; linkedRepoIds: string[] }[] = [];
+  try {
+    const listClusters = resolve<ListClustersUseCase>('ListClustersUseCase');
+    const clusterRepo = resolve<IClusterRepository>('IClusterRepository');
+    const clusters = await listClusters.execute();
+    clustersWithLinks = await Promise.all(
+      clusters.map(async (cluster) => {
+        const linkedRepos = await clusterRepo.getLinkedRepositories(cluster.id);
+        return { cluster, linkedRepoIds: linkedRepos.map((r) => r.id) };
+      })
+    );
+  } catch {
+    // Cluster use case not registered — skip silently
+  }
+
   const { workflow } = getSettings();
   const { nodes, edges } = buildGraphNodes(repositories, featuresWithRuns, {
     enableEvidence: workflow.enableEvidence,
@@ -200,6 +219,7 @@ export async function getGraphData(): Promise<{
     ciWatchEnabled: workflow.ciWatchEnabled,
     repoGitInfo: repoGitInfoMap,
     repoGitStatus: repoGitStatusMap,
+    clusters: clustersWithLinks.length > 0 ? clustersWithLinks : undefined,
   });
 
   // Load all live deployments via the use case. The client-side

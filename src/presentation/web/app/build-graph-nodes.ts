@@ -1,4 +1,4 @@
-import type { Feature, Repository, AgentRun } from '@shepai/core/domain/generated/output';
+import type { Feature, Repository, AgentRun, Cluster } from '@shepai/core/domain/generated/output';
 import { AgentRunStatus } from '@shepai/core/domain/generated/output';
 import {
   deriveNodeState,
@@ -38,6 +38,8 @@ export interface BuildGraphNodesOptions {
   >;
   /** Git info resolution status keyed by repository path */
   repoGitStatus?: Map<string, 'loading' | 'ready' | 'not-a-repo'>;
+  /** Clusters to render on the canvas (with their linked repository IDs) */
+  clusters?: { cluster: Cluster; linkedRepoIds: string[] }[];
 }
 
 export function buildGraphNodes(
@@ -146,6 +148,39 @@ export function buildGraphNodes(
   // Applications are NOT rendered on the canvas anymore — they live
   // on the dedicated `/applications` page. Do not add application
   // nodes here regardless of what the caller passes.
+
+  // Add cluster nodes + cluster→repo edges
+  if (options?.clusters) {
+    for (const { cluster, linkedRepoIds } of options.clusters) {
+      const clusterNodeId = `cluster-${cluster.id}`;
+      nodes.push({
+        id: clusterNodeId,
+        type: 'clusterNode',
+        position: { x: 0, y: 0 },
+        data: {
+          id: cluster.id,
+          name: cluster.name,
+          description: cluster.description,
+          status: cluster.status,
+          linkedRepoCount: linkedRepoIds.length,
+          linkedAppCount: 0,
+          argoCdEnabled: cluster.argoCdEnabled,
+        },
+      });
+
+      for (const repoId of linkedRepoIds) {
+        const repoNodeId = `repo-${repoId}`;
+        if (nodes.some((n) => n.id === repoNodeId)) {
+          edges.push({
+            id: `cluster-edge-${clusterNodeId}-${repoNodeId}`,
+            source: clusterNodeId,
+            target: repoNodeId,
+            style: { strokeDasharray: '3 3' },
+          });
+        }
+      }
+    }
+  }
 
   return { nodes, edges };
 }
