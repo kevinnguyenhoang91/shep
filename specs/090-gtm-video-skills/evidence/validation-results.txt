@@ -1,0 +1,26 @@
+=== Full Validation Suite ===
+Date: 2026-04-16T19:29:00Z
+
+--- pnpm typecheck (tsc --noEmit) ---
+Exit code: 0
+No errors.
+
+--- pnpm lint (eslint . --max-warnings 0 --cache) ---
+Exit code: 0
+No warnings, no errors.
+
+--- pnpm build (tsc + tsc-alias) ---
+Exit code: 0
+Build completed successfully.
+
+--- pnpm test:unit (vitest) ---
+Test Files: 461 passed (461)
+Tests:      6288 passed (6288)
+Duration:   81.55s
+
+--- Settings Defaults Factory Test (isolated) ---
+Test Files: 1 passed (1)
+Tests:      36 passed (36)
+Duration:   128ms
+
+=== All checks passed ===
