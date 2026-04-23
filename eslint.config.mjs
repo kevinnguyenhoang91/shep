@@ -73,6 +73,8 @@ export default tseslint.config(
       // Test outputs
       'test-results/**',
       'playwright-report/**',
+      'playwright-report-mock/**',
+      '.features-gen/**',
 
       // POC TypeScript files (not part of main tsconfig)
       'docs/poc/**/*.ts',

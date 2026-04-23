@@ -1,0 +1,14 @@
+# Smoke scenario
+#
+# Proves the scenario-replay infrastructure is wired end-to-end:
+# the web server boots under SHEP_E2E_MOCK_AGENT=1, the loader
+# finds this file, and a feature spec can select it by name.
+#
+# Deliberately contains NO turns — no UI interaction drives an
+# agent call. Every assertion is structural (the applications list
+# page renders).
+
+version: 1
+name: smoke
+description: Smoke test for the web e2e mock infrastructure — no agent turns.
+turns: []

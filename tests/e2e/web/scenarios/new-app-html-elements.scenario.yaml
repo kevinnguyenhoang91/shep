@@ -1,0 +1,62 @@
+# Golden-path scenario — NEW APP + FIRST ITERATION
+#
+# Template scenario that exercises the applications flow end-to-end
+# with scripted agent turns. Used as the reference implementation for
+# future feature authors.
+#
+# NOTE: the corresponding .feature is marked `@pending` while the
+# real `create-application` pipeline's dependencies (bun / vite, real
+# scaffolder) are sorted for hermetic runs. The YAML validates
+# against the schema so it ships with full infra coverage.
+
+version: 1
+name: new-app-html-elements
+description: >
+  User types a prompt, the mock agent resolves a slug/name, the
+  scaffolder produces a real project on disk, then a first iteration
+  adds two HTML elements to index.html.
+
+turns:
+  # Phase 1 — app metadata resolution (the only turn today's
+  # SHEP_MOCK_EXECUTOR also covers). Returns a JSON blob consumed by
+  # the create-application use case.
+  - kind: text
+    text: '{"slug":"html-playground","name":"Html Playground","description":"A tiny page to test adding HTML elements"}'
+    delayMs: 40
+
+  # Phase 2 — kickoff workflow first step.
+  - kind: text
+    text: 'Analyzing the scaffolded project structure.'
+    delayMs: 30
+  - kind: tool-call
+    tool: readFile
+    input: { path: 'index.html' }
+
+  # Phase 3 — iteration: add two elements.
+  - kind: text
+    text: 'Adding a button and an input to the landing page.'
+  - kind: tool-call
+    tool: writeFile
+    input:
+      path: 'src/App.tsx'
+      content: |
+        export default function App() {
+          return (
+            <div>
+              <button data-testid="e2e-btn">Click</button>
+              <input data-testid="e2e-input" />
+            </div>
+          );
+        }
+  - kind: text
+    text: 'Done — two elements added.'
+
+mocks:
+  # Placeholders — cloud/github mocks are delivered in a follow-up.
+  # Present so scenario authors can see the shape.
+  cloud:
+    deploymentId: 'dep_fake_1'
+    finalUrl: 'https://html-playground.pages.dev'
+  github:
+    owners: ['shep-bot']
+    createRepoResults: ['ok']

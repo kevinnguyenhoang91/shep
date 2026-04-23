@@ -30,9 +30,11 @@ coverage/
 # =============================================================================
 test-results/
 playwright-report/
+playwright-report-mock/
 playwright/.cache/
 .playwright-mcp/
 .test-artifacts/
+.features-gen/
 
 # =============================================================================
 # IDE & Editors
