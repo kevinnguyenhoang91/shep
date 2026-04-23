@@ -160,7 +160,19 @@ content: |
   SHEP_E2E_MOCK_AGENT=1 on ubuntu-latest. Docs land in
   `docs/development/e2e-testing.md`.
 
-  ## Testing Strategy (TDD: Tests FIRST)
+  ## Clean Architecture Alignment
+
+  The infra respects Clean Architecture boundaries: the replay executor is
+  an infrastructure adapter behind the existing `IAgentExecutorProvider`
+  port; the mock cloud/github services sit behind their respective ports;
+  no use case or domain code is modified. Test code imports only domain
+  types, not infrastructure internals.
+
+  ## Testing Strategy (TDD: RED → GREEN → REFACTOR)
+
+  Every implementation task follows the RED → GREEN → REFACTOR cycle.
+  RED tests are committed first (failing), then GREEN minimal code, then
+  REFACTOR cleanups while keeping tests green.
 
   **Unit (vitest) — scenario loader & schema**
   - RED: invalid YAML throws with line/column
