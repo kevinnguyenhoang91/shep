@@ -1,0 +1,123 @@
+# Feature Specification (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: web-e2e-mock-infra
+number: 092
+branch: feat/092-web-e2e-mock-infra
+oneLiner: Scalable BDD + scenario-replay e2e infrastructure for the web UI's applications flow.
+summary: >
+  Build reusable end-to-end test infrastructure for the web UI by adding a
+  scenario replay layer under IAgentExecutorProvider (activated via
+  SHEP_E2E_MOCK_AGENT=1), YAML-driven agent scenarios, mock remote adapters
+  (cloud deploy, GitHub), and a Gherkin / playwright-bdd authoring layer.
+  The first consumer is the new-application → setup workflow → first
+  iteration flow, but the infra is deliberately generic so future features
+  can ship scenarios + .feature files without touching test code.
+phase: Requirements
+sizeEstimate: L
+
+# Relationships
+relatedFeatures:
+  - '090-application-sse-deltas'
+  - '091-apps-only-surface'
+  - '089-one-click-cloud-deploy'
+
+technologies:
+  - TypeScript
+  - Playwright
+  - playwright-bdd (Gherkin)
+  - js-yaml
+  - tsyringe
+  - Next.js
+  - reflect-metadata
+
+relatedLinks:
+  - title: playwright-bdd
+    url: https://vitalets.github.io/playwright-bdd/
+  - title: IAgentExecutorProvider port
+    url: packages/core/src/application/ports/output/agents/agent-executor-provider.interface.ts
+  - title: Existing SHEP_MOCK_EXECUTOR wiring
+    url: packages/core/src/infrastructure/di/modules/register-agents.ts
+  - title: Existing SSE mock helper
+    url: tests/e2e/web/helpers/sse-mock.ts
+
+# Open questions (must be resolved before implementation)
+openQuestions: []
+
+# Markdown content (the actual spec)
+content: |
+  ## Problem Statement
+
+  The web UI's applications flow (new app → setup workflow → iteration) is
+  the most visible product surface and has the most transitions, yet we have
+  no automated way to exercise it end-to-end. The existing
+  `SHEP_MOCK_EXECUTOR=1` path is narrowly scoped (it returns a single JSON
+  blob for the new-app prompt) and does not stream tool calls, file writes,
+  or multi-turn setup workflows. There is no shared scenario format, no way
+  for tests to select a scenario, and no mocks for cloud / GitHub adapters.
+  Every new UI feature therefore ships without end-to-end coverage, and
+  regressions in transitions / empty states / loading overlays are caught
+  only by manual QA.
+
+  We need **reusable** test infrastructure — not just one or two tests —
+  that future features can plug into by adding a YAML scenario and a
+  `.feature` file, with no core test code changes.
+
+  ## Success Criteria
+
+  - [ ] Running `SHEP_E2E_MOCK_AGENT=1 pnpm test:e2e:web` completes a full
+        "new app → setup workflow → first iteration" scenario against the
+        real Next.js server, using no network calls to Anthropic / OpenAI
+        / GitHub / Cloudflare, in under 60 seconds.
+  - [ ] A new e2e scenario can be added by writing a single YAML file under
+        `tests/e2e/web/scenarios/` + a `.feature` file under
+        `tests/e2e/web/features/` — no changes to step definitions,
+        executor adapters, or DI wiring required.
+  - [ ] All transitions in the applications flow (idle → scaffolding →
+        streaming → awaiting-input → iteration) are driven by scripted
+        turns from the scenario and observable in Playwright.
+  - [ ] The real `IApplicationScaffolder` runs during tests (a real Vite /
+        shadcn project is created in a temp dir).
+  - [ ] `IAgentExecutorProvider`, cloud deploy provider, and GitHub
+        repository service have e2e mock adapters that are only bound
+        when `SHEP_E2E_MOCK_AGENT=1` — production DI is untouched.
+  - [ ] Every scenario schema violation produces a clear, actionable
+        validation error at test startup (fail fast, not at first replay).
+  - [ ] A Gherkin `.feature` file for the golden path lands in-repo and
+        passes in CI on ubuntu-latest.
+  - [ ] The existing `SHEP_MOCK_EXECUTOR=1` code path is either migrated
+        or explicitly preserved with a documented scope boundary.
+
+  ## Affected Areas
+
+  | Area                                     | Impact  | Reasoning                                                                   |
+  | ---------------------------------------- | ------- | --------------------------------------------------------------------------- |
+  | `packages/core/src/infrastructure/services/agents/` | New    | Add `ScenarioReplayExecutorFactory` + scenario schema/loader                |
+  | `packages/core/src/infrastructure/di/modules/register-agents.ts` | Medium | Add `SHEP_E2E_MOCK_AGENT` branch next to existing `SHEP_MOCK_EXECUTOR`      |
+  | `packages/core/src/infrastructure/di/modules/` (new mock module) | New    | Bind e2e cloud + github mock adapters only when flag is on                  |
+  | `tests/e2e/web/scenarios/`               | New    | Home for YAML agent scenarios (first: `new-app-html-elements.scenario.yaml`) |
+  | `tests/e2e/web/features/`                | New    | Gherkin `.feature` files                                                   |
+  | `tests/e2e/web/steps/`                   | New    | Step definitions (page objects + scenario loader)                           |
+  | `tests/e2e/web/pages/`                   | New    | Page object models for the applications flow                                |
+  | `playwright.config.ts`                   | Medium | Wire playwright-bdd feature compilation + env propagation                   |
+  | `package.json` scripts + devDeps         | Medium | Add `playwright-bdd`, `test:e2e:web:bdd` script                             |
+  | `src/presentation/web/**` components     | None    | No app-code changes — tests run against the real UI                         |
+
+  ## Dependencies
+
+  - **SHEP_MOCK_EXECUTOR**: existing narrow mock — we must coexist, not
+    conflict. New flag `SHEP_E2E_MOCK_AGENT=1` is the superset.
+  - **090-application-sse-deltas**: the scenarios must emit turn-group
+    deltas compatible with this SSE format.
+  - **091-apps-only-surface**: apps-only shell is already testable; this
+    infra covers its flow too.
+
+  ## Size Estimate
+
+  **L** — ~12–15 focused tasks across three layers (core executor mock,
+  DI wiring + remote mocks, Playwright-BDD plumbing + first feature).
+  Scope is bounded by leaving deploy / Get Online out of v1.
+
+  ---
+
+  _Generated by `/shep-kit:new-feature-fast`_

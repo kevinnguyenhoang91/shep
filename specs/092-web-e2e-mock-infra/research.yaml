@@ -1,0 +1,136 @@
+# Research Artifact (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: web-e2e-mock-infra
+summary: >
+  The codebase already has the hook-points we need (string DI tokens,
+  an IAgentExecutorProvider port, existing env-var-driven mock, Playwright
+  with webServer autostart). Three pillars: a scenario-replay executor
+  behind the existing port, mock cloud/github adapters gated by a new env
+  var, and playwright-bdd layered on top for authoring.
+
+relatedFeatures:
+  - '090-application-sse-deltas'
+  - '091-apps-only-surface'
+  - '089-one-click-cloud-deploy'
+
+technologies:
+  - playwright-bdd
+  - js-yaml
+  - zod
+  - tsyringe
+
+relatedLinks:
+  - title: playwright-bdd
+    url: https://vitalets.github.io/playwright-bdd/
+
+decisions:
+  - title: Env flag is SHEP_E2E_MOCK_AGENT, separate from SHEP_MOCK_EXECUTOR
+    chosen: New flag, new executor class
+    rejected:
+      - Extend SHEP_MOCK_EXECUTOR — too narrow scope today; risks regressing integration tests
+    rationale: >
+      Existing MockAgentExecutorService returns a single JSON reply for the
+      new-app prompt and has no concept of streaming or tool calls. Keep it
+      for its narrow role; add a superset scenario-replay executor for web
+      e2e. Clear boundary, no collision.
+
+  - title: Scenarios are declarative YAML under tests/e2e/web/scenarios/
+    chosen: YAML with a versioned schema and js-yaml loader + zod validator
+    rejected:
+      - TypeScript fixture modules — no schema validation, harder for non-devs
+      - JSON scenarios — no comments, harder to review
+    rationale: >
+      YAML keeps scenarios readable and diff-friendly. zod schema validation
+      at load time gives actionable errors. Versioned schema lets us evolve
+      the format.
+
+  - title: Real scaffolder runs, only agent + remote adapters mocked
+    chosen: Keep IApplicationScaffolder real; mock IAgentExecutorProvider, ICloudDeploymentProvider, IGitHubRepositoryService
+    rejected:
+      - Fully simulate scaffolding — would miss wiring bugs
+      - Mock everything including scaffolder — too removed from production
+    rationale: >
+      Scaffolder regressed silently inside the packaged Electron build in
+      091. Keeping it real exercises the full file-write + overlay +
+      operation-log pipeline while isolating the slow / external parts.
+
+  - title: playwright-bdd for Gherkin authoring
+    chosen: playwright-bdd@^8
+    rejected:
+      - '@cucumber/cucumber — older, heavier, weaker Playwright integration'
+      - No BDD — loses the reusable-steps-as-infra win
+    rationale: >
+      Compiles .feature files into Playwright specs and participates in
+      Playwright fixtures/reporters. Steps become first-class reusable
+      infra.
+
+  - title: Scenario selection via URL query param
+    chosen: '?e2eScenario=<name>' read by the replay executor via request header/cookie
+    rejected:
+      - One scenario per process via env var — forces webServer restarts
+      - HTTP control endpoint — adds a prod-visible surface
+    rationale: >
+      Each Playwright test navigates to a URL with the scenario name. The
+      replay executor reads a per-request value, allowing parallel tests
+      against a single web server. Production never sees this because it
+      is behind SHEP_E2E_MOCK_AGENT.
+
+  - title: Remote adapter mocks live in infrastructure, bound conditionally
+    chosen: Mock classes in infrastructure/services/*/mocks/ bound only when flag is set
+    rejected:
+      - Mocks in tests/ — would require cross-tree imports
+      - Separate test-only package — overkill
+    rationale: >
+      Clean-architecture compatible. Kept in mocks/ subfolders so auditors
+      can see them. Excluded from production bundle by the conditional
+      binding.
+
+openQuestions: []
+
+content: |
+  ## Technology Decisions
+
+  **SHEP_E2E_MOCK_AGENT vs extending SHEP_MOCK_EXECUTOR.** Existing
+  mock is narrow by design. Overloading it would either break its
+  consumers or turn it into a god-class. New, richer
+  `ScenarioReplayExecutor` gated by a new flag. Both can be active at
+  once; production is unaffected because neither flag is ever set in
+  prod builds.
+
+  **YAML scenarios with zod validation.** YAML is the repo's existing
+  fixture format. zod gives a typed loader + actionable error messages
+  when a scenario is malformed. A `version: 1` field lets us evolve
+  the schema without breaking old fixtures.
+
+  **Real scaffolder, mocked externals.** Scaffolder failures were a
+  live bug source in 091. External services (Anthropic, Cloudflare,
+  GitHub) are rate-limited, slow, costly — those are the ones we mock.
+
+  **playwright-bdd for authoring.** Gherkin steps become a reusable
+  library; scenarios are composable data. Cost is one devDep + ~30
+  lines of Playwright config to wire `bddgen`.
+
+  ## Library Analysis
+
+  | Library          | Version | License | Why                                                 |
+  | ---------------- | ------- | ------- | --------------------------------------------------- |
+  | playwright-bdd   | ^8      | MIT     | Gherkin layer over @playwright/test                 |
+  | js-yaml          | ^4      | MIT     | Already in repo — scenario YAML loading             |
+  | zod              | ^4      | MIT     | Already in repo — scenario schema validation        |
+
+  ## Security Considerations
+
+  The replay executor and mock remote adapters are **bound only** when
+  `SHEP_E2E_MOCK_AGENT=1`. Production builds never set this flag. The
+  selection header / query param is ignored unless the flag is active,
+  so no bypass surface exists outside of test builds. Scenarios contain
+  only scripted outputs — no secrets.
+
+  ## Performance Implications
+
+  Replay is CPU-only in-process — no network, no LLM. Scenario turns
+  can be played back with configurable `delayMs` so tests verify
+  loading states without multi-second latency. Target: golden-path
+  scenario completes in <15s on CI. playwright-bdd `bddgen` runs once
+  before tests (~200ms).

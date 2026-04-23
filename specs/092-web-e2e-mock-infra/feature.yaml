@@ -1,0 +1,42 @@
+feature:
+  id: '092-web-e2e-mock-infra'
+  name: 'web-e2e-mock-infra'
+  number: 92
+  branch: 'feat/092-web-e2e-mock-infra'
+  lifecycle: 'implementation'
+  createdAt: '2026-04-23T16:08:58Z'
+
+status:
+  phase: 'ready-to-implement'
+  progress:
+    completed: 0
+    total: 15
+    percentage: 0
+  currentTask: null
+  lastUpdated: '2026-04-23T16:08:58Z'
+  lastUpdatedBy: 'shep-kit:new-feature-fast'
+
+validation:
+  lastRun: null
+  gatesPassed: []
+  autoFixesApplied: []
+
+tasks:
+  current: null
+  blocked: []
+  failed: []
+
+checkpoints:
+  - phase: 'feature-created'
+    completedAt: '2026-04-23T16:08:58Z'
+    completedBy: 'shep-kit:new-feature-fast'
+  - phase: 'research-complete'
+    completedAt: '2026-04-23T16:08:58Z'
+    completedBy: 'shep-kit:new-feature-fast'
+  - phase: 'plan-complete'
+    completedAt: '2026-04-23T16:08:58Z'
+    completedBy: 'shep-kit:new-feature-fast'
+
+errors:
+  current: null
+  history: []

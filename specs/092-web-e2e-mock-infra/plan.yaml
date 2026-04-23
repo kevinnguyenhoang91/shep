@@ -1,0 +1,229 @@
+# Implementation Plan (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: web-e2e-mock-infra
+summary: Implementation plan for 092-web-e2e-mock-infra
+
+relatedFeatures:
+  - '090-application-sse-deltas'
+  - '091-apps-only-surface'
+
+technologies:
+  - playwright-bdd
+  - js-yaml
+  - zod
+  - tsyringe
+
+relatedLinks:
+  - title: playwright-bdd
+    url: https://vitalets.github.io/playwright-bdd/
+
+# Structured implementation phases
+phases:
+  - id: phase-1
+    name: 'Foundation — scenario schema + loader'
+    parallel: false
+    taskIds: [task-1, task-2]
+
+  - id: phase-2
+    name: 'Scenario-replay executor + DI wiring'
+    parallel: false
+    taskIds: [task-3, task-4, task-5]
+
+  - id: phase-3
+    name: 'Mock remote adapters (cloud + GitHub)'
+    parallel: true
+    taskIds: [task-6, task-7]
+
+  - id: phase-4
+    name: 'Playwright-BDD plumbing + page objects'
+    parallel: false
+    taskIds: [task-8, task-9, task-10]
+
+  - id: phase-5
+    name: 'Golden-path scenario + feature file'
+    parallel: false
+    taskIds: [task-11, task-12, task-13]
+
+  - id: phase-6
+    name: 'CI wiring + docs'
+    parallel: false
+    taskIds: [task-14, task-15]
+
+# Files to create
+filesToCreate:
+  - path: tests/e2e/web/scenarios/schema.ts
+    purpose: Zod schema + TS types for scenario YAML
+  - path: tests/e2e/web/scenarios/loader.ts
+    purpose: Parse + validate + index-by-name loader with file watching off
+  - path: packages/core/src/infrastructure/services/agents/common/executors/scenario-replay-executor.service.ts
+    purpose: IAgentExecutor impl that streams scripted turns from a scenario
+  - path: packages/core/src/infrastructure/services/agents/common/scenario-replay-executor-factory.service.ts
+    purpose: Factory that resolves per-request scenario name and returns a configured executor
+  - path: packages/core/src/infrastructure/services/cloud-deployment/mocks/mock-cloud-deployment-provider.service.ts
+    purpose: In-memory ICloudDeploymentProvider; returns scripted results from scenario
+  - path: packages/core/src/infrastructure/services/github/mocks/mock-github-repository-service.ts
+    purpose: In-memory IGitHubRepositoryService; simulates repo create/collision/etc
+  - path: packages/core/src/infrastructure/di/modules/register-e2e-mocks.ts
+    purpose: Conditional DI module activated only when SHEP_E2E_MOCK_AGENT=1
+  - path: src/presentation/web/app/api/e2e/scenario/route.ts
+    purpose: Web route that sets a scenario-name cookie from ?e2eScenario= query (NO-OP unless flag on)
+  - path: tests/e2e/web/features/new-app-html-elements.feature
+    purpose: Golden-path Gherkin spec for new app → setup → first iteration
+  - path: tests/e2e/web/steps/applications.steps.ts
+    purpose: Gherkin step definitions (given/when/then)
+  - path: tests/e2e/web/pages/applications.page.ts
+    purpose: Page object for the applications list + detail
+  - path: tests/e2e/web/pages/chat.page.ts
+    purpose: Page object for the chat tab (turn groups, operation bubbles)
+  - path: tests/e2e/web/scenarios/new-app-html-elements.scenario.yaml
+    purpose: First canonical scenario — hard-coded HTML element additions
+  - path: tests/e2e/web/scenarios/README.md
+    purpose: Scenario authoring guide (schema reference, how to add a new one)
+  - path: docs/development/e2e-testing.md
+    purpose: Developer-facing documentation for the new infra
+
+# Files to modify
+filesToModify:
+  - path: packages/core/src/infrastructure/di/modules/register-agents.ts
+    change: Add SHEP_E2E_MOCK_AGENT branch next to existing SHEP_MOCK_EXECUTOR
+  - path: packages/core/src/infrastructure/di/container.ts
+    change: Invoke registerE2EMocks() when flag is set
+  - path: playwright.config.ts
+    change: Wire playwright-bdd defineBddConfig, set env propagation, project for *.feature
+  - path: package.json
+    change: Add playwright-bdd devDep, new test:e2e:web:bdd script, pass SHEP_E2E_MOCK_AGENT through
+  - path: .github/workflows/ci.yml
+    change: Add e2e-web-mock job (or extend existing e2e-web) that sets SHEP_E2E_MOCK_AGENT=1
+  - path: docs/development/testing.md (or nearest equivalent)
+    change: Link to new e2e-testing.md
+
+openQuestions: []
+
+content: |
+  ## Architecture Overview
+
+  ```
+  Playwright test (BDD .feature → generated .spec.ts)
+       │
+       │ navigates to /applications?e2eScenario=new-app-html-elements
+       ▼
+  Next.js request → middleware cookie writer (e2e-scenario)
+       │
+       ▼
+  Use case (e.g. StartApplicationScaffoldingUseCase)
+       │
+       │ resolve('IAgentExecutorProvider')
+       ▼
+  ScenarioReplayExecutorFactory
+       │  reads scenario name from AsyncLocalStorage (request-scoped)
+       │  loads scenario via loader (cached)
+       ▼
+  ScenarioReplayExecutor — streams scripted turns:
+       ├─ text deltas (w/ optional delayMs)
+       ├─ tool calls → delegated to real IApplicationScaffolder
+       ├─ file writes → scaffolder produces real files in a temp dir
+       └─ turn completion → emits SSE-shaped events
+  ```
+
+  Cloud deploy + GitHub ports are also swapped (gated by the same env
+  flag) with mocks that return scripted results from the same scenario
+  YAML — so "Get Online" scenarios can be added later without new infra.
+
+  ## Implementation Strategy
+
+  **Phase 1** lays the data foundation: a zod schema for the YAML
+  format and a loader that validates at startup (fail fast). RED
+  tests cover malformed scenarios. No other code touches the loader
+  yet, so this phase is isolable and reviewable on its own.
+
+  **Phase 2** adds the replay executor behind the existing port.
+  Because the DI token is a string, we only need to swap the factory
+  binding. RED tests assert turn streaming order, text-delta grouping,
+  tool-call dispatch, and scenario-not-found error handling.
+
+  **Phase 3** adds the two remote mocks in parallel — they're
+  independent of each other and of the executor. Each mock reads its
+  responses from a `mocks:` section of the scenario, so the scenario
+  YAML is the single source of truth for a test run.
+
+  **Phase 4** wires playwright-bdd into the existing playwright.config.ts.
+  `bddgen` runs once before the test project. Step definitions use
+  injected page objects. Scenario selection is via Gherkin background
+  step `Given I am running scenario "<name>"`.
+
+  **Phase 5** writes the first scenario + `.feature` as the reference
+  implementation — hard-coded HTML element additions, no deploy. This
+  validates the whole stack end-to-end.
+
+  **Phase 6** wires a CI job that runs the BDD suite with
+  SHEP_E2E_MOCK_AGENT=1 on ubuntu-latest. Docs land in
+  `docs/development/e2e-testing.md`.
+
+  ## Testing Strategy (TDD: Tests FIRST)
+
+  **Unit (vitest) — scenario loader & schema**
+  - RED: invalid YAML throws with line/column
+  - RED: missing `version` field → clear error
+  - RED: duplicate scenario names in a folder → error
+  - GREEN: load + index by name; round-trip test fixtures
+
+  **Unit (vitest) — scenario-replay executor**
+  - RED: streams text deltas in order, honoring `delayMs`
+  - RED: dispatches tool calls via injected IApplicationScaffolder
+  - RED: throws if scenario name isn't set in request context
+  - GREEN: implement incrementally to pass each test
+
+  **Unit (vitest) — DI binding**
+  - RED: with flag off, token resolves to real factory
+  - RED: with flag on, token resolves to ScenarioReplayExecutorFactory
+  - GREEN: `registerE2EMocks()` wired into container bootstrap
+
+  **Integration (vitest) — remote mocks**
+  - RED: mock cloud provider returns scripted URLs + status
+  - RED: mock github service simulates a collision → auto-retry suffix
+  - GREEN: minimal class bodies
+
+  **E2E (playwright-bdd) — golden-path feature**
+  - RED: `.feature` file fails (no steps) → steps missing error
+  - GREEN: implement steps; verify full scenario passes on ubuntu-latest
+
+  ## Files to Create
+
+  | Path                                                         | Purpose                                        |
+  | ------------------------------------------------------------ | ---------------------------------------------- |
+  | tests/e2e/web/scenarios/schema.ts                            | Zod schema + TS types                          |
+  | tests/e2e/web/scenarios/loader.ts                            | Validated loader                                |
+  | .../agents/common/executors/scenario-replay-executor.service.ts | Replay executor                                 |
+  | .../agents/common/scenario-replay-executor-factory.service.ts | Per-request factory                            |
+  | .../cloud-deployment/mocks/mock-cloud-deployment-provider.service.ts | Cloud mock                                     |
+  | .../github/mocks/mock-github-repository-service.ts            | GitHub mock                                    |
+  | .../di/modules/register-e2e-mocks.ts                          | Conditional DI wiring                          |
+  | src/presentation/web/app/api/e2e/scenario/route.ts            | Scenario-name cookie writer (flag-gated)       |
+  | tests/e2e/web/features/new-app-html-elements.feature          | Golden path Gherkin                            |
+  | tests/e2e/web/steps/applications.steps.ts                     | Step definitions                               |
+  | tests/e2e/web/pages/{applications,chat}.page.ts               | Page objects                                   |
+  | tests/e2e/web/scenarios/new-app-html-elements.scenario.yaml   | First scenario                                 |
+  | tests/e2e/web/scenarios/README.md                             | Authoring guide                                |
+  | docs/development/e2e-testing.md                               | Developer docs                                 |
+
+  ## Files to Modify
+
+  | Path                                   | Change                                       |
+  | -------------------------------------- | -------------------------------------------- |
+  | .../di/modules/register-agents.ts      | Add SHEP_E2E_MOCK_AGENT branch              |
+  | .../di/container.ts                    | Invoke registerE2EMocks() conditionally     |
+  | playwright.config.ts                   | Wire defineBddConfig + env propagation      |
+  | package.json                           | Add playwright-bdd devDep + script          |
+  | .github/workflows/ci.yml               | Wire SHEP_E2E_MOCK_AGENT in e2e job         |
+
+  ## Risk Mitigation
+
+  | Risk                                             | Mitigation                                                                 |
+  | ------------------------------------------------ | -------------------------------------------------------------------------- |
+  | Production DI regression                         | New module only registered when SHEP_E2E_MOCK_AGENT=1; contract test       |
+  | Scenario YAML drift vs actual API shapes         | zod schema + generated types from TypeSpec domain models where applicable  |
+  | Parallel test pollution (shared webServer)       | Scenario selection per-request via cookie; AsyncLocalStorage per request   |
+  | `bddgen` lag / CI flake                          | Run bddgen once in pretest hook; pin playwright-bdd version                 |
+  | Temp dir leakage                                 | Use os.tmpdir() + afterEach cleanup; isolate per scenario run              |
+  | Future feature forgetting to add a scenario      | CI step that lists features lacking a scenario; infra docs in spec         |

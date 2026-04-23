@@ -1,0 +1,350 @@
+# Task Breakdown (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: web-e2e-mock-infra
+summary: Task breakdown for 092-web-e2e-mock-infra
+
+relatedFeatures:
+  - '090-application-sse-deltas'
+  - '091-apps-only-surface'
+technologies:
+  - playwright-bdd
+  - tsyringe
+  - js-yaml
+  - zod
+relatedLinks: []
+
+tasks:
+  - id: task-1
+    title: Define scenario YAML zod schema + TS types
+    description: >
+      Create tests/e2e/web/scenarios/schema.ts with a zod schema that
+      encodes the scenario format (version, name, mocks.cloud, mocks.github,
+      turns[] with text / tool-call / delayMs, files[]). Export inferred
+      TS types for use by the loader and the replay executor.
+    state: Todo
+    dependencies: []
+    acceptanceCriteria:
+      - 'schema.ts exports Scenario zod schema + Scenario TS type'
+      - 'version field required; currently only 1 is accepted'
+      - 'turns[] discriminated union (text | tool-call)'
+      - 'Malformed samples throw validation errors that include the failing path'
+    tdd:
+      red:
+        - 'tests/unit/e2e-scenarios/schema.test.ts asserts malformed YAML → thrown error path'
+        - 'schema rejects unknown version'
+      green:
+        - 'Minimal schema satisfying tests'
+      refactor:
+        - 'Extract shared turn shape, document fields inline'
+    estimatedEffort: S
+
+  - id: task-2
+    title: Scenario loader with fail-fast validation
+    description: >
+      Create tests/e2e/web/scenarios/loader.ts. Loads all
+      *.scenario.yaml files from tests/e2e/web/scenarios/ (or a passed
+      dir), validates each via the zod schema, indexes by name, returns
+      a lookup function getScenario(name). On any validation failure,
+      throws with the file path + zod error path.
+    state: Todo
+    dependencies: [task-1]
+    acceptanceCriteria:
+      - 'loadAllScenarios(dir) → Map<name, Scenario>'
+      - 'Duplicate scenario names across files → throw with conflicting paths'
+      - 'Invalid YAML → throw with file path + line if available'
+      - 'Pure function — no global state'
+    tdd:
+      red:
+        - 'tests/unit/e2e-scenarios/loader.test.ts covers valid fixture, duplicate name, missing file, invalid YAML'
+      green:
+        - 'Implement loadAllScenarios + getScenario using fs/promises + js-yaml + zod'
+      refactor:
+        - 'Split file I/O and validation for testability'
+    estimatedEffort: S
+
+  - id: task-3
+    title: ScenarioReplayExecutor service
+    description: >
+      Implement IAgentExecutor in
+      packages/core/src/infrastructure/services/agents/common/executors/scenario-replay-executor.service.ts.
+      Consumes a Scenario and an onEvent callback; replays turns in
+      order, respecting delayMs. Delegates tool calls to injected
+      services (e.g., IApplicationScaffolder — not re-implemented here).
+    state: Todo
+    dependencies: [task-1, task-2]
+    acceptanceCriteria:
+      - 'Emits text deltas in declared order'
+      - 'Dispatches tool calls to the injected service port (by name)'
+      - 'Honors delayMs per turn'
+      - 'Throws ScenarioTurnError with turn index when a tool name is unknown'
+    tdd:
+      red:
+        - 'tests/unit/infrastructure/services/agents/scenario-replay-executor.test.ts: order + timing + unknown-tool error'
+      green:
+        - 'for-of loop over turns, await delayMs, emit events'
+      refactor:
+        - 'Extract tool-call dispatcher for reuse by future scenarios'
+    estimatedEffort: M
+
+  - id: task-4
+    title: ScenarioReplayExecutorFactory with per-request scenario resolution
+    description: >
+      Implements IAgentExecutorFactory. Reads the current scenario name
+      from an AsyncLocalStorage (request scope), loads the scenario via
+      the loader, and returns a ScenarioReplayExecutor. Throws a clear
+      error when the scenario is missing.
+    state: Todo
+    dependencies: [task-3]
+    acceptanceCriteria:
+      - 'Returns an executor per request'
+      - 'Missing scenario → 5xx-mapped error with scenario name in the message'
+      - 'Reuses a cached scenario map (loader called once per process)'
+    tdd:
+      red:
+        - 'Integration test: two requests with different scenario names get different executors'
+      green:
+        - 'tsyringe-decorated class; AsyncLocalStorage reader injected'
+      refactor:
+        - 'Move AsyncLocalStorage owner to a dedicated e2e-scope module'
+    estimatedEffort: M
+
+  - id: task-5
+    title: Wire SHEP_E2E_MOCK_AGENT flag into DI
+    description: >
+      Extend packages/core/src/infrastructure/di/modules/register-agents.ts
+      with a new branch. When SHEP_E2E_MOCK_AGENT=1, bind both the
+      factory and provider to ScenarioReplayExecutorFactory / Provider.
+      Invoke new register-e2e-mocks.ts from container bootstrap. Ensure
+      SHEP_MOCK_EXECUTOR path still works unchanged.
+    state: Todo
+    dependencies: [task-4]
+    acceptanceCriteria:
+      - 'Flag off → real factory resolved (regression test)'
+      - 'Flag on → replay factory resolved'
+      - 'Both flags set → E2E flag wins (documented precedence)'
+    tdd:
+      red:
+        - 'tests/integration/infrastructure/di/register-agents-flags.test.ts covers all 4 flag combinations'
+      green:
+        - 'If/else branch in register-agents.ts + new module'
+      refactor:
+        - 'Extract an envFlag helper for clarity'
+    estimatedEffort: S
+
+  - id: task-6
+    title: MockCloudDeploymentProvider (scenario-driven)
+    description: >
+      Implement ICloudDeploymentProvider in infrastructure/services/cloud-deployment/mocks/.
+      Reads scripted results from the active scenario's mocks.cloud
+      section. Supports initiate, status polling, and completion.
+    state: Todo
+    dependencies: [task-4]
+    acceptanceCriteria:
+      - 'initiate() returns scripted deploymentId + status-poll URL'
+      - 'Status polls advance through scripted states in scenario order'
+      - 'No network calls in process'
+    tdd:
+      red:
+        - 'tests/unit/infrastructure/services/cloud-deployment/mock-cloud.test.ts'
+      green:
+        - 'Minimal class; state advance via counter'
+      refactor:
+        - 'Share polling helper with GitHub mock if duplicated'
+    estimatedEffort: S
+
+  - id: task-7
+    title: MockGitHubRepositoryService (scenario-driven)
+    description: >
+      Implement IGitHubRepositoryService in infrastructure/services/github/mocks/.
+      Simulates repo create / collision / retry suffix behavior from
+      the scenario's mocks.github section.
+    state: Todo
+    dependencies: [task-4]
+    acceptanceCriteria:
+      - 'createRepo honors scripted collision responses (conflict → success with suffix)'
+      - 'listUserRepos returns scripted owner list'
+      - 'No outbound HTTP'
+    tdd:
+      red:
+        - 'tests/unit/infrastructure/services/github/mock-github.test.ts covers collision retry sequence'
+      green:
+        - 'Counter-driven state transitions'
+      refactor:
+        - 'Unify scripted-sequence helper with cloud mock if viable'
+    estimatedEffort: S
+
+  - id: task-8
+    title: Add playwright-bdd devDep + bddgen wiring
+    description: >
+      Install playwright-bdd, update playwright.config.ts with
+      defineBddConfig, add a test:e2e:web:bdd script that runs bddgen
+      then playwright test. Ensure env SHEP_E2E_MOCK_AGENT=1 is passed
+      into the webServer block.
+    state: Todo
+    dependencies: []
+    acceptanceCriteria:
+      - '`pnpm install` adds playwright-bdd without peer-dep warnings'
+      - 'pnpm test:e2e:web:bdd executes bddgen then playwright without errors even on an empty features/ dir'
+      - 'playwright-bdd picks up *.feature under tests/e2e/web/features/'
+    tdd:
+      red:
+        - 'tests/e2e/web/features/_smoke.feature asserts a trivial scenario — initially no steps → expected failure'
+      green:
+        - 'Wire config; provide an empty step registry for compile'
+      refactor: []
+    estimatedEffort: S
+
+  - id: task-9
+    title: Page objects — applications, chat
+    description: >
+      Create tests/e2e/web/pages/applications.page.ts and chat.page.ts.
+      Encapsulate selectors, key actions (navigate, submit prompt,
+      expand turn-group, wait for operation-bubble text).
+    state: Todo
+    dependencies: [task-8]
+    acceptanceCriteria:
+      - 'Each page object has a goto(), a minimal set of typed actions, and assertion helpers'
+      - 'No raw page.locator() calls in step definitions — all go through page objects'
+    tdd:
+      red:
+        - 'tests/e2e/web/pages/_contract.test.ts: every exported method typed'
+      green:
+        - 'Minimal implementations using stable data-testid selectors (add testids where missing)'
+      refactor:
+        - 'Merge duplicated selectors into a shared ui-testids.ts'
+    estimatedEffort: M
+
+  - id: task-10
+    title: Step definitions — applications flow
+    description: >
+      Create tests/e2e/web/steps/applications.steps.ts with Given /
+      When / Then steps covering scenario selection, prompt input,
+      setup workflow state assertions, iteration submission, and
+      completion checks.
+    state: Todo
+    dependencies: [task-9]
+    acceptanceCriteria:
+      - 'Steps cover: Given scenario "X", When I create an app "Y", Then the setup workflow appears, When it finishes, Then I can iterate'
+      - 'Steps only call page objects, not page.locator directly'
+      - 'Exports are auto-imported by bddgen'
+    tdd:
+      red:
+        - '.feature with these steps compiles but initially red'
+      green:
+        - 'Implement each step via page objects'
+      refactor:
+        - 'Collapse duplicated waits into one waitForWorkflow helper'
+    estimatedEffort: M
+
+  - id: task-11
+    title: Golden-path scenario — new-app-html-elements
+    description: >
+      Author tests/e2e/web/scenarios/new-app-html-elements.scenario.yaml.
+      Includes: app-name JSON reply, setup workflow turns (scaffold,
+      install, first commit), a first iteration that adds HTML
+      elements (button + input). Includes mocks for cloud/github
+      (not used here but populated as reference).
+    state: Todo
+    dependencies: [task-3, task-6, task-7]
+    acceptanceCriteria:
+      - 'Loader accepts the scenario'
+      - 'Scenario plays end-to-end against real scaffolder in a temp dir'
+      - 'Each turn exercises a distinct UI state (scaffolding, streaming, awaiting, iteration)'
+    tdd:
+      red:
+        - 'Integration test replays scenario via ScenarioReplayExecutor and asserts emitted events'
+      green:
+        - 'Tune scenario until events match UI expectations'
+      refactor:
+        - 'Extract common turn patterns into helpers for future scenarios'
+    estimatedEffort: M
+
+  - id: task-12
+    title: Golden-path .feature file + step wiring
+    description: >
+      Write tests/e2e/web/features/new-app-html-elements.feature using
+      existing steps. Run via `pnpm test:e2e:web:bdd` locally.
+    state: Todo
+    dependencies: [task-10, task-11]
+    acceptanceCriteria:
+      - 'Feature passes on ubuntu-latest'
+      - 'All transitions are asserted (scaffolding, streaming, iteration-ready, iteration-complete)'
+      - 'Run time <60s locally, <90s on CI'
+    tdd:
+      red:
+        - 'Feature initially red (missing scenario fixture or step)'
+      green:
+        - 'Iterate until pass'
+      refactor:
+        - 'Promote common Given backgrounds into a shared .feature or step'
+    estimatedEffort: M
+
+  - id: task-13
+    title: Scenario authoring guide
+    description: >
+      Create tests/e2e/web/scenarios/README.md that documents the YAML
+      schema, how to add a new scenario, how to run locally, and how
+      scenarios relate to .feature files.
+    state: Todo
+    dependencies: [task-11]
+    acceptanceCriteria:
+      - 'README covers: schema fields, example, local run command'
+      - 'Linked from docs/development/e2e-testing.md'
+    tdd: null
+    estimatedEffort: S
+
+  - id: task-14
+    title: CI job — e2e web mock suite
+    description: >
+      Add a CI job (or extend existing E2E Web) that runs `pnpm
+      test:e2e:web:bdd` with SHEP_E2E_MOCK_AGENT=1 on ubuntu-latest.
+      Artifacts: Playwright traces + HTML report on failure.
+    state: Todo
+    dependencies: [task-12]
+    acceptanceCriteria:
+      - 'New (or extended) job passes in CI'
+      - 'Failure uploads Playwright trace + report as artifacts'
+      - 'Run time within existing e2e-web budget (<8 min)'
+    tdd: null
+    estimatedEffort: S
+
+  - id: task-15
+    title: Developer documentation — e2e-testing.md
+    description: >
+      Author docs/development/e2e-testing.md. Covers: architecture
+      overview, how to run locally, how to add a feature + scenario,
+      and the boundary between real scaffolder vs mocked externals.
+    state: Todo
+    dependencies: [task-13]
+    acceptanceCriteria:
+      - 'Doc exists and is linked from README or docs index'
+      - 'Contains a minimal reproducible "add a new scenario in 5 steps" recipe'
+    tdd: null
+    estimatedEffort: S
+
+totalEstimate: L (15 tasks across 6 phases; ~2–3 days focused work)
+
+openQuestions: []
+
+content: |
+  ## Summary
+
+  15 tasks across 6 phases. Phases 1–2 lay the data + executor
+  foundation, Phase 3 adds remote mocks in parallel, Phase 4 wires
+  playwright-bdd + page objects, Phase 5 delivers the first scenario
+  + feature, Phase 6 covers CI + docs.
+
+  ## Acceptance Checklist
+
+  - [ ] Schema + loader tested in isolation (task-1, task-2)
+  - [ ] Replay executor streams in order and dispatches tool calls (task-3, task-4)
+  - [ ] DI flag wiring does not regress production (task-5)
+  - [ ] Cloud + GitHub mocks read from scenario YAML (task-6, task-7)
+  - [ ] playwright-bdd compiles + runs (task-8)
+  - [ ] Page objects encapsulate selectors (task-9)
+  - [ ] Steps only call page objects (task-10)
+  - [ ] Golden-path scenario + feature pass locally (task-11, task-12)
+  - [ ] Scenario authoring doc published (task-13)
+  - [ ] CI job green on ubuntu-latest (task-14)
+  - [ ] Developer docs published (task-15)
