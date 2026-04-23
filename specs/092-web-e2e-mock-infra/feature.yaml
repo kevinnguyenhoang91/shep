@@ -7,11 +7,11 @@ feature:
   createdAt: '2026-04-23T16:08:58Z'
 
 status:
-  phase: 'ready-to-implement'
+  phase: 'ready-for-review'
   progress:
-    completed: 0
+    completed: 12
     total: 15
-    percentage: 0
+    percentage: 80
   currentTask: null
   lastUpdated: '2026-04-23T16:08:58Z'
   lastUpdatedBy: 'shep-kit:new-feature-fast'
@@ -36,6 +36,16 @@ checkpoints:
   - phase: 'plan-complete'
     completedAt: '2026-04-23T16:08:58Z'
     completedBy: 'shep-kit:new-feature-fast'
+  - phase: 'implementation-v1-complete'
+    completedAt: '2026-04-23T19:35:00Z'
+    completedBy: 'shep-kit:implement'
+    notes: >
+      Tasks 1-5, 8-13, 15 shipped (12 of 15). Deferred to follow-up
+      PR: task-6 (MockCloudDeploymentProvider), task-7
+      (MockGitHubRepositoryService), task-14 (CI job). Cloud/GitHub
+      mocks are not exercised by the v1 smoke scenario and the CI
+      wiring waits on the scaffolder-hermetic work needed to
+      un-@pending the golden-path feature.
 
 errors:
   current: null
