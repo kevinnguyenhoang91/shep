@@ -436,6 +436,9 @@ importers:
       which:
         specifier: ^5.0.0
         version: 5.0.0
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@electron/rebuild':
         specifier: ^3.7.1
