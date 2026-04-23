@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ScenarioSchema } from '../../../tests/e2e/web/scenarios/schema.js';
+import { ScenarioSchema } from '../../../packages/core/src/infrastructure/services/agents/common/executors/scenario/schema.js';
 
 describe('ScenarioSchema', () => {
   it('accepts a minimal valid scenario (version 1, name, empty turns)', () => {

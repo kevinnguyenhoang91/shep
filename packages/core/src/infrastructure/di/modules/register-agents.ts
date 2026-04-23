@@ -18,6 +18,8 @@ import { AgentExecutorFactory } from '../../services/agents/common/agent-executo
 import { AgentExecutorProvider } from '../../services/agents/common/agent-executor-provider.service.js';
 import { StructuredAgentCallerService } from '../../services/agents/common/structured-agent-caller.service.js';
 import { MockAgentExecutorFactory } from '../../services/agents/common/executors/mock-executor-factory.service.js';
+import { ScenarioReplayExecutorFactory } from '../../services/agents/common/executors/scenario-replay-executor-factory.service.js';
+import { loadAllScenariosSync } from '../../services/agents/common/executors/scenario/loader.js';
 import { AgentRegistryService } from '../../services/agents/common/agent-registry.service.js';
 import { AgentRunnerService } from '../../services/agents/common/agent-runner.service.js';
 import { PhaseTimingContextAdapter } from '../../services/agents/feature-agent/phase-timing-context.adapter.js';
@@ -41,7 +43,24 @@ export function registerAgents(container: DependencyContainer): void {
     PhaseTimingContextAdapter
   );
 
-  if (process.env.SHEP_MOCK_EXECUTOR === '1') {
+  if (process.env.SHEP_E2E_MOCK_AGENT === '1') {
+    // Web e2e scenario-replay adapter. Takes precedence over the older,
+    // narrow SHEP_MOCK_EXECUTOR so tests can opt into the richer mock
+    // without clearing the other flag. Scenario files live outside
+    // `packages/core/` so we resolve the directory via env (overrideable
+    // for tests) and fall back to the repo-local default.
+    container.register<IAgentExecutorFactory>('IAgentExecutorFactory', {
+      useFactory: () => {
+        const scenariosDir =
+          process.env.SHEP_E2E_SCENARIOS_DIR ?? `${process.cwd()}/tests/e2e/web/scenarios`;
+        // Fail-fast: scenarios must be loadable before the web server
+        // accepts traffic. A half-loaded map would surface as confusing
+        // per-request 500s mid-test.
+        const scenarios = loadAllScenariosSync(scenariosDir);
+        return new ScenarioReplayExecutorFactory(scenarios);
+      },
+    });
+  } else if (process.env.SHEP_MOCK_EXECUTOR === '1') {
     container.register<IAgentExecutorFactory>('IAgentExecutorFactory', {
       useFactory: () => new MockAgentExecutorFactory(),
     });

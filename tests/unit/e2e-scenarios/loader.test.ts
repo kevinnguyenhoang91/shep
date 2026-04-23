@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadAllScenarios } from '../../../tests/e2e/web/scenarios/loader.js';
+import { loadAllScenarios } from '../../../packages/core/src/infrastructure/services/agents/common/executors/scenario/loader.js';
 
 let workDir: string;
 
