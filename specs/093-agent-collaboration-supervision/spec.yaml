@@ -1,0 +1,237 @@
+# Feature Specification (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: "agent-collaboration-supervision"
+number: 93
+branch: "feat/093-agent-collaboration-supervision"
+oneLiner: "Enable agents to collaborate, be supervised by a user-delegated agent, and surface questions to the user mid-run"
+userQuery: |
+  Some one asked me the following question about the project,
+  I want to support him
+  הם הכוונה איג׳נטים
+  הם יכולים לדבר אחד עם השני תו"כ עבודה?
+  אני יכול לשים אייג'נט משגיח מטעמי?
+  מה קורה כשהאייג'נטים רוצים לשאול שאלות?
+
+  based on his questions lets think what product changes we need to do to support him
+summary: >
+  Three intertwined product capabilities motivated by a real user's questions: (1) agent-to-agent
+  communication during execution, (2) a user-delegated supervisor/watchdog agent that can monitor
+  and intervene on the user's behalf, and (3) a clear, first-class flow for when running agents
+  need to ask the user (or supervisor) questions. The codebase already has strong foundations —
+  approval gates, SSE event streaming, AskUserQuestion via SDK V2, LangGraph workflows, and a
+  draft team-execution protocol (spec 014) — but lacks a production-grade messaging fabric, a
+  supervisor-agent role, and a unified question/escalation pipeline.
+phase: "Analysis"
+sizeEstimate: "L"
+
+# Relationships
+relatedFeatures:
+  - "014-ui-sidebar (team-execution protocol draft for multi-agent coordination)"
+  - "Interactive sessions / SDK V2 AskUserQuestion flow"
+  - "Approval gates on AgentRun (allowPrd / allowPlan / allowMerge)"
+  - "Notifications system and SSE event streaming"
+
+technologies:
+  - "TypeScript / Node.js"
+  - "Clean Architecture (domain / application / infrastructure / presentation)"
+  - "TypeSpec (tsp/) — domain model source of truth"
+  - "LangGraph — agent state machines, checkpointing, resumption"
+  - "Claude Code SDK V2 — unstable_v2_createSession / canUseTool / AskUserQuestion"
+  - "tsyringe — dependency injection"
+  - "SQLite + custom migrations — persistence"
+  - "Server-Sent Events (SSE) — real-time agent event streaming to web UI"
+  - "Git worktrees — per-feature isolation"
+  - "Next.js + React + React Flow — web presentation"
+  - "Commander — CLI presentation"
+
+relatedLinks:
+  - title: "Agent system architecture (in-repo)"
+    url: "docs/architecture/agent-system.md"
+  - title: "AGENTS.md — agent resolution rules"
+    url: "AGENTS.md"
+  - title: "Team-execution protocol draft (spec 014)"
+    url: "specs/014-ui-sidebar/team-execution.md"
+  - title: "Anthropic Claude Code SDK V2 — canUseTool / AskUserQuestion"
+    url: "https://docs.anthropic.com/en/docs/claude-code/sdk"
+  - title: "LangGraph — multi-agent supervision patterns"
+    url: "https://langchain-ai.github.io/langgraph/concepts/multi_agent/"
+
+# Open questions (must be resolved before implementation)
+openQuestions:
+  - "Scope of inter-agent messaging: do agents talk peer-to-peer, or always through a hub (supervisor / EM)? Spec 014 chose hub. Do we keep that?"
+  - "Does the supervisor itself run as a long-lived LangGraph agent, or as a lightweight rule/LLM evaluator subscribed to SSE? (Hybrid is possible.)"
+  - "What authority does the supervisor have? Read-only monitor, auto-approve gates, auto-stop, auto-answer interactive questions, or all of the above — gated by per-app policy?"
+  - "Where do agent→user questions surface? Reuse InteractiveMessage + AskUserQuestion, or introduce a dedicated AgentQuestion entity with priority/timeout/answerer (user|supervisor)?"
+  - "Cross-feature vs in-feature collaboration: are collaborating agents always inside one feature/worktree, or can they span features? (Affects isolation model.)"
+  - "Do we need a new presentation surface (supervisor inbox / agent chat room) or extend the existing feature page and notifications?"
+  - "Conflict resolution when supervisor and user disagree on an answer/approval — last-write-wins, supervisor advisory only, or explicit policy per gate?"
+  - "Audit & explainability: every supervisor decision must be loggable and reviewable — what's the minimum activity-log shape?"
+
+# Markdown content (the actual spec)
+content: |
+  ## Problem Statement
+
+  A user evaluating Shep asked three concrete questions (translated from Hebrew):
+
+  1. **Can agents talk to each other while they work?** Today, two parallel feature agents
+     in different worktrees have no shared communication channel. Coordination is implicit
+     (via git, the spec, the user) rather than explicit.
+  2. **Can I place a supervisor agent on my behalf?** Today there is no first-class
+     "supervisor" role. Approval gates pause agents, but the only entity that can answer
+     is the human user. There is no delegated guardian that can approve, reject, redirect,
+     or escalate on the user's behalf according to a policy.
+  3. **What happens when agents want to ask questions?** Interactive sessions support
+     `AskUserQuestion` through the Claude SDK V2 `canUseTool` callback, but background
+     feature agents (LangGraph workers) primarily use approval gates rather than free-form
+     questions. There is no unified "agent question" surface across both modes.
+
+  These three questions describe the same missing concept: a **collaboration & supervision
+  fabric** that lets agents communicate with each other and with a delegated human-or-supervisor
+  responder, with structured questions, escalations, and audit.
+
+  ## Codebase Analysis
+
+  ### Project Structure
+
+  - `tsp/` — TypeSpec source of truth for domain models. Already contains
+    `agents/agent-run.tsp`, `agents/agent-session.tsp`, `agents/agent-definition.tsp`,
+    `agents/approval-gates.tsp`, `agents/interactive-message.tsp`, `agents/workflow-step.tsp`.
+  - `packages/core/src/domain/` — generated types (`generated/output.ts`), value objects,
+    domain errors, factories. No business logic for inter-agent messaging today.
+  - `packages/core/src/application/use-cases/agents/` — `RunAgent`, `ApproveAgentRun`,
+    `RejectAgentRun`, `StopAgentRun`, `StreamAgentEvents`, `ReviewFeature`, etc.
+  - `packages/core/src/application/ports/output/agents/` — `IAgentExecutor`,
+    `IAgentExecutorProvider`, `IAgentRunner`, `IAgentRegistry`, `IAgentRunRepository`,
+    `IInteractiveAgentExecutor`, `IPhaseTimingRepository`. **No port for inter-agent
+    messaging or supervision today.**
+  - `packages/core/src/infrastructure/services/agents/feature-agent/feature-agent-worker.ts`
+    — background worker that runs LangGraph state machine in an isolated worktree.
+  - `packages/core/src/infrastructure/services/agents/common/executors/claude-code-interactive-executor.service.ts`
+    — SDK V2 wrapper; intercepts `AskUserQuestion` via `canUseTool`.
+  - `packages/core/src/infrastructure/persistence/sqlite/migrations/` — 86+ migrations.
+    Tables relevant here: `agent_runs`, `agent_sessions`, `interactive_messages`,
+    `workflow_steps`, `phase_timings`, `notifications`, `activity_log`.
+  - `src/presentation/web/` — Next.js app, SSE consumer (`useAgentEvents`,
+    `agent-events-provider`), React Flow surfaces.
+  - `src/presentation/cli/` and `src/presentation/tui/` — Commander CLI and Ink TUI.
+  - `specs/014-ui-sidebar/team-execution.md` — draft multi-agent protocol with EM (hub)
+    role and standardized message prefixes (`[TASK-READY]`, `[BLOCKED]`, `[USER-UPDATE]`).
+
+  ### Architecture Patterns
+
+  - **Clean architecture, four layers**, dependencies pointing inward. Any new capability
+    must define a port in `application/ports/output/`, a use case in
+    `application/use-cases/`, and an adapter in `infrastructure/`.
+  - **TypeSpec-first**: any new domain entity (`AgentMessage`, `SupervisorPolicy`,
+    `AgentQuestion`, `SupervisorDecision`) must originate in `tsp/` and be re-generated.
+  - **Agent-agnostic resolution** via `IAgentExecutorProvider` — no hardcoded provider.
+  - **DI via tsyringe** with string tokens; no module-level singletons outside
+    infrastructure bootstrapping.
+  - **TDD mandatory** (RED → GREEN → REFACTOR) per `.claude/rules` and CLAUDE.md.
+  - **SSE-based real-time UI**: `StreamAgentEventsUseCase` polls DB every 500ms and
+    multiplexes via Service Worker.
+  - **Approval gates** are the existing human-in-the-loop primitive: embedded in
+    `AgentRun` via `ApprovalGates { allowPrd, allowPlan, allowMerge }`, with
+    `waiting_approval` status pausing the workflow until `ApproveAgentRunUseCase` runs.
+  - **Interactive sessions** use polymorphic `featureId` (UUID, `repo-<id>`, `global`),
+    persist messages in `interactive_messages`, and stream chunks (`StreamChunk`) which
+    can carry `interaction?: UserInteractionData`.
+
+  ### Relevant Technologies
+
+  - **LangGraph** — already used for feature agents; supports supervisor patterns
+    natively (e.g., supervisor as a routing node). New supervisor could be a graph node
+    or a separate workflow subscribing to SSE.
+  - **Claude Code SDK V2** — `canUseTool` interception is the existing path for
+    `AskUserQuestion`. Same primitive can power agent→supervisor questions.
+  - **SSE / Service Worker fan-out** — already streams every agent event to web clients;
+    a supervisor agent can subscribe to the same stream.
+  - **SQLite + tsp-driven migrations** — schema additions for new entities are routine.
+  - **React Flow** — already used in web; a future "agent room" / collaboration graph view
+    would fit naturally.
+
+  ## Affected Areas
+
+  | Area | Impact | Reasoning |
+  | ---- | ------ | --------- |
+  | `tsp/agents/` | High | New TypeSpec models: `AgentMessage`, `AgentQuestion`, `SupervisorPolicy`, `SupervisorDecision`, plus enums for question kind, urgency, answerer. |
+  | `tsp/domain/entities/settings.tsp` | Medium | New `SupervisorConfig` block (enabled, model, policy ref, autonomy level, escalation rules). |
+  | `packages/core/src/application/ports/output/agents/` | High | New ports: `IAgentMessageBus`, `IAgentQuestionService`, `ISupervisorAgent`, `IAgentInbox`. |
+  | `packages/core/src/application/use-cases/agents/` | High | New use cases: `SendAgentMessage`, `AskAgentQuestion`, `AnswerAgentQuestion`, `EscalateToUser`, `EvaluateSupervisorDecision`, `ConfigureSupervisor`. |
+  | `packages/core/src/infrastructure/services/agents/` | High | New adapters: in-process or SQLite-backed message bus, supervisor agent runner (LangGraph or LLM-evaluator), question routing. |
+  | `packages/core/src/infrastructure/persistence/sqlite/migrations/` | High | New tables: `agent_messages`, `agent_questions`, `supervisor_policies`, `supervisor_decisions`, plus `activity_log` extensions. |
+  | `packages/core/src/infrastructure/services/agents/feature-agent/feature-agent-worker.ts` | Medium | Worker must publish lifecycle events to the message bus and consult supervisor for gates if configured. |
+  | `packages/core/src/infrastructure/services/agents/common/executors/claude-code-interactive-executor.service.ts` | Medium | `canUseTool` for `AskUserQuestion` must route through the question service so supervisor can answer. |
+  | `packages/core/src/application/use-cases/agents/stream-agent-events.use-case.ts` | Medium | Add new event kinds: `AgentMessage`, `AgentQuestion`, `SupervisorDecision`. |
+  | `src/presentation/web/` | High | New surfaces: supervisor configuration page, agent-questions inbox, optional collaboration graph; notification surface for escalations. |
+  | `src/presentation/cli/commands/` | Medium | New commands: `shep supervisor configure|status|approve|reject`, `shep agent ask|answer`. |
+  | `src/presentation/tui/` | Low | Optional: TUI panel for live agent questions / supervisor decisions. |
+  | `docs/architecture/agent-system.md`, `AGENTS.md` | Medium | Document the new collaboration & supervision model. |
+  | Notifications & SSE | Medium | New notification events: `agent_question_pending`, `supervisor_escalated`, `agent_message_received`. |
+
+  ## Dependencies
+
+  - **Existing approval-gate machinery** (`ApprovalGates`, `ApproveAgentRunUseCase`,
+    `RejectAgentRunUseCase`, `waiting_approval` status) — supervisor reuses these as the
+    primary intervention mechanism rather than inventing a new pause primitive.
+  - **Interactive session message history** (`interactive_messages`,
+    `IInteractiveSessionService`, `respondToInteraction`) — agent→user questions in
+    interactive mode already flow here; we extend rather than replace.
+  - **SSE streaming** (`StreamAgentEventsUseCase`, `useAgentEvents`,
+    `agent-events-provider`) — supervisor subscribes here; new event kinds added here.
+  - **Notification system** (`INotificationService`, `notifications` table, per-event
+    preferences in `Settings.notificationPreferences`) — escalations and pending
+    questions become notifications.
+  - **LangGraph + checkpointer** — pattern for supervisor as a graph node, and for
+    pausing/resuming agents on supervisor decisions.
+  - **Claude Code SDK V2 `canUseTool`** — single interception point for agent questions
+    in interactive mode; we reuse it.
+  - **Spec 014 team-execution protocol** — provides a vocabulary (`[TASK-READY]`,
+    `[BLOCKED]`, `[USER-UPDATE]`) we can adopt for structured agent messages.
+  - **Activity log + audit migrations (064, 082)** — every supervisor decision and
+    cross-agent message must be recorded; tables already exist.
+
+  ## Size Estimate
+
+  **L** — This is a multi-week effort, not a single sprint. Justification:
+
+  - **3 distinct product capabilities** (peer messaging, supervisor delegation,
+    question/escalation pipeline) that share infrastructure but each need their own
+    domain model, ports, use cases, and presentation.
+  - **High-impact persistence work**: at least 4 new tables, all requiring migrations,
+    repositories, and TypeSpec definitions.
+  - **Cross-cutting**: touches every layer (tsp → domain → application → infrastructure
+    → presentation × CLI/TUI/Web) and all three execution modes (background feature
+    agent, interactive session, deploy agent).
+  - **Policy & safety surface**: supervisor authority levels, conflict resolution between
+    user and supervisor, audit/explainability — these are product decisions that need
+    careful design before implementation.
+  - **Realistic phasing** (to be confirmed in /shep-kit:plan):
+    1. Foundation — `AgentMessage` + `IAgentMessageBus` + activity-log integration (S–M).
+    2. Question pipeline — unified `AgentQuestion` model bridging interactive
+       `AskUserQuestion` and background-agent gates, with notifications (M).
+    3. Supervisor — `SupervisorPolicy`, `ISupervisorAgent`, evaluator wired into
+       approval gates and questions, opt-in per app/feature (M–L).
+    4. Presentation — supervisor config UI, agent-questions inbox, CLI commands (M).
+    5. Docs, audit hardening, migration safety, end-to-end tests (S–M).
+
+  ## Notes for Research Phase
+
+  Topics worth deep-diving in `/shep-kit:research`:
+  - LangGraph supervisor patterns (supervisor-as-router vs supervisor-as-evaluator).
+  - Bus options: SQLite-polled (matches existing SSE pattern, zero new infra) vs
+    in-process EventEmitter (faster, but only for single-process scenarios) vs
+    file-based pub/sub for cross-worktree communication.
+  - Whether peer-to-peer messaging is needed at all, or whether all coordination
+    can flow through the supervisor as the hub (simpler model, matches spec 014).
+  - Reuse vs extend: should `AgentQuestion` be a new entity, or just a typed
+    `InteractiveMessage` + `WorkflowStep` combo?
+  - Supervisor autonomy levels (advisory / co-sign / autonomous) and how the user
+    configures them per app/feature.
+  - Audit & rollback: ensure every supervisor decision is reversible via the
+    existing reject/stop primitives.
+
+  ---
+
+  _Generated by feature agent — proceed with research_
