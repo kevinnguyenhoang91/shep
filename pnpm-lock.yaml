@@ -439,6 +439,9 @@ importers:
       which:
         specifier: ^5.0.0
         version: 5.0.0
+      ws:
+        specifier: ^8.20.0
+        version: 8.20.0
     devDependencies:
       '@electron/rebuild':
         specifier: ^3.7.1
