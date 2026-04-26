@@ -93,6 +93,7 @@ export function Thread({
   afterMessages,
   composer,
   hideEmpty,
+  hideMessages,
 }: {
   className?: string;
   /** Content rendered inside the scrollable viewport, BEFORE messages. Used by the application chat to pin the step tracker at the top of the scroll area. */
@@ -102,6 +103,18 @@ export function Thread({
   composer?: React.ReactNode;
   /** Suppress the default "empty chat" placeholder — useful when `beforeMessages` already fills the viewport (e.g. a step tracker). */
   hideEmpty?: boolean;
+  /**
+   * Suppress the flat `ThreadPrimitive.Messages` slot entirely.
+   * Required when the host owns the chat surface via a grouping
+   * overlay (turn-group cards + operation bubbles) — even with
+   * `hideAllMessages: true` returning an empty `threadMessages`
+   * array, the assistant-ui runtime still injects a synthetic
+   * pending assistant message while a response is in flight,
+   * which would otherwise render as a stray Bot avatar bubble
+   * below the overlay. Pass `hideMessages` to drop the slot from
+   * the DOM entirely.
+   */
+  hideMessages?: boolean;
 }) {
   return (
     <ThreadPrimitive.Root className={cn('flex h-full flex-col', className)}>
@@ -114,12 +127,14 @@ export function Thread({
 
         {beforeMessages}
 
-        <ThreadPrimitive.Messages
-          components={{
-            UserMessage,
-            AssistantMessage,
-          }}
-        />
+        {hideMessages ? null : (
+          <ThreadPrimitive.Messages
+            components={{
+              UserMessage,
+              AssistantMessage,
+            }}
+          />
+        )}
 
         {afterMessages}
       </ThreadPrimitive.Viewport>
@@ -164,7 +179,7 @@ const UserMessage: FC = () => {
       </div>
 
       <div className="flex max-w-[85%] min-w-0 flex-col gap-0.5">
-        <div className="text-foreground mt-px overflow-hidden rounded-2xl rounded-tl-sm border border-violet-500/15 bg-violet-500/8 px-4 py-2 text-sm leading-relaxed break-words shadow-sm backdrop-blur-md">
+        <div className="text-foreground mt-px overflow-hidden rounded-2xl rounded-tl-sm border border-violet-500/15 bg-violet-500/8 px-4 py-2 text-sm leading-relaxed break-words shadow-sm backdrop-blur-md dark:bg-violet-500/15">
           <MessagePrimitive.Content components={{ Text: UserMessageText }} />
         </div>
 
@@ -274,7 +289,7 @@ const AssistantMessage: FC = () => {
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="bg-muted/50 text-foreground mt-px overflow-hidden rounded-2xl rounded-tl-sm border border-white/5 px-4 py-2 text-sm leading-relaxed break-words shadow-sm backdrop-blur-md">
+        <div className="bg-muted/50 text-foreground mt-px overflow-hidden rounded-2xl rounded-tl-sm border border-white/5 px-4 py-2 text-sm leading-relaxed break-words shadow-sm backdrop-blur-md dark:bg-neutral-800/60">
           <MessagePrimitive.Content components={{ Text: AssistantMessageText }} />
         </div>
 

@@ -19,8 +19,8 @@
 import { injectable, inject } from 'tsyringe';
 
 import { AgentType } from '../../../domain/generated/output.js';
-import { getSettings } from '../../../infrastructure/services/settings.service.js';
 import type { IAgentAuthDetectorService } from '../../ports/output/services/agent-auth-detector.interface.js';
+import type { ISettingsRepository } from '../../ports/output/repositories/settings.repository.interface.js';
 import { ListToolsUseCase } from '../tools/list-tools.use-case.js';
 
 export interface CheckAgentAuthResult {
@@ -65,6 +65,10 @@ const AGENT_METADATA: Record<string, AgentMetadata> = {
   [AgentType.Aider]: { label: 'Aider', toolId: null, binaryName: null },
   [AgentType.Continue]: { label: 'Continue', toolId: null, binaryName: null },
   [AgentType.Dev]: { label: 'Demo', toolId: null, binaryName: null },
+  [AgentType.Cline]: { label: 'Cline', toolId: null, binaryName: 'cline' },
+  [AgentType.OpenRouter]: { label: 'OpenRouter', toolId: null, binaryName: null },
+  [AgentType.TogetherAi]: { label: 'Together AI', toolId: null, binaryName: null },
+  [AgentType.Ollama]: { label: 'Ollama', toolId: null, binaryName: null },
 };
 
 const UNKNOWN_RESULT: CheckAgentAuthResult = {
@@ -82,13 +86,19 @@ export class CheckAgentAuthUseCase {
   constructor(
     @inject(ListToolsUseCase) private readonly listToolsUseCase: ListToolsUseCase,
     @inject('IAgentAuthDetectorService')
-    private readonly authDetector: IAgentAuthDetectorService
+    private readonly authDetector: IAgentAuthDetectorService,
+    @inject('ISettingsRepository')
+    private readonly settingsRepository: ISettingsRepository
   ) {}
 
   async execute(): Promise<CheckAgentAuthResult> {
     let agentType: string;
     try {
-      agentType = getSettings().agent.type;
+      const settings = await this.settingsRepository.load();
+      if (settings === null) {
+        return UNKNOWN_RESULT;
+      }
+      agentType = settings.agent.type;
     } catch {
       return UNKNOWN_RESULT;
     }

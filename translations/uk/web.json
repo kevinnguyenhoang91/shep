@@ -205,6 +205,10 @@
       "reactFileManagerDescription": "Використовувати вбудований файловий менеджер React замість системного вибору папок",
       "inventory": "Інвентар",
       "inventoryDescription": "Увімкнути сторінку Інвентарю, що відображає всі репозиторії та функції у вигляді дерева",
+      "projects": "Проєкти",
+      "projectsDescription": "Увімкнути навігацію Проєктів та сторінки управління проєктами у вебінтерфейсі",
+      "codeReview": "AI Code Review",
+      "codeReviewDescription": "Enable AI-powered code review that analyzes PR diffs and posts inline comments to GitHub",
       "hint": "Експериментальні функції, що ще перебувають у розробці. Вмикайте на власний ризик — вони можуть змінитися або бути видалені в майбутніх версіях. Режим відлагодження додає докладне журналювання, корисне для усунення неполадок."
     },
     "interactiveAgent": {
@@ -248,7 +252,8 @@
     "settings": "Налаштування",
     "sessions": "Сесії",
     "tools": "Інструменти",
-    "skills": "Навички"
+    "skills": "Навички",
+    "applications": "Applications"
   },
   "sidebar": {
     "features": "Функції",
@@ -477,6 +482,13 @@
     "pendingModeDescription": "Створити без запуску — запустити вручну пізніше.",
     "fastModeLabel": "Швидкий режим",
     "fastModeDescription": "Пропустити фази SDLC і реалізувати напряму з промпту.",
+    "modeGroupLabel": "Режим збірки",
+    "modeApplication": "Застосунок",
+    "modeApplicationDescription": "Повний цикл застосунку з дослідженням, планом і реалізацією.",
+    "modeFast": "Швидко",
+    "modeFastDescription": "Пропустити фази SDLC і реалізувати напряму з промпту.",
+    "modeSpec": "Spec",
+    "modeSpecDescription": "Spec-керований потік із явними кроками PRD і плану.",
     "fileDropZone": "Зона перетягування файлів",
     "prd": "PRD",
     "prdDescription": "Автозатвердження переходу вимог до планування.",

@@ -205,6 +205,10 @@
       "reactFileManagerDescription": "Usar el administrador de archivos React integrado en lugar del selector de carpetas nativo del SO",
       "inventory": "Inventario",
       "inventoryDescription": "Habilitar la página de Inventario que muestra todos los repositorios y funciones en vista de árbol",
+      "projects": "Proyectos",
+      "projectsDescription": "Habilitar la navegación de Proyectos y las páginas de gestión de proyectos en la interfaz web",
+      "codeReview": "AI Code Review",
+      "codeReviewDescription": "Enable AI-powered code review that analyzes PR diffs and posts inline comments to GitHub",
       "hint": "Funcionalidades experimentales que aún están en desarrollo. Habilítalas bajo tu propio riesgo — pueden cambiar o ser eliminadas en versiones futuras. El modo de depuración agrega registro detallado útil para la resolución de problemas."
     },
     "interactiveAgent": {
@@ -248,7 +252,8 @@
     "settings": "Configuración",
     "sessions": "Sesiones",
     "tools": "Herramientas",
-    "skills": "Habilidades"
+    "skills": "Habilidades",
+    "applications": "Applications"
   },
   "sidebar": {
     "features": "Funcionalidades",
@@ -477,6 +482,13 @@
     "pendingModeDescription": "Crear sin iniciar — iniciar manualmente después.",
     "fastModeLabel": "Modo rápido",
     "fastModeDescription": "Omitir fases SDLC e implementar directamente desde tu prompt.",
+    "modeGroupLabel": "Modo de construcción",
+    "modeApplication": "Aplicación",
+    "modeApplicationDescription": "Flujo completo de app con investigación, plan e implementación.",
+    "modeFast": "Rápido",
+    "modeFastDescription": "Omitir fases SDLC e implementar directamente desde tu prompt.",
+    "modeSpec": "Spec",
+    "modeSpecDescription": "Flujo dirigido por specs con pasos explícitos de PRD y plan.",
     "fileDropZone": "Zona de arrastre de archivos",
     "prd": "PRD",
     "prdDescription": "Auto-aprobar transición de requisitos a planificación.",

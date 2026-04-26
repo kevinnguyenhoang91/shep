@@ -54,6 +54,12 @@ const nextConfig: NextConfig = {
     root: resolve(import.meta.dirname, '../../..'),
   },
 
+  // Hide the dev-mode "compiling / N issues" badge in the bottom-right
+  // corner. Shep's own UI uses that corner for the application FAB and
+  // workflow tracker, so the Next.js indicator just gets in the way.
+  // No effect in production builds.
+  devIndicators: false,
+
   // Exclude native/DI packages and Node.js builtins from Next.js bundling.
   // Without this, Turbopack statically evaluates os.platform() at build time
   // and tree-shakes platform-conditional branches (e.g., open-shell.ts).
@@ -72,6 +78,18 @@ const nextConfig: NextConfig = {
 
   // Configure the output directory
   distDir: '.next',
+
+  // Produce a self-contained production server under
+  // `.next/standalone/`. Required for the Electron packaged app: when
+  // the web UI ships inside `resources/web/` (outside `app.asar`),
+  // Turbopack-compiled chunks emit `require('next/dist/compiled/...')`
+  // calls that can't resolve the `next` package across the asar
+  // boundary. `standalone` bundles every runtime dep into
+  // `.next/standalone/node_modules/`, sibling to the server entry, so
+  // the walks work from any caller. In dev (`pnpm dev:web` / `shep ui`)
+  // the standalone output is simply ignored — Next still serves from
+  // `.next/` directly.
+  output: 'standalone',
 
   // Inject version info from package.json for the web UI
   env: loadDevFallbacks(),

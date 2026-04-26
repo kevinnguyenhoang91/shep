@@ -24,6 +24,48 @@ silently fails because (a) the server action returns `{ success: false, error }`
 a live instance of that service — unit tests with fetch mocks are not sufficient because they
 only verify what you *think* the protocol is.
 
+## Adding a Web Feature Flag — Full Wiring Checklist
+
+Feature flags are persisted in the Settings singleton and toggled via the Settings page. A new flag is NOT just an env var or a hardcoded boolean — it must be wired end-to-end or the Settings toggle will silently fail to persist.
+
+**When adding a new flag, touch ALL of the following:**
+
+1. `tsp/domain/entities/settings.tsp` — add field to `model FeatureFlags` with `= false` default
+2. Run `pnpm tsp:compile` to regenerate `packages/core/src/domain/generated/output.ts` (never edit this file by hand)
+3. New migration `packages/core/src/infrastructure/persistence/sqlite/migrations/NNN-add-feature-flag-<name>.ts` — `ALTER TABLE settings ADD COLUMN feature_flag_<name> INTEGER NOT NULL DEFAULT 0` (guarded by `pragma table_info` check)
+4. `packages/core/src/infrastructure/persistence/sqlite/mappers/settings.mapper.ts` — 3 edits:
+   - `SettingsRow` interface: add `feature_flag_<name>: number`
+   - `toDatabase()`: add `feature_flag_<name>: settings.featureFlags?.<name> ? 1 : 0`
+   - `fromDatabase()`: add `<name>: row.feature_flag_<name> === 1` inside `featureFlags`
+5. `packages/core/src/infrastructure/repositories/sqlite-settings.repository.ts` — 3 edits:
+   - INSERT column list
+   - INSERT `VALUES (..., @feature_flag_<name>, ...)`
+   - UPDATE SET clause
+6. `packages/core/src/domain/factories/settings-defaults.factory.ts` — add `<name>: false` to the `FeatureFlags` defaults object
+7. `src/presentation/web/lib/feature-flags.ts` — add field to `FeatureFlagsState` interface, to the DB-primary branch, and to the env-var fallback branch (+ optional deprecated accessor)
+8. `src/presentation/web/components/features/settings/settings-page-client.tsx` — add `<SwitchRow>` inside the Feature Flags `SettingsSection` and add the key to the fallback object at the top (`const featureFlags = settings.featureFlags ?? { ... }`).
+9. Translation strings in EVERY locale — `translations/<lang>/web.json` → `settings.featureFlags.<name>` and `settings.featureFlags.<name>Description`. Missing keys render as the raw key path on-screen. Locales: `en, ar, es, de, fr, he, pt, uk, ru`.
+10. Gate the UI on `featureFlags.<name>` wherever the feature is exposed (sidebar, routes, search, FAB actions)
+11. Update hardcoded `FeatureFlags` / `FeatureFlagsState` fixtures across stories, tests, and hooks. `tsc --noEmit` will surface every one — run `pnpm typecheck` BEFORE committing so the pre-commit hook doesn't bounce. Known fixture locations (grow this list when a new one shows up):
+    - `src/presentation/web/hooks/feature-flags-context.tsx`
+    - `src/presentation/web/components/features/settings/settings-page-client.tsx` (fallback object)
+    - `src/presentation/web/components/features/settings/settings-page-client.stories.tsx`
+    - `src/presentation/web/components/layouts/app-sidebar/app-sidebar.stories.tsx`
+    - `src/presentation/web/components/common/repository-node/repository-drawer.stories.tsx`
+    - `tests/unit/presentation/web/layouts/app-sidebar.test.tsx`
+    - `tests/unit/presentation/web/layouts/app-shell.test.tsx`
+    - `tests/unit/presentation/web/components/common/add-repository-button/add-repository-button.test.tsx`
+    - `tests/unit/infrastructure/services/settings-service-update.test.ts`
+    - `tests/unit/infrastructure/persistence/sqlite/mappers/settings.mapper.test.ts` (snake_case `feature_flag_<name>` field)
+    - `tests/integration/infrastructure/repositories/sqlite-settings.repository.test.ts`
+    - `tests/unit/domain/factories/settings-defaults.factory.test.ts` (uses `toEqual` for exact-shape assertion — only fires at runtime, NOT in typecheck)
+
+**Verify before claiming done:** run `pnpm typecheck`, then open the Settings page in the browser and confirm the new toggle actually renders. If it doesn't, you forgot translation keys (see step 9) or the DB row still has the default value.
+
+**Failure mode if you skip a step:** the UI toggle saves, the mapper writes the column, but the repo SQL omits it → the value is silently dropped on INSERT/UPDATE. Same pattern as the per-feature flag bug below — mapper and repo SQL are separate sources of truth and must stay in sync.
+
+**Do NOT** hide a flag only via `NEXT_PUBLIC_FLAG_*` env vars when the rest of the flag system is DB-backed. Users expect to toggle flags from the Settings page, not by editing `.env`.
+
 ## Auth-Detection Checks Must Match the Tool's Real Storage + Real CLI
 
 `check-agent-auth.ts` was reporting **Claude Code needs authentication** even though the user was logged in. Two stacked bugs:
@@ -293,3 +335,16 @@ import 'reflect-metadata';
 before any other import. This does NOT apply to routes that only `resolve<T>('StringToken')` without importing the class itself — those don't evaluate tsyringe's decorators in the route's module graph.
 
 **Prevention:** When creating a new API route under `src/presentation/web/app/api/` that imports a use case class from `@shepai/core`, the very first line must be `import 'reflect-metadata';`.
+
+
+## Don't Conflate "Empty State" Variants — Check Git History Deeper
+
+When the user asks to restore "the original" or "the version we had before", check git history beyond the most recent commit that touched the file. The empty state of control center has had multiple distinct designs over time:
+
+1. **Onboarding wizard** (older) — agent setup + tool status checklist + "Choose folder" / "New Project" buttons + CLI commands. Lives in `control-center-onboarding.tsx`.
+2. **Prompt-first** (newer) — "What do you want to build?" hero + textarea + build mode dropdown (application/fast/spec). Lives in `control-center-empty-state.tsx`. Used by **applications view only**, not control center.
+
+**Rule:** The control center empty state uses `ControlCenterOnboarding`. The applications view (and the FAB-triggered create-application overlay on control center) uses `ControlCenterEmptyState` (the prompt). Do not conflate them.
+
+**How this came up:** A user asked to restore the "original getting started" in the control center. The first attempt restored the prompt version (recent), but the user clarified there was an even older version. Always trace the file back through `git log --follow --oneline` and look at the version BEFORE the major UX rewrites (e.g. commits with "replace onboarding with prompt-first experience").
+

@@ -523,6 +523,15 @@ model NotificationEventConfig {
 
   @doc("Notify when feature is ready for merge review")
   mergeReviewReady: boolean = true;
+
+  @doc("Notify when cloud deployment status changes (spec 089)")
+  cloudDeploymentUpdated?: boolean = true;
+
+  @doc("Notify when application row changes (setupComplete, status, gitRemoteUrl, cloudDeploymentProvider — spec 090)")
+  applicationUpdated?: boolean = true;
+
+  @doc("Notify when a new operation log entry is appended (spec 090)")
+  operationLogAppended?: boolean = true;
 }
 
 /**
@@ -592,6 +601,12 @@ model FeatureFlags {
 
   @doc("Enable the Inventory page showing all repositories and features")
   inventory: boolean = false;
+
+  @doc("Enable Projects pages and navigation (project management)")
+  projects: boolean = false;
+
+  @doc("Enable AI-powered code review for pull requests")
+  codeReview: boolean = false;
 }
 
 /**

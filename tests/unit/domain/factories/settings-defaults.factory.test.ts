@@ -320,6 +320,8 @@ describe('createDefaultSettings', () => {
         gitRebaseSync: false,
         reactFileManager: false,
         inventory: false,
+        projects: false,
+        codeReview: false,
       });
     });
   });

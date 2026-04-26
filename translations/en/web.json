@@ -205,6 +205,10 @@
       "reactFileManagerDescription": "Use the built-in React file manager instead of the native OS folder picker",
       "inventory": "Inventory",
       "inventoryDescription": "Enable the Inventory page showing all repositories and features in a tree view",
+      "projects": "Projects",
+      "projectsDescription": "Enable Projects navigation and project management pages in the web UI",
+      "codeReview": "AI Code Review",
+      "codeReviewDescription": "Enable AI-powered code review that analyzes PR diffs and posts inline comments to GitHub",
       "hint": "Experimental features that are still under development. Enable at your own risk — they may change or be removed in future versions. Debug mode adds verbose logging useful for troubleshooting."
     },
     "interactiveAgent": {
@@ -248,7 +252,8 @@
     "settings": "Settings",
     "sessions": "Sessions",
     "tools": "Tools",
-    "skills": "Skills"
+    "skills": "Skills",
+    "applications": "Applications"
   },
   "sidebar": {
     "features": "Features",
@@ -481,6 +486,13 @@
     "pendingModeDescription": "Create without starting — start manually later.",
     "fastModeLabel": "Fast Mode",
     "fastModeDescription": "Skip SDLC phases and implement directly from your prompt.",
+    "modeGroupLabel": "Build mode",
+    "modeApplication": "Application",
+    "modeApplicationDescription": "Full app workflow with research, plan, implementation.",
+    "modeFast": "Fast",
+    "modeFastDescription": "Skip SDLC phases and implement directly from your prompt.",
+    "modeSpec": "Spec",
+    "modeSpecDescription": "Spec-driven workflow with explicit PRD + plan steps.",
     "fileDropZone": "File drop zone",
     "prd": "PRD",
     "prdDescription": "Auto-approve requirements move to planning.",

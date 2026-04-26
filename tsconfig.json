@@ -20,6 +20,7 @@
     "paths": {
       "@shepai/core": ["packages/core/src/index.ts"],
       "@shepai/core/*": ["packages/core/src/*"],
+      "@tanstack/react-query": ["src/presentation/web/node_modules/@tanstack/react-query"],
       "@/application/*": ["packages/core/src/application/*"],
       "@/infrastructure/*": ["packages/core/src/infrastructure/*"],
       "@/domain/*": ["packages/core/src/domain/*"],
@@ -52,5 +53,11 @@
     "playwright.config.ts",
     ".storybook/**/*"
   ],
-  "exclude": ["node_modules", "dist", "tsp", "apis"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tsp",
+    "apis",
+    "packages/core/src/infrastructure/templates/**"
+  ]
 }

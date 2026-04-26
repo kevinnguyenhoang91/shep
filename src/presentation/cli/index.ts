@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * Shep AI CLI Entry Point
+ * Shep CLI Entry Point
  *
- * Autonomous AI Native SDLC Platform - CLI Interface
+ * Autonomous AI-native SDLC platform — run parallel AI agents in isolated worktrees
+ * to automate the development cycle from idea to deploy.
  *
  * Usage:
  *   shep [command] [options]
@@ -47,6 +48,12 @@ import { createIdeOpenCommand } from './commands/ide-open.command.js';
 import { createInstallCommand } from './commands/install.command.js';
 import { createUpgradeCommand } from './commands/upgrade.command.js';
 import { createToolsCommand } from './commands/tools.command.js';
+import { createProjectCommand } from './commands/project/index.js';
+import { createItemCommand } from './commands/item/index.js';
+import { createCycleCommand } from './commands/cycle/index.js';
+import { createIntakeCommand } from './commands/intake/index.js';
+import { createNotificationsCommand } from './commands/notifications/index.js';
+import { createReviewCommand } from './commands/review.command.js';
 import { messages } from './ui/index.js';
 
 // Daemon lifecycle commands
@@ -132,6 +139,12 @@ async function bootstrap() {
     program.addCommand(createIdeOpenCommand());
     program.addCommand(createInstallCommand());
     program.addCommand(createToolsCommand());
+    program.addCommand(createProjectCommand());
+    program.addCommand(createItemCommand());
+    program.addCommand(createCycleCommand());
+    program.addCommand(createIntakeCommand());
+    program.addCommand(createNotificationsCommand());
+    program.addCommand(createReviewCommand());
     program.addCommand(createUpgradeCommand());
 
     // Daemon lifecycle commands (task-9)

@@ -32,6 +32,8 @@ export default tseslint.config(
       'dist/**',
       'packages/*/dist/**',
       'packages/*/release/**',
+      'packages/*/release-apps-only/**',
+      'packages/*/staged-*/**',
       'build/**',
       'web/**',
       '**/.next/**',
@@ -51,6 +53,13 @@ export default tseslint.config(
       'next-env.d.ts',
       'src/domain/generated/**', // TypeSpec-generated domain models
       'packages/core/src/domain/generated/**', // TypeSpec-generated domain models (core)
+
+      // Fat-template payload — raw assets shipped into user projects at
+      // scaffold time. These files import from the user's own
+      // `react` / `lucide-react` / `@/lib/utils` scope (not core's),
+      // so they're intentionally excluded from the core tsconfig and
+      // must also be skipped by eslint's project service.
+      'packages/core/src/infrastructure/templates/**',
 
       // Spec artifacts (auto-generated YAML/MD, evidence PNGs)
       'specs/**',
@@ -293,6 +302,103 @@ export default tseslint.config(
       'storybook/hierarchy-separator': 'error',
       'storybook/no-uninstalled-addons': 'error',
       'storybook/prefer-pascal-case': 'warn',
+    },
+  },
+
+  // =============================================================================
+  // Clean Architecture — application layer must not import infrastructure
+  // =============================================================================
+  {
+    files: ['packages/core/src/application/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/infrastructure/**', '**/infrastructure/*'],
+              message:
+                'Application layer must not import from infrastructure. Use a port interface in application/ports/ and inject via DI.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // =============================================================================
+  // Interactive service subfolder layering
+  //
+  // Dependency direction: core/ ← lifecycle/ ← runtime/ ← api/ ← facade
+  // Inner layers must NOT import from outer layers.
+  // =============================================================================
+  {
+    files: ['packages/core/src/infrastructure/services/interactive/core/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '**/services/interactive/lifecycle/**',
+                '**/services/interactive/lifecycle/*',
+              ],
+              message:
+                'core/ must not import from lifecycle/. Dependency direction: core ← lifecycle ← runtime ← api.',
+            },
+            {
+              group: ['**/services/interactive/runtime/**', '**/services/interactive/runtime/*'],
+              message:
+                'core/ must not import from runtime/. Dependency direction: core ← lifecycle ← runtime ← api.',
+            },
+            {
+              group: ['**/services/interactive/api/**', '**/services/interactive/api/*'],
+              message:
+                'core/ must not import from api/. Dependency direction: core ← lifecycle ← runtime ← api.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/core/src/infrastructure/services/interactive/lifecycle/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/services/interactive/runtime/**', '**/services/interactive/runtime/*'],
+              message:
+                'lifecycle/ must not import from runtime/. Dependency direction: core ← lifecycle ← runtime ← api.',
+            },
+            {
+              group: ['**/services/interactive/api/**', '**/services/interactive/api/*'],
+              message:
+                'lifecycle/ must not import from api/. Dependency direction: core ← lifecycle ← runtime ← api.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/core/src/infrastructure/services/interactive/runtime/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/services/interactive/api/**', '**/services/interactive/api/*'],
+              message:
+                'runtime/ must not import from api/. Dependency direction: core ← lifecycle ← runtime ← api.',
+            },
+          ],
+        },
+      ],
     },
   },
 

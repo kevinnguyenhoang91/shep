@@ -21,8 +21,34 @@ import {
   shell,
   ipcMain,
   dialog,
+  session as electronSession,
 } from 'electron';
 import path from 'node:path';
+import Module from 'node:module';
+
+/**
+ * Pre-launch module-resolution patch for the packaged Electron build.
+ *
+ * The Next.js production server runs inside this main process and its
+ * Turbopack-generated chunks live under `resources/web/.next/server/`
+ * (an `extraResources` copy, OUTSIDE the `app.asar`). Those chunks
+ * emit bare `require('next/dist/compiled/next-server/...')` calls that
+ * Node resolves by walking UP from the chunk's own directory — which
+ * never reaches the `next` package buried inside `app.asar/node_modules`.
+ *
+ * Appending the asar's `node_modules` to `NODE_PATH` and calling
+ * `Module._initPaths()` lets those requires fall back to the bundled
+ * dep tree, without having to ship a second copy of `next` alongside
+ * the web output.
+ */
+if (app.isPackaged) {
+  const asarNodeModules = path.join(process.resourcesPath, 'app.asar', 'node_modules');
+  const existing = process.env.NODE_PATH ?? '';
+  process.env.NODE_PATH = existing
+    ? `${existing}${path.delimiter}${asarNodeModules}`
+    : asarNodeModules;
+  (Module as unknown as { _initPaths: () => void })._initPaths();
+}
 import windowStateKeeper from 'electron-window-state';
 import { startApp, type AppDeps } from './app.js';
 import { initializeContainer, container } from '@shepai/core/infrastructure/di/container.js';
@@ -53,6 +79,9 @@ import fs from 'node:fs';
 
 /* eslint-disable no-console */
 
+const shellVariant: 'full' | 'apps-only' =
+  process.env.SHEP_SHELL_VARIANT === 'apps-only' ? 'apps-only' : 'full';
+
 const deps = {
   electron: { app, BrowserWindow, Tray, Menu, nativeImage },
   windowStateKeeper,
@@ -79,7 +108,7 @@ const deps = {
   },
   resourcesDir: path.join(import.meta.dirname, '..', 'resources'),
   splashHtmlPath: path.join(import.meta.dirname, 'splash.html'),
-  preloadPath: path.join(import.meta.dirname, 'preload.js'),
+  preloadPath: path.join(import.meta.dirname, 'preload.cjs'),
 
   // Phase 3: Electron adapter deps
   adapterDeps: {
@@ -144,6 +173,18 @@ const deps = {
     repoName: 'cli',
     fetch: (url: string) => globalThis.fetch(url),
     warn: (msg: string, error?: unknown) => console.warn(msg, error),
+  },
+
+  // Shell variant: controls whether the Electron window loads the full shell
+  // or the slim Applications-only surface. Driven by SHEP_SHELL_VARIANT env.
+  shellVariant,
+  setShellVariantCookie: async (port: number, variant: 'full' | 'apps-only') => {
+    await electronSession.defaultSession.cookies.set({
+      url: `http://localhost:${port}`,
+      name: 'shep-shell-variant',
+      value: variant,
+      path: '/',
+    });
   },
 };
 

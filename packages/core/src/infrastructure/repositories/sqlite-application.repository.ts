@@ -23,10 +23,18 @@ export class SQLiteApplicationRepository implements IApplicationRepository {
     const stmt = this.db.prepare(`
       INSERT INTO applications (
         id, name, slug, description, repository_path, additional_paths,
-        agent_type, model_override, status, created_at, updated_at, deleted_at
+        agent_type, model_override, status, setup_complete, agent_session_id,
+        git_remote_url, cloud_deployment_provider, cloud_deployment_status,
+        cloud_deployment_id, cloud_deployment_url, cloud_deployment_error,
+        last_deployed_at,
+        created_at, updated_at, deleted_at
       ) VALUES (
         @id, @name, @slug, @description, @repository_path, @additional_paths,
-        @agent_type, @model_override, @status, @created_at, @updated_at, @deleted_at
+        @agent_type, @model_override, @status, @setup_complete, @agent_session_id,
+        @git_remote_url, @cloud_deployment_provider, @cloud_deployment_status,
+        @cloud_deployment_id, @cloud_deployment_url, @cloud_deployment_error,
+        @last_deployed_at,
+        @created_at, @updated_at, @deleted_at
       )
     `);
     stmt.run(row);
@@ -65,7 +73,23 @@ export class SQLiteApplicationRepository implements IApplicationRepository {
   async update(
     id: string,
     fields: Partial<
-      Pick<Application, 'name' | 'status' | 'additionalPaths' | 'agentType' | 'modelOverride'>
+      Pick<
+        Application,
+        | 'name'
+        | 'status'
+        | 'additionalPaths'
+        | 'agentType'
+        | 'modelOverride'
+        | 'setupComplete'
+        | 'agentSessionId'
+        | 'gitRemoteUrl'
+        | 'cloudDeploymentProvider'
+        | 'cloudDeploymentStatus'
+        | 'cloudDeploymentId'
+        | 'cloudDeploymentUrl'
+        | 'cloudDeploymentError'
+        | 'lastDeployedAt'
+      >
     >
   ): Promise<void> {
     const now = Date.now();
@@ -91,6 +115,46 @@ export class SQLiteApplicationRepository implements IApplicationRepository {
     if (fields.modelOverride !== undefined) {
       setClauses.push('model_override = ?');
       values.push(fields.modelOverride);
+    }
+    if (fields.setupComplete !== undefined) {
+      setClauses.push('setup_complete = ?');
+      values.push(fields.setupComplete ? 1 : 0);
+    }
+    if (fields.agentSessionId !== undefined) {
+      setClauses.push('agent_session_id = ?');
+      values.push(fields.agentSessionId);
+    }
+    if (fields.gitRemoteUrl !== undefined) {
+      setClauses.push('git_remote_url = ?');
+      values.push(fields.gitRemoteUrl);
+    }
+    if (fields.cloudDeploymentProvider !== undefined) {
+      setClauses.push('cloud_deployment_provider = ?');
+      values.push(fields.cloudDeploymentProvider);
+    }
+    if (fields.cloudDeploymentStatus !== undefined) {
+      setClauses.push('cloud_deployment_status = ?');
+      values.push(fields.cloudDeploymentStatus);
+    }
+    if (fields.cloudDeploymentId !== undefined) {
+      setClauses.push('cloud_deployment_id = ?');
+      values.push(fields.cloudDeploymentId);
+    }
+    if (fields.cloudDeploymentUrl !== undefined) {
+      setClauses.push('cloud_deployment_url = ?');
+      values.push(fields.cloudDeploymentUrl);
+    }
+    if (fields.cloudDeploymentError !== undefined) {
+      setClauses.push('cloud_deployment_error = ?');
+      values.push(fields.cloudDeploymentError);
+    }
+    if (fields.lastDeployedAt !== undefined) {
+      setClauses.push('last_deployed_at = ?');
+      values.push(
+        fields.lastDeployedAt instanceof Date
+          ? fields.lastDeployedAt.getTime()
+          : fields.lastDeployedAt
+      );
     }
 
     values.push(id);

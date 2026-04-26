@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import {
   Home,
+  LayoutGrid,
   Moon,
   Sun,
   Volume2,
@@ -14,6 +15,7 @@ import {
   Puzzle,
   Settings,
   TableProperties,
+  FolderKanban,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -158,9 +160,15 @@ export function AppSidebar({
 
           <SidebarNavItem
             icon={Home}
+            label={t('navigation.applications')}
+            href="/applications"
+            active={pathname === '/applications'}
+          />
+          <SidebarNavItem
+            icon={LayoutGrid}
             label={t('navigation.controlCenter')}
-            href="/"
-            active={pathname === '/'}
+            href="/control-center"
+            active={pathname === '/control-center'}
           />
           {featureFlags.inventory ? (
             <SidebarNavItem
@@ -176,6 +184,14 @@ export function AppSidebar({
             href="/tools"
             active={pathname === '/tools'}
           />
+          {featureFlags.projects ? (
+            <SidebarNavItem
+              icon={FolderKanban}
+              label="Projects"
+              href="/projects"
+              active={pathname?.startsWith('/projects') ?? false}
+            />
+          ) : null}
           {featureFlags.skills ? (
             <SidebarNavItem
               icon={Puzzle}

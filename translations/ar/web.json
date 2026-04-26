@@ -205,6 +205,10 @@
       "reactFileManagerDescription": "استخدام مدير ملفات React المدمج بدلاً من منتقي مجلدات نظام التشغيل الأصلي",
       "inventory": "المخزون",
       "inventoryDescription": "تمكين صفحة المخزون التي تعرض جميع المستودعات والميزات في عرض شجري",
+      "projects": "المشاريع",
+      "projectsDescription": "تمكين التنقل إلى المشاريع وصفحات إدارة المشاريع في واجهة الويب",
+      "codeReview": "AI Code Review",
+      "codeReviewDescription": "Enable AI-powered code review that analyzes PR diffs and posts inline comments to GitHub",
       "hint": "ميزات تجريبية لا تزال قيد التطوير. قم بتمكينها على مسؤوليتك — قد تتغير أو تُزال في الإصدارات المستقبلية. وضع التصحيح يضيف تسجيلًا مفصلاً مفيدًا لاستكشاف الأخطاء."
     },
     "interactiveAgent": {
@@ -248,7 +252,8 @@
     "settings": "الإعدادات",
     "sessions": "الجلسات",
     "tools": "الأدوات",
-    "skills": "المهارات"
+    "skills": "المهارات",
+    "applications": "Applications"
   },
   "sidebar": {
     "features": "الميزات",
@@ -477,6 +482,13 @@
     "pendingModeDescription": "إنشاء بدون تشغيل — التشغيل يدوياً لاحقاً.",
     "fastModeLabel": "الوضع السريع",
     "fastModeDescription": "تخطي مراحل SDLC والتنفيذ مباشرة من الأمر.",
+    "modeGroupLabel": "وضع البناء",
+    "modeApplication": "تطبيق",
+    "modeApplicationDescription": "سير عمل تطبيق كامل مع البحث والتخطيط والتنفيذ.",
+    "modeFast": "سريع",
+    "modeFastDescription": "تخطي مراحل SDLC والتنفيذ مباشرة من الأمر.",
+    "modeSpec": "مواصفات",
+    "modeSpecDescription": "سير عمل قائم على المواصفات مع خطوات PRD وخطة صريحة.",
     "fileDropZone": "منطقة إسقاط الملفات",
     "prd": "PRD",
     "prdDescription": "الموافقة التلقائية على انتقال المتطلبات إلى التخطيط.",

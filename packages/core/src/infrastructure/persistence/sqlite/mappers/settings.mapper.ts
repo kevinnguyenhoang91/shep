@@ -126,6 +126,8 @@ export interface SettingsRow {
   feature_flag_git_rebase_sync: number;
   feature_flag_react_file_manager: number;
   feature_flag_inventory: number;
+  feature_flag_projects: number;
+  feature_flag_code_review: number;
   // Interactive agent config (added in migration 046)
   interactive_agent_enabled: number;
   interactive_agent_auto_timeout_minutes: number;
@@ -277,6 +279,8 @@ export function toDatabase(settings: Settings): SettingsRow {
     feature_flag_git_rebase_sync: settings.featureFlags?.gitRebaseSync ? 1 : 0,
     feature_flag_react_file_manager: settings.featureFlags?.reactFileManager ? 1 : 0,
     feature_flag_inventory: settings.featureFlags?.inventory ? 1 : 0,
+    feature_flag_projects: settings.featureFlags?.projects ? 1 : 0,
+    feature_flag_code_review: settings.featureFlags?.codeReview ? 1 : 0,
 
     // InteractiveAgentConfig (boolean → 0/1, integer fields; defaults applied here)
     interactive_agent_enabled: (settings.interactiveAgent?.enabled ?? true) ? 1 : 0,
@@ -541,6 +545,8 @@ export function fromDatabase(row: SettingsRow): Settings {
       gitRebaseSync: row.feature_flag_git_rebase_sync === 1,
       reactFileManager: row.feature_flag_react_file_manager === 1,
       inventory: row.feature_flag_inventory === 1,
+      projects: row.feature_flag_projects === 1,
+      codeReview: row.feature_flag_code_review === 1,
     },
 
     // InteractiveAgentConfig (INTEGER 0/1 → boolean, integer → number)

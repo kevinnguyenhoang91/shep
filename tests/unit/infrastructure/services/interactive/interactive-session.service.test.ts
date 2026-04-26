@@ -26,6 +26,21 @@ vi.mock('node:child_process', () => ({
 }));
 
 import { InteractiveSessionService } from '@/infrastructure/services/interactive/interactive-session.service.js';
+import { SessionRegistry } from '@/infrastructure/services/interactive/core/session-registry.js';
+import { StreamEventDispatcher } from '@/infrastructure/services/interactive/core/stream-event-dispatcher.js';
+import { SessionPersistence } from '@/infrastructure/services/interactive/core/session-persistence.js';
+import { AgentConfigResolver } from '@/infrastructure/services/interactive/lifecycle/agent-config.resolver.js';
+import { AgentStreamConsumer } from '@/infrastructure/services/interactive/runtime/agent-stream.consumer.js';
+import { SessionBootstrapper } from '@/infrastructure/services/interactive/lifecycle/session-bootstrapper.js';
+import { SessionTerminator } from '@/infrastructure/services/interactive/lifecycle/session-terminator.js';
+import { TurnExecutor } from '@/infrastructure/services/interactive/runtime/turn.executor.js';
+import { UserInteractionCoordinator } from '@/infrastructure/services/interactive/runtime/user-interaction.coordinator.js';
+import { BootPromptResolver } from '@/infrastructure/services/interactive/lifecycle/boot-prompt.resolver.js';
+import { MessageDispatcher } from '@/infrastructure/services/interactive/api/message-dispatcher.js';
+import { ChatStateAssembler } from '@/infrastructure/services/interactive/api/chat-state.assembler.js';
+import { WorkflowHooks } from '@/infrastructure/services/interactive/api/workflow-hooks.js';
+import type { ISettingsProvider } from '@/application/ports/output/services/settings-provider.interface.js';
+import type { ILogger } from '@/application/ports/output/services/logger.interface.js';
 import { ConcurrentSessionLimitError } from '@/domain/errors/concurrent-session-limit.error.js';
 import type { IInteractiveSessionRepository } from '@/application/ports/output/repositories/interactive-session-repository.interface.js';
 import type { IInteractiveMessageRepository } from '@/application/ports/output/repositories/interactive-message-repository.interface.js';
@@ -266,6 +281,7 @@ describe('InteractiveSessionService', () => {
       getSupportedAgents: vi.fn().mockReturnValue([AgentType.ClaudeCode]),
       getCliInfo: vi.fn().mockReturnValue([]),
       getSupportedModels: vi.fn().mockReturnValue([]),
+      listAvailableModels: vi.fn().mockResolvedValue([]),
       createInteractiveExecutor: vi.fn().mockReturnValue(mockInteractiveExecutor),
       supportsInteractive: vi.fn().mockReturnValue(true),
     };
@@ -296,13 +312,91 @@ describe('InteractiveSessionService', () => {
       deleteByFeatureId: vi.fn(),
     };
 
+    const registry = new SessionRegistry();
+    const dispatcher = new StreamEventDispatcher(registry);
+    const persistence = new SessionPersistence(messageRepo, sessionRepo, registry, dispatcher);
+    const fakeSettingsProvider: ISettingsProvider = {
+      has: () => false,
+      get: () => {
+        throw new Error('not initialized');
+      },
+    };
+    const agentConfigResolver = new AgentConfigResolver(fakeSettingsProvider);
+    const fakeLogger: ILogger = {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+    const streamConsumer = new AgentStreamConsumer(persistence, dispatcher, fakeLogger);
+    const bootPromptResolver = new BootPromptResolver(featureRepo, contextBuilder);
+    const interactionCoordinator = new UserInteractionCoordinator(
+      persistence,
+      dispatcher,
+      fakeLogger,
+      registry
+    );
+    const bootstrapper = new SessionBootstrapper(
+      sessionRepo,
+      registry,
+      persistence,
+      dispatcher,
+      bootPromptResolver,
+      streamConsumer,
+      executorFactory,
+      agentConfigResolver,
+      interactionCoordinator,
+      fakeLogger
+    );
+    const terminator = new SessionTerminator(
+      registry,
+      persistence,
+      dispatcher,
+      fakeLogger,
+      messageRepo,
+      workflowStepRepo
+    );
+    const turnExecutor = new TurnExecutor(
+      sessionRepo,
+      registry,
+      persistence,
+      streamConsumer,
+      fakeLogger,
+      dispatcher
+    );
+    const messageDispatcher = new MessageDispatcher(
+      sessionRepo,
+      messageRepo,
+      registry,
+      persistence,
+      bootstrapper,
+      terminator,
+      turnExecutor
+    );
+    const chatStateAssembler = new ChatStateAssembler(
+      messageRepo,
+      sessionRepo,
+      workflowStepRepo,
+      registry
+    );
+    const workflowHooks = new WorkflowHooks(registry, dispatcher);
     service = new InteractiveSessionService(
       sessionRepo,
       messageRepo,
-      executorFactory,
       featureRepo,
       contextBuilder,
-      workflowStepRepo
+      workflowStepRepo,
+      registry,
+      dispatcher,
+      persistence,
+      fakeLogger,
+      bootstrapper,
+      terminator,
+      turnExecutor,
+      interactionCoordinator,
+      messageDispatcher,
+      chatStateAssembler,
+      workflowHooks
     );
   });
 
@@ -1014,7 +1108,13 @@ describe('InteractiveSessionService', () => {
       await flushPromises();
 
       const fh = latestHandle();
-      fh.pushEvent({ type: 'done', content: 'Hi there!' });
+      // The service persists assistant prose by appending `delta`
+      // chunks to an internal buffer and flushing on the terminal event.
+      // `done.content` is intentionally NOT re-persisted to avoid
+      // duplicating text that was already streamed — so the test must
+      // stream the reply the same way the real executor does.
+      fh.pushEvent({ type: 'delta', content: 'Hi there!' });
+      fh.pushEvent({ type: 'done' });
       await flushPromises();
 
       const assistantCreate = (messageRepo.create as ReturnType<typeof vi.fn>).mock.calls.find(

@@ -71,6 +71,15 @@ enum NotificationEventType {
 
   @doc("Feature is ready for merge review — PR created and waiting for approval")
   MergeReviewReady: "merge_review_ready",
+
+  @doc("Cloud deployment status changed — emitted by the in-process cloud deployment event bus")
+  CloudDeploymentUpdated: "cloud_deployment_updated",
+
+  @doc("Application row changed — one or more of setupComplete, status, gitRemoteUrl, or cloudDeploymentProvider transitioned since the last poll")
+  ApplicationUpdated: "application_updated",
+
+  @doc("A new OperationLogEntry was appended for a long-running operation (scaffold, cloud deploy, git publish, repo sync)")
+  OperationLogAppended: "operation_log_appended",
 }
 
 /**

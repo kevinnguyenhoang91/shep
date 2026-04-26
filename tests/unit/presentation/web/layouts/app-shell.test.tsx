@@ -27,6 +27,8 @@ const defaultFlags = {
   gitRebaseSync: false,
   reactFileManager: false,
   inventory: false,
+  projects: false,
+  codeReview: false,
 };
 
 function renderShell(children: React.ReactNode) {
@@ -66,7 +68,7 @@ function ContextPublisher({
 describe('AppShell', () => {
   beforeEach(() => {
     mockPush.mockClear();
-    mockPathname = '/';
+    mockPathname = '/control-center';
   });
 
   it('renders children within the dashboard layout', () => {
@@ -92,7 +94,7 @@ describe('AppShell', () => {
     expect(settingsLink).toBeInTheDocument();
   });
 
-  it('marks Control Center as active for / pathname', () => {
+  it('marks Control Center as active for /control-center pathname', () => {
     renderShell(<div>Content</div>);
     const controlCenterLink = screen.getByRole('link', { name: /control center/i });
     expect(controlCenterLink).toHaveAttribute('data-active', 'true');

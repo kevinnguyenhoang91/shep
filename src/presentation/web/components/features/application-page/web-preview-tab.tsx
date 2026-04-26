@@ -19,18 +19,32 @@
  */
 
 import { useCallback } from 'react';
-import { ExternalLink, Loader2, Play, TriangleAlert, Globe } from 'lucide-react';
+import { ExternalLink, Globe, Hammer, Loader2, Play, Square, TriangleAlert } from 'lucide-react';
 import { DeploymentState } from '@shepai/core/domain/generated/output';
 import type { DeployActionState } from '@/hooks/use-deploy-action';
 
 export interface WebPreviewTabProps {
   deploy: DeployActionState;
+  /**
+   * True while the agent / scaffolder is still producing the app.
+   * Supersedes the idle / ready states and shows a friendly "Building
+   * your app…" placeholder so the Web tab has something meaningful
+   * even before a single file has been written.
+   */
+  isBuilding?: boolean;
 }
 
-export function WebPreviewTab({ deploy }: WebPreviewTabProps) {
+export function WebPreviewTab({ deploy, isBuilding = false }: WebPreviewTabProps) {
   const openInNewTab = useCallback(() => {
     if (deploy.url) window.open(deploy.url, '_blank', 'noopener,noreferrer');
   }, [deploy.url]);
+
+  // While the project tree is still being produced we own this pane —
+  // no iframe, no "Start preview" CTA, just a soft progress placeholder
+  // so the Web tab feels alive from the first moment the user lands.
+  if (isBuilding && deploy.status !== DeploymentState.Ready) {
+    return <BuildingStub />;
+  }
 
   // Ready — live iframe
   if (deploy.status === DeploymentState.Ready && deploy.url) {
@@ -52,11 +66,30 @@ export function WebPreviewTab({ deploy }: WebPreviewTabProps) {
           <button
             type="button"
             onClick={openInNewTab}
-            className="text-muted-foreground hover:text-foreground hover:bg-background/60 inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors dark:hover:bg-neutral-800"
+            className="text-muted-foreground hover:text-foreground hover:bg-background/60 inline-flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 transition-colors dark:hover:bg-neutral-800"
             title="Open in a new browser tab"
           >
             <ExternalLink className="h-3 w-3" />
             <span>Open</span>
+          </button>
+          {/* Stop control — lives here (inside the Web pane) instead of
+              on the tab itself so it never interferes with click-to-switch.
+              The user only needs Stop while looking at the live preview,
+              which is exactly when they're on this tab. */}
+          <button
+            type="button"
+            onClick={deploy.stop}
+            disabled={deploy.stopLoading}
+            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive inline-flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            title="Stop the dev server"
+            aria-label="Stop the dev server"
+          >
+            {deploy.stopLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Square className="h-3 w-3 fill-current" />
+            )}
+            <span>Stop</span>
           </button>
         </div>
         <iframe
@@ -95,15 +128,17 @@ export function WebPreviewTab({ deploy }: WebPreviewTabProps) {
     );
   }
 
-  // Idle — CTA directly kicks off the dev server. Previously this
-  // fell through to `onRunClicked` (which only switched the view to
-  // Web) so clicking it while already on the Web tab did nothing.
+  // Idle — CTA kicks off the dev server. Doubles as the redundant
+  // entry point for users who land here from the IDE/Terminal tabs and
+  // want to see the preview — clicking the Web tab itself ALSO starts
+  // the dev server (see app-view-tabs.tsx), so this is the "I'm
+  // already here, just start it" affordance.
   return (
     <EmptyState
       icon={<Globe className="text-muted-foreground h-8 w-8" />}
-      title="No dev server running"
-      description="Click Preview to install dependencies and start the app. The preview will appear here."
-      actionLabel="Preview"
+      title="No live preview yet"
+      description="Click Start preview to install dependencies and run the app locally. Your live preview will appear here."
+      actionLabel="Start preview"
       actionIcon={<Play className="h-3.5 w-3.5 fill-current" />}
       onAction={deploy.deploy}
     />
@@ -121,6 +156,46 @@ interface EmptyStateProps {
   actionLabel?: string;
   actionIcon?: React.ReactNode;
   onAction?: () => void;
+}
+
+/**
+ * "Building your app…" placeholder for the Web pane — visible while
+ * the scaffolder or the agent is still producing the app. A sibling
+ * of EmptyState but with its own richer visual so it reads as an
+ * active progress stub rather than an error-adjacent empty state.
+ */
+function BuildingStub() {
+  return (
+    <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-6">
+      <div
+        aria-hidden
+        className="from-primary/10 via-background to-background pointer-events-none absolute inset-0 bg-gradient-to-br"
+      />
+      <div
+        aria-hidden
+        className="bg-[radial-gradient(circle,theme(colors.muted.DEFAULT)_1px,transparent_1px)] pointer-events-none absolute inset-0 [background-size:24px_24px] opacity-20"
+      />
+      <div className="relative flex max-w-sm flex-col items-center gap-4 text-center">
+        <div className="bg-background border-border ring-primary/10 relative inline-flex size-12 items-center justify-center rounded-full border shadow-sm ring-4">
+          <Hammer className="text-primary size-5" />
+          <span className="bg-primary absolute -end-1 -top-1 inline-flex size-3 items-center justify-center rounded-full">
+            <Loader2 className="text-primary-foreground size-2.5 animate-spin" />
+          </span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <h3 className="text-foreground text-sm font-semibold">Building your app…</h3>
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            Setting up the project tree, installing dependencies, and generating components. Your
+            live preview will land here the moment the app is ready.
+          </p>
+        </div>
+        <div className="text-muted-foreground inline-flex items-center gap-1.5 text-[11px]">
+          <Loader2 className="size-3 animate-spin" />
+          <span>Working on it</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function EmptyState({
@@ -141,11 +216,7 @@ function EmptyState({
           <button
             type="button"
             onClick={onAction}
-            // AI-purple palette — identical to the top-bar Preview
-            // button (run-dev-button.tsx idle state) so both entry
-            // points feel like the same action, not two competing
-            // affordances.
-            className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-md border border-violet-500/50 bg-gradient-to-br from-indigo-500/15 to-violet-500/20 px-3 text-xs font-medium text-violet-700 transition-colors hover:from-indigo-500/25 hover:to-violet-500/30 dark:text-violet-300"
+            className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 mt-2 inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors"
           >
             {actionIcon}
             <span>{actionLabel}</span>

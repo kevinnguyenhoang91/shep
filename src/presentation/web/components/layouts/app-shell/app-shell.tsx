@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { Direction } from 'radix-ui';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layouts/app-sidebar';
 import { ReactFileManagerDialog } from '@/components/common/react-file-manager-dialog';
 import { GlobalChatPopup } from '@/components/features/chat/ChatSheet';
+import { GlobalSearchDialog } from '@/components/features/search/global-search-dialog';
 import { pickFolder } from '@/components/common/add-repository-button/pick-folder';
 import { GitHubImportDialog } from '@/components/common/github-import-dialog';
 import { AgentEventsProvider } from '@/hooks/agent-events-provider';
@@ -20,20 +21,43 @@ import { TurnStatusesProvider } from '@/hooks/turn-statuses-provider';
 
 import { useNotifications } from '@/hooks/use-notifications';
 import { useFeatureFlags } from '@/hooks/feature-flags-context';
+import type { ShellVariant } from '@/lib/shell-variant';
+import { AppsOnlyShell } from './apps-only-shell';
 
 interface AppShellProps {
   children: ReactNode;
   /** Server-read sidebar state from cookie. */
   sidebarOpen?: boolean;
+  /**
+   * Outer-chrome variant. `full` (default) renders the existing sidebar
+   * + FAB + canvas chrome. `apps-only` renders a slim shell with just a
+   * top bar — see spec 091-apps-only-surface.
+   */
+  variant?: ShellVariant;
 }
 
-function AppShellInner({ children, sidebarOpen }: AppShellProps) {
+function AppShellInner({ children, sidebarOpen, variant = 'full' }: AppShellProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { guardedNavigate } = useDrawerCloseGuard();
   const featureFlags = useFeatureFlags();
 
-  // Subscribe to agent lifecycle events and dispatch toast/browser notifications
-  useNotifications();
+  // Application-centric routes own their own primary actions (smart
+  // deploy split-button in the top bar, create FAB on the list page)
+  // so the global chat FAB is redundant there and was colliding with
+  // the page-level FAB. Hide it entirely on /applications (list) and
+  // /application/[id] (individual app page).
+  const hideGlobalChat =
+    pathname === '/applications' ||
+    pathname?.startsWith('/applications/') ||
+    pathname?.startsWith('/application/');
+
+  // Subscribe to agent lifecycle events and dispatch toast/browser
+  // notifications. The apps-only desktop surface suppresses toasts
+  // entirely — the StepTracker + operation logs drawer already tell
+  // the story inside the app, and a stack of toasts over the preview
+  // pane just adds noise.
+  useNotifications(variant !== 'apps-only');
 
   const { features } = useSidebarFeaturesContext();
 
@@ -108,6 +132,10 @@ function AppShellInner({ children, sidebarOpen }: AppShellProps) {
     }
   }, []);
 
+  if (variant === 'apps-only') {
+    return <AppsOnlyShell>{children}</AppsOnlyShell>;
+  }
+
   return (
     <SidebarProvider defaultOpen={sidebarOpen ?? false}>
       <AppSidebar
@@ -117,17 +145,25 @@ function AppShellInner({ children, sidebarOpen }: AppShellProps) {
         onAddFeature={handleAddFeature}
       />
       <SidebarInset>
-        <div className="relative h-full">
-          <main className="h-full">{children}</main>
-          {/* Global chat popup — fixed, visible across all pages */}
-          <GlobalChatPopup />
-          {featureFlags.githubImport ? (
-            <GitHubImportDialog
-              open={githubDialogOpen}
-              onOpenChange={setGithubDialogOpen}
-              onImportComplete={handleGitHubImportComplete}
-            />
-          ) : null}
+        {/* `h-dvh` (not `h-full`) so the full-shell page area has an
+            explicit viewport-bound height regardless of child content.
+            Without this, the outer `SidebarProvider`'s `min-h-svh`
+            allows the tree to GROW past the viewport when a child
+            (e.g. the application page's expanded step tracker) exceeds
+            viewport height, producing an outer body scrollbar. */}
+        <div className="relative h-dvh">
+          <main className="h-full min-h-0">{children}</main>
+          {/* Global chat popup — fixed, visible across pages EXCEPT
+              on application routes where the page owns its own
+              primary actions and the chat FAB is redundant. */}
+          {hideGlobalChat ? null : <GlobalChatPopup />}
+          {/* Global search dialog — Cmd+K / Ctrl+K */}
+          <GlobalSearchDialog />
+          <GitHubImportDialog
+            open={githubDialogOpen}
+            onOpenChange={setGithubDialogOpen}
+            onImportComplete={handleGitHubImportComplete}
+          />
         </div>
       </SidebarInset>
       <ReactFileManagerDialog
@@ -146,7 +182,7 @@ function TurnStatusesBridge({ children }: { children: ReactNode }) {
   return <TurnStatusesProvider>{children}</TurnStatusesProvider>;
 }
 
-export function AppShell({ children, sidebarOpen }: AppShellProps) {
+export function AppShell({ children, sidebarOpen, variant = 'full' }: AppShellProps) {
   const { i18n } = useTranslation();
   const dir = i18n.dir();
 
@@ -156,7 +192,9 @@ export function AppShell({ children, sidebarOpen }: AppShellProps) {
         <DrawerCloseGuardProvider>
           <SidebarFeaturesProvider>
             <TurnStatusesBridge>
-              <AppShellInner sidebarOpen={sidebarOpen}>{children}</AppShellInner>
+              <AppShellInner sidebarOpen={sidebarOpen} variant={variant}>
+                {children}
+              </AppShellInner>
             </TurnStatusesBridge>
           </SidebarFeaturesProvider>
         </DrawerCloseGuardProvider>

@@ -1,3 +1,112 @@
+# [1.193.0](https://github.com/shep-ai/shep/compare/v1.192.0...v1.193.0) (2026-04-23)
+
+
+### Features
+
+* **ci:** parallel electron apps-only build (mac/win/linux) ([#575](https://github.com/shep-ai/shep/issues/575)) ([d1b4c48](https://github.com/shep-ai/shep/commit/d1b4c480f48b5dff3c97bdcfc2a4de15ffa70cc0))
+
+# [1.192.0](https://github.com/shep-ai/shep/compare/v1.191.0...v1.192.0) (2026-04-23)
+
+
+### Features
+
+* **agents:** add opus 4.7 support ([#572](https://github.com/shep-ai/shep/issues/572)) ([16ccc11](https://github.com/shep-ai/shep/commit/16ccc112c665ef0b8b7b230d3e9b1b28cd4790b9)), closes [#571](https://github.com/shep-ai/shep/issues/571)
+
+# [1.191.0](https://github.com/shep-ai/shep/compare/v1.190.0...v1.191.0) (2026-04-23)
+
+
+### Features
+
+* **web:** apps-only ux polish and safer cloud project names ([#574](https://github.com/shep-ai/shep/issues/574)) ([96b8904](https://github.com/shep-ai/shep/commit/96b8904f22c91db043a6e9c8ab75a3843f697e08))
+
+# [1.190.0](https://github.com/shep-ai/shep/compare/v1.189.0...v1.190.0) (2026-04-23)
+
+
+### Features
+
+* **web:** apps-only desktop surface (spec 091) ([#573](https://github.com/shep-ai/shep/issues/573)) ([9a8036b](https://github.com/shep-ai/shep/commit/9a8036bffd85e18053d160551615ef645276a390))
+
+# [1.189.0](https://github.com/shep-ai/shep/compare/v1.188.0...v1.189.0) (2026-04-20)
+
+
+### Features
+
+* **web:** chat timeline overlay + zero-brain Get Online + unified activity log ([#565](https://github.com/shep-ai/shep/issues/565)) ([b48e643](https://github.com/shep-ai/shep/commit/b48e643dffedaeb683b18aa352f2660007a49802)), closes [Hi#level](https://github.com/Hi/issues/level) [hi#level](https://github.com/hi/issues/level)
+
+# [1.188.0](https://github.com/shep-ai/shep/compare/v1.187.3...v1.188.0) (2026-04-15)
+
+
+### Features
+
+* **web:** scaffolding progress tracker + dark-mode card surface lift ([#564](https://github.com/shep-ai/shep/issues/564)) ([06567cb](https://github.com/shep-ai/shep/commit/06567cb711059bff7c4f1975ae5f1ff26baed0ab)), closes [#563](https://github.com/shep-ai/shep/issues/563) [#ffffff](https://github.com/shep-ai/shep/issues/ffffff) [#ffffff](https://github.com/shep-ai/shep/issues/ffffff) [#0a0a0a](https://github.com/shep-ai/shep/issues/0a0a0a) [#0a0a0a](https://github.com/shep-ai/shep/issues/0a0a0a) [#111827](https://github.com/shep-ai/shep/issues/111827) [#111827](https://github.com/shep-ai/shep/issues/111827) [#0a0a0a](https://github.com/shep-ai/shep/issues/0a0a0a) [#171717](https://github.com/shep-ai/shep/issues/171717) [#262626](https://github.com/shep-ai/shep/issues/262626)
+
+## [1.187.3](https://github.com/shep-ai/shep/compare/v1.187.2...v1.187.3) (2026-04-14)
+
+
+### Bug Fixes
+
+* **web:** application card live preview and consistent title ([#562](https://github.com/shep-ai/shep/issues/562)) ([81ebd9a](https://github.com/shep-ai/shep/commit/81ebd9a6461b45efd84aac6a08506f5276e879f9))
+
+## [1.187.2](https://github.com/shep-ai/shep/compare/v1.187.1...v1.187.2) (2026-04-14)
+
+
+### Bug Fixes
+
+* **web:** force-stop stuck workflow steps + bundled deploy/chat reliability fixes ([#561](https://github.com/shep-ai/shep/issues/561)) ([ec1e95c](https://github.com/shep-ai/shep/commit/ec1e95cb001440b4c281e0cc1b5523c48161a225)), closes [#560](https://github.com/shep-ai/shep/issues/560) [#560](https://github.com/shep-ai/shep/issues/560)
+
+## [1.187.1](https://github.com/shep-ai/shep/compare/v1.187.0...v1.187.1) (2026-04-14)
+
+# [1.187.0](https://github.com/shep-ai/shep/compare/v1.186.1...v1.187.0) (2026-04-14)
+
+
+### Features
+
+* one-click cloud deploy for applications (spec 089) ([#554](https://github.com/shep-ai/shep/issues/554)) ([29342f8](https://github.com/shep-ai/shep/commit/29342f80df4a4776b7142246cabb4552da9502e3))
+
+## [1.186.1](https://github.com/shep-ai/shep/compare/v1.186.0...v1.186.1) (2026-04-14)
+
+
+### Bug Fixes
+
+* application creation flow, tracker UX, and scaffolding reliability ([#559](https://github.com/shep-ai/shep/issues/559)) ([e3034c1](https://github.com/shep-ai/shep/commit/e3034c1dd1bcc274f5e0af14f172940abc42abd9))
+
+# [1.186.0](https://github.com/shep-ai/shep/compare/v1.185.0...v1.186.0) (2026-04-14)
+
+
+### Features
+
+* **config:** unify branding and reduce contributor onboarding friction ([#556](https://github.com/shep-ai/shep/issues/556)) ([0327d23](https://github.com/shep-ai/shep/commit/0327d23c965282036c9f5fa343e1118b335d2e25))
+
+# [1.185.0](https://github.com/shep-ai/shep/compare/v1.184.0...v1.185.0) (2026-04-14)
+
+
+### Features
+
+* **dx:** add discord badge to readme ([#553](https://github.com/shep-ai/shep/issues/553)) ([13cd39d](https://github.com/shep-ai/shep/commit/13cd39d3e119a37aa1a2ad96c6adc7fa048688e3))
+
+# [1.184.0](https://github.com/shep-ai/shep/compare/v1.183.0...v1.184.0) (2026-04-14)
+
+
+### Features
+
+* **agents:** add multi-provider support with cline agentic executor ([#544](https://github.com/shep-ai/shep/issues/544)) ([d05e962](https://github.com/shep-ai/shep/commit/d05e96264388c5293b05819845dd77053b97e477))
+* **specs:** add plane-like project management capabilities to shep ([#552](https://github.com/shep-ai/shep/issues/552)) ([a54d250](https://github.com/shep-ai/shep/commit/a54d250e32f96c763d0d7adde767afc17115e970))
+
+# [1.183.0](https://github.com/shep-ai/shep/compare/v1.182.1...v1.183.0) (2026-04-13)
+
+
+### Features
+
+* **web:** applications page, workflow resume, and dark mode polish ([#550](https://github.com/shep-ai/shep/issues/550)) ([f06bd34](https://github.com/shep-ai/shep/commit/f06bd343a04910cc3a5f84867c31b8e5effec068))
+* **agents:** replace claude co-author branding with shep bot ([#548](https://github.com/shep-ai/shep/issues/548)) ([ebd68d3](https://github.com/shep-ai/shep/commit/ebd68d32fcde1d9cfb91cec87adc0eadd6ebf023))
+
+## [1.182.1](https://github.com/shep-ai/shep/compare/v1.182.0...v1.182.1) (2026-04-13)
+
+
+### Bug Fixes
+
+* **api:** handle existing clone destination and upstream remote during github repo import ([#551](https://github.com/shep-ai/shep/issues/551)) ([e6e1577](https://github.com/shep-ai/shep/commit/e6e1577bb9eecf6fcfe977908737d78e738b9b04)), closes [#545](https://github.com/shep-ai/shep/issues/545)
+
 # [1.182.0](https://github.com/shep-ai/shep/compare/v1.181.0...v1.182.0) (2026-04-12)
 
 

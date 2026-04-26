@@ -45,3 +45,7 @@ import "./pull-request.tsp";
 import "./feature-status-metadata.tsp";
 import "./attachment.tsp";
 import "./evidence.tsp";
+import "./activity-entry.tsp";
+import "./custom-property.tsp";
+import "./work-item-relation.tsp";
+import "./time-entry.tsp";

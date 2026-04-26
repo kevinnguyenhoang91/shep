@@ -205,6 +205,10 @@
       "reactFileManagerDescription": "Использовать встроенный файловый менеджер React вместо системного выбора папок",
       "inventory": "Инвентарь",
       "inventoryDescription": "Включить страницу Инвентаря, отображающую все репозитории и функции в виде дерева",
+      "projects": "Проекты",
+      "projectsDescription": "Включить навигацию Проектов и страницы управления проектами в веб-интерфейсе",
+      "codeReview": "AI Code Review",
+      "codeReviewDescription": "Enable AI-powered code review that analyzes PR diffs and posts inline comments to GitHub",
       "hint": "Экспериментальные функции, которые ещё находятся в разработке. Включайте на свой страх и риск — они могут измениться или быть удалены в будущих версиях. Режим отладки добавляет подробное логирование, полезное для устранения неполадок."
     },
     "interactiveAgent": {
@@ -248,7 +252,8 @@
     "settings": "Настройки",
     "sessions": "Сессии",
     "tools": "Инструменты",
-    "skills": "Навыки"
+    "skills": "Навыки",
+    "applications": "Applications"
   },
   "sidebar": {
     "features": "Функции",
@@ -477,6 +482,13 @@
     "pendingModeDescription": "Создать без запуска — запустить вручную позже.",
     "fastModeLabel": "Быстрый режим",
     "fastModeDescription": "Пропустить фазы SDLC и реализовать напрямую из промпта.",
+    "modeGroupLabel": "Режим сборки",
+    "modeApplication": "Приложение",
+    "modeApplicationDescription": "Полный цикл приложения с исследованием, планом и реализацией.",
+    "modeFast": "Быстро",
+    "modeFastDescription": "Пропустить фазы SDLC и реализовать напрямую из промпта.",
+    "modeSpec": "Spec",
+    "modeSpecDescription": "Spec-управляемый поток с явными шагами PRD и плана.",
     "fileDropZone": "Зона перетаскивания файлов",
     "prd": "PRD",
     "prdDescription": "Автоодобрение перехода требований к планированию.",

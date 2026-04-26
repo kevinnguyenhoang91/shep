@@ -34,6 +34,14 @@ properties:
     type: boolean
     default: false
     description: Enable the Inventory page showing all repositories and features
+  projects:
+    type: boolean
+    default: false
+    description: Enable Projects pages and navigation (project management)
+  codeReview:
+    type: boolean
+    default: false
+    description: Enable AI-powered code review for pull requests
 required:
   - skills
   - envDeploy
@@ -43,4 +51,6 @@ required:
   - gitRebaseSync
   - reactFileManager
   - inventory
+  - projects
+  - codeReview
 description: Feature flag toggles for runtime feature control

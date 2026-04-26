@@ -47,6 +47,10 @@ export interface EnhancedStepState {
   status: 'pending' | 'running' | 'done' | 'failed' | 'interrupted';
   metadata: Record<string, unknown> | null;
   toolMessages: InteractiveMessage[];
+  /** Milliseconds since epoch when the step flipped to `running`. */
+  startedAt: number | null;
+  /** Milliseconds since epoch when the step reached a terminal state. */
+  finishedAt: number | null;
 }
 
 /** Enhanced progress consumed by `StepTracker` + `ChatTab`. */
@@ -88,6 +92,31 @@ function parseMetadata(raw: string | null | undefined): Record<string, unknown> 
   } catch {
     return null;
   }
+}
+
+/**
+ * Coerce a timestamp field from a WorkflowStep row into a millisecond
+ * epoch. The backend stores timestamps as integer ms since 1970 but
+ * the generated domain type widens them to `any`; they arrive here
+ * as numbers, ISO strings, or Date instances depending on the code
+ * path (SSE chunks vs. SSR serialization). Returns null for any
+ * falsy or unparseable input so the UI can distinguish "not yet set"
+ * from "set to zero".
+ */
+function toEpochMillis(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  if (raw instanceof Date) {
+    const ms = raw.getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
+  if (typeof raw === 'string') {
+    const asNumber = Number(raw);
+    if (Number.isFinite(asNumber)) return asNumber;
+    const asDate = new Date(raw).getTime();
+    return Number.isFinite(asDate) ? asDate : null;
+  }
+  return null;
 }
 
 interface SessionInfo {
@@ -164,6 +193,45 @@ export interface ChatRuntimeOptions {
    * background refetch only confirms / updates them.
    */
   initialChatState?: ChatState;
+  /**
+   * When true, the host page intends to render the first stepless user
+   * message ABOVE the step tracker via its own pinned bubble — so the
+   * hook must (a) always surface that message as `initialRequestMessage`
+   * and (b) filter it out of the flat thread, even when no workflow plan
+   * has landed yet (placeholder-only state). Without this flag the bubble
+   * would appear BELOW the tracker during the window between app creation
+   * and the first workflow-step row, because the filter previously only
+   * kicked in once `hasPlan` became true.
+   */
+  pinInitialRequest?: boolean;
+  /**
+   * Message ids to filter out of the flat thread. These belong to
+   * server-derived "turn groups" that the host page renders as
+   * collapsible cards above the thread — the raw bubbles must not
+   * also appear in the flat message list, or the user would see the
+   * same content twice (once inside the card, once flat below).
+   * See `GetChatTurnGroupsUseCase` for the server-side derivation.
+   */
+  hiddenMessageIds?: readonly string[];
+  /**
+   * When true, the hook stops injecting its synthetic `streaming`
+   * message (the one that carries the live delta + "Thinking…" /
+   * "Agent is waking up…" placeholders) into `threadMessages`. The
+   * same streaming data is exposed separately on the return value
+   * (`streamingState`) so the host can render it wherever it wants —
+   * typically inside an in-progress turn card owned by the server.
+   */
+  suppressStreamingIndicator?: boolean;
+  /**
+   * When true, `threadMessages` is returned as an empty list — the
+   * flat thread renders no persisted bubbles at all. The host is
+   * expected to render the full conversation via its own grouping
+   * layer (e.g. `CurrentTurnCard` + `CompletedTurnGroupsList`) using
+   * `rawMessages`. Stable contract used by the web UI when turn-group
+   * rendering is on: the flat thread is dead, the overlay is the
+   * only visible surface.
+   */
+  hideAllMessages?: boolean;
 }
 
 /** A debug event captured from SSE for display in debug mode. */
@@ -619,6 +687,8 @@ export function useChatRuntime(
       status: mapStatus(s.status),
       metadata: parseMetadata(s.metadata),
       toolMessages: byStep.get(s.id) ?? [],
+      startedAt: toEpochMillis(s.startedAt),
+      finishedAt: toEpochMillis(s.finishedAt),
     }));
     const allDone = steps.length > 0 && steps.every((s) => s.status === 'done');
     // Live status string for the running step card. Order of fallback
@@ -670,13 +740,35 @@ export function useChatRuntime(
   //    the layout can render it ABOVE the step tracker — matching
   //    the mental model "user asked X, Shep built it, then we
   //    kept chatting".
+  const pinInitialRequest = options?.pinInitialRequest === true;
   const initialRequestMessage = useMemo<InteractiveMessage | null>(() => {
-    if (!stepProgress.hasPlan) return null;
+    if (!stepProgress.hasPlan && !pinInitialRequest) return null;
     const first = messages.find((m) => m.role === InteractiveMessageRole.user && !m.stepId);
     return first ?? null;
-  }, [stepProgress.hasPlan, messages]);
+  }, [stepProgress.hasPlan, pinInitialRequest, messages]);
+
+  // Server-derived turn-group filter. The set is rebuilt whenever the
+  // host passes a new array of hidden ids (typically from
+  // `useTurnGroups()` keyed off the same featureId). Kept outside the
+  // threadMessages memo so the expensive memo only re-runs when the
+  // underlying message list actually changes.
+  const hiddenMessageIdSet = useMemo(
+    () => new Set(options?.hiddenMessageIds ?? []),
+    [options?.hiddenMessageIds]
+  );
 
   const threadMessages: ThreadMessageLike[] = useMemo(() => {
+    // Short-circuit: the host is rendering a full grouping overlay
+    // (turn group cards + step tracker + operation bubbles) and
+    // does NOT want any raw persisted bubbles to appear in the
+    // flat thread. Return an empty list so no message from the
+    // chat-state cache leaks into the Thread body; the composer
+    // and pending-interaction surfaces continue to work because
+    // they live OUTSIDE `threadMessages`.
+    if (options?.hideAllMessages === true) {
+      return [];
+    }
+
     const hasPlan = stepProgress.hasPlan;
 
     // When a workflow is active and STILL RUNNING: hide stepless
@@ -701,10 +793,18 @@ export function useChatRuntime(
     // via `<InitialRequestBubble>` so leaving it in the flat thread
     // would duplicate it.
     const workflowRunning = hasPlan && !stepProgress.allDone;
-    const sourceMessages = hasPlan
+    // Filter when a plan exists OR when the host has explicitly asked us
+    // to pin the initial request bubble above the tracker (placeholder
+    // window before the first workflow-step row lands). In the
+    // placeholder-only case we still want the first user message pulled
+    // out of the flat thread so the host's `<InitialRequestBubble>`
+    // isn't duplicated below the tracker.
+    const shouldFilter = hasPlan || pinInitialRequest || hiddenMessageIdSet.size > 0;
+    const sourceMessages = shouldFilter
       ? messages.filter((m) => {
           if (m.id === initialRequestMessage?.id) return false;
           if (m.stepId) return false; // step-tagged messages live inside their card
+          if (hiddenMessageIdSet.has(m.id)) return false; // hidden inside a completed turn-group card
           if (workflowRunning && m.role === InteractiveMessageRole.assistant) {
             // Race-window leftover — see comment above.
             return false;
@@ -752,42 +852,56 @@ export function useChatRuntime(
       result = chatMessages;
     }
 
-    // When the step-tracker is active we hide ALL assistant
-    // placeholders (streaming text, status log, thinking). The
-    // tracker itself conveys progress; stacking bubbles on top of it
-    // is noise.
-    if (hasPlan) {
+    // While the workflow is STILL RUNNING, hide the assistant
+    // placeholder (streaming text, status log, thinking). The
+    // running step card already conveys in-flight progress via its
+    // spinner + live-status line; stacking a bubble on top of the
+    // tracker is noise.
+    //
+    // Once the workflow is DONE, follow-up chat turns must show the
+    // usual thinking/streaming indicator — the tracker is collapsed
+    // into its summary by then and nothing else in the UI signals
+    // that the agent is working on the user's new message.
+    if (hasPlan && !stepProgress.allDone) {
       return result;
     }
 
     // Streaming text as the last message — may include a live activity suffix.
-    if (activeStreamText.trim()) {
-      const parts: { type: 'text'; text: string }[] = [{ type: 'text', text: activeStreamText }];
-      // Append live activity indicator when agent is doing tool work
-      if (statusLog) {
-        parts.push({ type: 'text', text: `*⏳ ${statusLog}*` });
+    //
+    // Skipped entirely when the host has asked us to suppress the
+    // indicator because the server-derived in-progress turn card is
+    // rendering it inline instead (see `streamingState` below).
+    const suppressStreaming = options?.suppressStreamingIndicator === true;
+
+    if (!suppressStreaming) {
+      if (activeStreamText.trim()) {
+        const parts: { type: 'text'; text: string }[] = [{ type: 'text', text: activeStreamText }];
+        // Append live activity indicator when agent is doing tool work
+        if (statusLog) {
+          parts.push({ type: 'text', text: `*⏳ ${statusLog}*` });
+        }
+        result.push({ id: 'streaming', role: 'assistant', content: parts });
+      } else if (statusLog) {
+        // No streaming text yet but agent is actively working (tool calls, etc.)
+        result.push({
+          id: 'streaming',
+          role: 'assistant',
+          content: [{ type: 'text', text: `*⏳ ${statusLog}*` }],
+        });
+      } else if (awaitingResponse || sessionStatus === 'booting') {
+        // Note: sendMutation.isPending is NOT included here — the 600ms
+        // delay via startAwaiting() prevents flash on fast responses.
+        result.push({
+          id: 'streaming',
+          role: 'assistant',
+          content: [
+            {
+              type: 'text',
+              text: sessionStatus === 'booting' ? '*Agent is waking up...*' : '*Thinking...*',
+            },
+          ],
+        });
       }
-      result.push({ id: 'streaming', role: 'assistant', content: parts });
-    } else if (statusLog) {
-      // No streaming text yet but agent is actively working (tool calls, etc.)
-      result.push({
-        id: 'streaming',
-        role: 'assistant',
-        content: [{ type: 'text', text: `*⏳ ${statusLog}*` }],
-      });
-    } else if (awaitingResponse || sessionStatus === 'booting') {
-      // Note: sendMutation.isPending is NOT included here — the 600ms
-      // delay via startAwaiting() prevents flash on fast responses.
-      result.push({
-        id: 'streaming',
-        role: 'assistant',
-        content: [
-          {
-            type: 'text',
-            text: sessionStatus === 'booting' ? '*Agent is waking up...*' : '*Thinking...*',
-          },
-        ],
-      });
     }
 
     return result;
@@ -799,9 +913,13 @@ export function useChatRuntime(
     sessionStatus,
     statusLog,
     options?.debugMode,
+    options?.suppressStreamingIndicator,
+    options?.hideAllMessages,
     debugEvents,
     stepProgress.hasPlan,
     stepProgress.allDone,
+    pinInitialRequest,
+    hiddenMessageIdSet,
   ]);
 
   // ── Status info for typing indicator ──────────────────────────────────
@@ -915,5 +1033,20 @@ export function useChatRuntime(
     respondToInteraction,
     stepProgress,
     initialRequestMessage,
+    /** Raw persisted messages — exposed so the host can hydrate
+     *  collapsed server-derived turn-group cards by id lookup. */
+    rawMessages: messages,
+    /**
+     * Live streaming state for external renderers (in-progress turn
+     * card). Always populated whether or not the synthetic streaming
+     * thread message is injected — `suppressStreamingIndicator`
+     * only controls the flat-thread injection, not the data exposure.
+     */
+    streamingState: {
+      text: activeStreamText,
+      statusLog,
+      awaiting: awaitingResponse,
+      sessionStatus,
+    },
   };
 }

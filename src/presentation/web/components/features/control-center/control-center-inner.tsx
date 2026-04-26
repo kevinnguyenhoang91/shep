@@ -45,6 +45,7 @@ import { useViewportPersistence } from '@/hooks/use-viewport-persistence';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useFabLayout } from '@/hooks/fab-layout-context';
 import { ControlCenterEmptyState } from './control-center-empty-state';
+import { ControlCenterOnboarding } from './control-center-onboarding';
 import { NewProjectDialog } from './new-project-dialog';
 import { useControlCenterState } from './use-control-center-state';
 import { useCanvasEventListeners } from './use-canvas-event-listeners';
@@ -252,10 +253,10 @@ export function ControlCenterInner({ initialNodes, initialEdges }: ControlCenter
     [nodes, router, guardedNavigate]
   );
 
-  // Close all drawers — navigate back to root
+  // Close all drawers — navigate back to the control-center canvas
   const handleClearDrawers = useCallback(() => {
-    if (pathname !== '/') {
-      guardedNavigate(() => router.push('/'));
+    if (pathname !== '/control-center') {
+      guardedNavigate(() => router.push('/control-center'));
     }
   }, [router, pathname, guardedNavigate]);
 
@@ -513,12 +514,7 @@ export function ControlCenterInner({ initialNodes, initialEdges }: ControlCenter
       </div>
     </div>
   ) : (
-    <ControlCenterEmptyState
-      onRepositorySelect={addRepoAndFocus}
-      onApplicationCreated={(appId) => {
-        router.push(`/application/${appId}`);
-      }}
-    />
+    <ControlCenterOnboarding onRepositorySelect={addRepoAndFocus} />
   );
 
   // ── Full-screen create prompt overlay ────────────────────────────────
@@ -575,6 +571,7 @@ export function ControlCenterInner({ initialNodes, initialEdges }: ControlCenter
         onPaneClick={handleClearDrawers}
         onMoveEnd={handleMoveEnd}
         toolbar={canvasToolbar}
+        showToolbarOnEmpty={workspaceFilteredEmpty}
         emptyState={emptyStateNode}
       />
       {/* (+) FAB — bottom-left, moves with sidebar */}
@@ -653,7 +650,8 @@ export function ControlCenterInner({ initialNodes, initialEdges }: ControlCenter
               addRepoAndFocus(path);
             }}
             onApplicationCreated={(appId) => {
-              setShowCreatePrompt(false);
+              // Navigate first — keep overlay mounted to avoid canvas flash.
+              // The overlay unmounts when the route changes.
               router.push(`/application/${appId}`);
             }}
             onClose={() => setShowCreatePrompt(false)}
