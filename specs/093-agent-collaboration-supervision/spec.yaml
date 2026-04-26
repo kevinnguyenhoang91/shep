@@ -22,7 +22,7 @@ summary: >
   approval gates, SSE event streaming, AskUserQuestion via SDK V2, LangGraph workflows, and a
   draft team-execution protocol (spec 014) — but lacks a production-grade messaging fabric, a
   supervisor-agent role, and a unified question/escalation pipeline.
-phase: "Analysis"
+phase: "Requirements"
 sizeEstimate: "L"
 
 # Relationships
@@ -59,14 +59,188 @@ relatedLinks:
 
 # Open questions (must be resolved before implementation)
 openQuestions:
-  - "Scope of inter-agent messaging: do agents talk peer-to-peer, or always through a hub (supervisor / EM)? Spec 014 chose hub. Do we keep that?"
-  - "Does the supervisor itself run as a long-lived LangGraph agent, or as a lightweight rule/LLM evaluator subscribed to SSE? (Hybrid is possible.)"
-  - "What authority does the supervisor have? Read-only monitor, auto-approve gates, auto-stop, auto-answer interactive questions, or all of the above — gated by per-app policy?"
-  - "Where do agent→user questions surface? Reuse InteractiveMessage + AskUserQuestion, or introduce a dedicated AgentQuestion entity with priority/timeout/answerer (user|supervisor)?"
-  - "Cross-feature vs in-feature collaboration: are collaborating agents always inside one feature/worktree, or can they span features? (Affects isolation model.)"
-  - "Do we need a new presentation surface (supervisor inbox / agent chat room) or extend the existing feature page and notifications?"
-  - "Conflict resolution when supervisor and user disagree on an answer/approval — last-write-wins, supervisor advisory only, or explicit policy per gate?"
-  - "Audit & explainability: every supervisor decision must be loggable and reviewable — what's the minimum activity-log shape?"
+  - question: "What collaboration topology should agents use to communicate?"
+    resolved: true
+    options:
+      - option: "Hub-and-spoke via supervisor"
+        description: "All inter-agent messages flow through the supervisor agent (or a logical hub when no supervisor is configured). Simplest model, matches spec 014's EM (engineering manager) pattern, gives one place to enforce policy and audit. Limitation: extra hop adds latency and the hub can become a bottleneck."
+        selected: true
+      - option: "Peer-to-peer mesh"
+        description: "Agents publish/subscribe directly to a shared bus and address each other by run/feature ID. Maximum flexibility and decoupling, but harder to police, audit, and reason about. Risks emergent chatter and conflicting decisions."
+        selected: false
+      - option: "Broadcast-only (no addressing)"
+        description: "Agents emit structured events on a shared topic; consumers (other agents, UI, supervisor) decide what to act on. Simplest infrastructure, but lacks targeted requests/replies needed for handoffs."
+        selected: false
+    selectionRationale: "Hub-and-spoke aligns with the existing draft team-execution protocol (spec 014) and the supervisor concept the user is asking for. It centralizes policy, audit, and conflict resolution in one place, which is critical for a delegated guardian. We can later relax to peer-to-peer for high-frequency exchanges if a real need emerges, but starting centralized avoids emergent chaos and matches Shep's existing 'one orchestrator per feature' mental model."
+    answer: "Hub-and-spoke via supervisor"
+
+  - question: "How should the agent message bus be implemented?"
+    resolved: true
+    options:
+      - option: "SQLite-backed with polling"
+        description: "Persist messages in a new agent_messages table; consumers poll (matching the existing 500ms SSE pattern in StreamAgentEventsUseCase). Pros: zero new infra, durable, cross-process and cross-worktree, identical pattern to current event streaming, naturally auditable. Cons: ~500ms latency, polling cost."
+        selected: true
+      - option: "In-process EventEmitter"
+        description: "Use Node.js EventEmitter as the bus. Pros: sub-millisecond latency, trivial to implement. Cons: single-process only — fails immediately for parallel feature agents in separate worktree processes, which is exactly the user's scenario."
+        selected: false
+      - option: "Redis pub/sub"
+        description: "Add Redis as a message broker. Pros: low latency, horizontal scale, mature pub/sub. Cons: adds a heavy external dependency to a tool that is currently single-binary + SQLite, breaks the offline-first/local-first promise."
+        selected: false
+      - option: "File-based watcher"
+        description: "Drop messages as JSON files in a shared directory; use chokidar/fs.watch. Pros: cross-process, no DB schema. Cons: noisy, unordered, hard to audit, worse than SQLite for every property that matters."
+        selected: false
+    selectionRationale: "SQLite polling reuses the exact pattern already proven by StreamAgentEventsUseCase (500ms poll, multiplexed via SSE/Service Worker). It works across processes and worktrees, gives free durability and audit, and adds zero new infrastructure. Latency is acceptable for human-paced supervision (~500ms is invisible compared to LLM turn time). We avoid Redis to preserve the local-first / single-binary value proposition."
+    answer: "SQLite-backed with polling"
+
+  - question: "What is the default supervisor autonomy level?"
+    resolved: true
+    options:
+      - option: "Advisory (default)"
+        description: "Supervisor observes, comments, and recommends but cannot approve/reject without the user. The user keeps full control; supervisor adds context and surfaces risk. Safe default that respects user expectations from existing approval-gate behavior."
+        selected: true
+      - option: "Co-sign"
+        description: "Supervisor must approve in addition to the user, or supervisor can pre-approve for the user to confirm. Stricter — useful for high-stakes flows like deploy/merge but adds friction."
+        selected: false
+      - option: "Autonomous"
+        description: "Supervisor approves/rejects on the user's behalf without confirmation, within configured policy. Maximum hands-off but maximum blast radius; should never be the default for new users."
+        selected: false
+    selectionRationale: "Advisory is the only safe default for a brand-new capability. Approval gates today are user-only; promoting the supervisor to autonomous-by-default would silently change the trust contract. Users opt into stronger autonomy per scope (per-app, per-feature, per-gate) once they've watched the supervisor advise them and built confidence. This mirrors how every successful delegated-agent product (Copilot Workspace, Devin reviewers) ramps trust."
+    answer: "Advisory (default)"
+
+  - question: "Should AgentQuestion be a new domain entity or a thin extension of existing models?"
+    resolved: true
+    options:
+      - option: "New first-class entity"
+        description: "Define AgentQuestion in TypeSpec with its own table, repository, and use cases. Bridges interactive AskUserQuestion (via canUseTool) and background-agent escalations (via approval gates). One unified inbox across modes; supervisor can answer in either mode without special-casing."
+        selected: true
+      - option: "Reuse InteractiveMessage + WorkflowStep"
+        description: "No new entity — encode questions as typed InteractiveMessage variants for interactive mode and tagged WorkflowStep for background mode. Less schema work but creates two parallel surfaces and forces every consumer (notifications, supervisor, UI inbox) to query two tables."
+        selected: false
+      - option: "Extend approval-gate model only"
+        description: "Treat every question as a free-form approval gate. Maximum reuse but loses fidelity — an open-ended 'which library should I use?' is not the same shape as 'allow merge yes/no'."
+        selected: false
+    selectionRationale: "A first-class AgentQuestion entity is the only design that gives a unified inbox across interactive and background modes — which is the user's actual ask ('what happens when agents want to ask questions?'). Bolting onto existing tables looks cheaper but forces every downstream surface (UI inbox, supervisor, notifications, audit) to do double work and never converges. The new entity is small (~6 fields) and fits naturally beside agent_runs and interactive_messages."
+    answer: "New first-class entity"
+
+  - question: "What is the supervisor configuration scope?"
+    resolved: true
+    options:
+      - option: "Per-app with per-feature override"
+        description: "Configure a supervisor at the app level (default for all features in that app) with optional override per feature. Matches how AgentRun and ApprovalGates already cascade. Strikes balance between expressiveness and discoverability."
+        selected: true
+      - option: "Global only"
+        description: "One supervisor for all apps/features. Simplest UX. Too coarse — different projects have different risk profiles (a side project doesn't need the same guardrails as production)."
+        selected: false
+      - option: "Per-feature only"
+        description: "Configure on every feature individually. Maximum control but maximum friction; users will not configure 50 features by hand."
+        selected: false
+      - option: "Per-agent-type"
+        description: "Configure separately for each agent type (feature, deploy, review). Useful but orthogonal — should be expressible as a policy field inside the per-app config rather than a separate scope."
+        selected: false
+    selectionRationale: "Per-app with per-feature override matches every existing scoping decision in Shep (settings, approval gates, agent definitions). Users already think in apps as the natural project unit. Per-agent-type and per-gate concerns become fields inside a single SupervisorPolicy rather than a parallel scope hierarchy. Keeping configuration consistent across the product reduces cognitive load and lets us reuse existing settings UI patterns."
+    answer: "Per-app with per-feature override"
+
+  - question: "What happens when the user and supervisor disagree on a gate?"
+    resolved: true
+    options:
+      - option: "User always wins"
+        description: "User's decision is final. Supervisor's vote is recorded for audit but cannot override. Safest default — preserves user agency and matches the 'delegated guardian' mental model (a guardian advises; the principal decides)."
+        selected: true
+      - option: "Supervisor wins in autonomous mode"
+        description: "When supervisor is configured as autonomous for that scope, supervisor's decision is final and user must explicitly override via a separate command. Useful for hands-off operation but requires careful UX to avoid surprise."
+        selected: false
+      - option: "First responder wins"
+        description: "Whoever (user or supervisor) responds first locks in the decision. Race condition by design — produces unpredictable outcomes."
+        selected: false
+    selectionRationale: "User-always-wins is the right invariant for a feature that exists to give users more confidence, not less. The supervisor's value is filtering and recommending, not vetoing. When users explicitly configure autonomous mode, they're handing the supervisor write authority for that scope — but even then, a user override (via the existing reject/stop primitives) must always be possible. This rule is also the easiest to explain in docs and audits."
+    answer: "User always wins"
+
+  - question: "How should escalations be routed to the user?"
+    resolved: true
+    options:
+      - option: "Reuse existing notification system + new event types"
+        description: "Add new notification kinds (agent_question_pending, supervisor_escalated, agent_message_blocked) to the existing INotificationService and notifications table. Honors per-event preferences in Settings.notificationPreferences. Zero new delivery infrastructure."
+        selected: true
+      - option: "New dedicated escalation channel"
+        description: "Build a separate priority lane (e.g., real-time push, email) just for supervisor escalations. Higher reliability but duplicates the notification system that already supports priorities."
+        selected: false
+      - option: "In-app only (no notification)"
+        description: "Show pending questions only in the web/CLI inbox; rely on the user opening Shep. Simplest but defeats the point of delegated supervision when the user is away."
+        selected: false
+    selectionRationale: "The notification system already supports per-event preferences and is wired into both web and CLI. Adding new event kinds is a small, low-risk extension. We get free user controls (mute, channel preference) and a single mental model for all agent-driven alerts. Building a parallel channel would duplicate code without solving any real problem."
+    answer: "Reuse existing notification system + new event types"
+
+  - question: "How should the supervisor agent be implemented?"
+    resolved: true
+    options:
+      - option: "LangGraph node + LLM evaluator"
+        description: "Supervisor is a LangGraph workflow that runs on every relevant event (gate, question, milestone). Uses the existing IAgentExecutorProvider abstraction to call any configured LLM. Plays well with the agent-agnostic rule, reuses checkpointing/resumption, and fits the existing feature-agent-worker pattern."
+        selected: true
+      - option: "Lightweight rule engine"
+        description: "Supervisor is a deterministic policy engine (e.g., 'auto-approve if test coverage > 80% and no migrations'). Predictable and cheap, but inflexible and doesn't satisfy the user's mental model of an 'agent' supervisor."
+        selected: false
+      - option: "External LLM call from a use case"
+        description: "Each evaluation is a one-shot LLM call from EvaluateSupervisorDecisionUseCase. Simpler than LangGraph but loses memory/state across decisions and breaks the 'agent has a session' model used everywhere else."
+        selected: false
+    selectionRationale: "LangGraph + LLM evaluator behind IAgentExecutorProvider is the only choice that respects the mandatory agent-agnostic rule and reuses the proven feature-agent infrastructure (workers, checkpointing, sessions, SSE). It also lets the supervisor accumulate context across decisions, which is what makes it feel like a real guardian rather than a rubber-stamp. Rule engines and one-shot calls are interesting future additions but should not be the foundation."
+    answer: "LangGraph node + LLM evaluator"
+
+  - question: "Is cross-worktree direct messaging required for v1?"
+    resolved: true
+    options:
+      - option: "Not required — supervisor as the bridge"
+        description: "Two parallel feature agents in different worktrees coordinate by sending messages to the supervisor (or main process), which can broadcast or relay. Avoids designing a cross-process IPC primitive in v1. Suitable because the SQLite bus is already cross-process by virtue of shared DB."
+        selected: true
+      - option: "Direct cross-worktree pub/sub"
+        description: "Each worktree process subscribes to topics and can address peers directly. More flexible but introduces ordering/identity concerns (which worktree is authoritative for a given run ID?) that we don't need to solve yet."
+        selected: false
+    selectionRationale: "The SQLite bus is already cross-process — any worktree can read/write agent_messages — so 'cross-worktree messaging' is solved structurally. We only need to decide whether agents address each other directly or via the hub, and the hub answer (per the topology question) makes direct addressing unnecessary for v1. This keeps v1 scope realistic."
+    answer: "Not required — supervisor as the bridge"
+
+  - question: "What audit and explainability is mandatory for supervisor actions?"
+    resolved: true
+    options:
+      - option: "Full audit + rationale for every decision"
+        description: "Every supervisor approve/reject/escalate stores: input context hash, model + prompt version, structured rationale (string), confidence (optional), referenced policy rule, and is appended to the existing activity_log. Reversible via existing reject/stop primitives. Surfaces in UI as a 'why?' panel on every decision."
+        selected: true
+      - option: "Decision only"
+        description: "Store only the verdict (approved/rejected). Cheap but defeats trust — a user delegating authority to an agent must be able to inspect why it did what it did."
+        selected: false
+      - option: "Audit only on dispute"
+        description: "Generate rationale lazily when the user clicks 'explain'. Cheaper writes but means we can't reconstruct decisions if the model changes."
+        selected: false
+    selectionRationale: "Delegated authority without explainability is the fastest way to lose user trust. The cost of writing one extra string per decision is negligible; the cost of a user catching a bad supervisor call and having no way to inspect it is the entire feature's reputation. activity_log already exists, so persistence is essentially free. Lazy generation breaks if the model/prompt rotates between decision and inspection."
+    answer: "Full audit + rationale for every decision"
+
+  - question: "What urgency model should AgentQuestion expose?"
+    resolved: true
+    options:
+      - option: "Three-tier (info / question / blocking)"
+        description: "info = FYI, no response needed; question = answer when convenient, agent will continue with reasonable default after timeout; blocking = agent paused, MUST be answered. Maps cleanly to existing approval-gate semantics (blocking) and SSE notifications (info/question). Three tiers is enough to drive UI prioritization without overloading the user."
+        selected: true
+      - option: "Binary (blocking / non-blocking)"
+        description: "Just two levels. Simpler but conflates 'agent wants advice' with 'agent paused waiting' — these have very different UX needs (queue vs interrupt)."
+        selected: false
+      - option: "Numeric priority 1-10"
+        description: "Free-form numeric urgency. Maximum expressiveness but no shared meaning — agent picks 7 vs 6 with no semantic anchor; users can't filter or route."
+        selected: false
+    selectionRationale: "Three tiers (info, question, blocking) cover every real interaction pattern with distinct UX: info goes to a feed, question goes to an inbox the user reviews on their schedule, blocking interrupts and shows a banner. This also maps directly onto existing notification priority and matches how spec 014 already proposes [TASK-READY] / [BLOCKED] markers. More granularity gives no real benefit and harder routing."
+    answer: "Three-tier (info / question / blocking)"
+
+  - question: "Should v1 ship all three capabilities together, or phased?"
+    resolved: true
+    options:
+      - option: "Phased rollout under one feature flag"
+        description: "Ship in this order behind shep.feature.collaboration: (1) AgentMessage + bus + activity-log, (2) AgentQuestion unified inbox, (3) Supervisor agent with advisory mode. Each phase ships independently to main but is gated until the user opts in. Reduces blast radius and lets us validate each layer before building on it."
+        selected: true
+      - option: "All-at-once big-bang release"
+        description: "Build everything, ship it once. Lower iteration overhead but high risk; if supervisor evaluation has a bug it blocks the whole feature. Also forces a multi-week branch which conflicts with Shep's small-PR norm."
+        selected: false
+      - option: "Question pipeline only (drop supervisor for v1)"
+        description: "Ship just the unified question/escalation surface; defer supervisor and inter-agent messaging. Smallest scope but doesn't answer the user's two main questions about agents talking and supervision."
+        selected: false
+    selectionRationale: "Phased under a feature flag is the only way to maintain Shep's commit-PR cadence on an L-sized feature. Each phase delivers user-visible value (messages → unified questions → supervisor) and the flag lets us land partial work without exposing half-built UI. The flag is also free with the existing feature-management infrastructure shipped in PR #557."
+    answer: "Phased rollout under one feature flag"
 
 # Markdown content (the actual spec)
 content: |
@@ -89,6 +263,188 @@ content: |
   These three questions describe the same missing concept: a **collaboration & supervision
   fabric** that lets agents communicate with each other and with a delegated human-or-supervisor
   responder, with structured questions, escalations, and audit.
+
+  ## Success Criteria
+
+  - [ ] User can configure a supervisor agent at the app level via web UI and CLI, with
+        autonomy mode = advisory by default.
+  - [ ] When a feature agent reaches an approval gate, a configured supervisor evaluates it
+        within 30s and either (a) advises the user with a rationale or (b) — in autonomous
+        mode for that gate — approves/rejects on the user's behalf.
+  - [ ] Two parallel feature agents (different worktrees) can exchange structured messages
+        through the agent message bus and observe each other's lifecycle events.
+  - [ ] Every agent question (interactive `AskUserQuestion` and background-agent escalation)
+        appears in a single unified "Agent Questions" inbox in the web UI and CLI, regardless
+        of execution mode.
+  - [ ] Blocking questions interrupt the user via the existing notification system; non-blocking
+        questions queue without interruption; info messages stream to the activity feed only.
+  - [ ] Every supervisor decision stores a rationale, model+prompt version, and policy rule
+        reference; the user can open a "Why?" panel and see all of it.
+  - [ ] User can override any supervisor decision via the existing reject/stop primitives;
+        user's decision always wins.
+  - [ ] All new persistence is migration-driven, idempotent, and includes rollback verification
+        in tests.
+  - [ ] Feature flag `collaboration` (or equivalent) gates the entire surface; with the flag
+        off, behavior is identical to today's main branch.
+  - [ ] Documentation updated: `AGENTS.md`, `docs/architecture/agent-system.md`, and a new
+        `docs/architecture/supervision.md`.
+  - [ ] Test coverage: unit tests for every new use case and port adapter; integration tests
+        for the message bus, supervisor evaluation, and question routing; e2e test for the
+        web supervisor configuration flow.
+
+  ## Functional Requirements
+
+  ### Agent Messaging (collaboration)
+
+  - **FR-1**: The system MUST provide a domain entity `AgentMessage` defined in TypeSpec
+    with fields: `id`, `from` (agentRunId or 'user' or 'supervisor'), `to` (agentRunId,
+    'broadcast', 'supervisor', or 'user'), `kind` (enum: status, request, reply, blocked,
+    info), `payload` (structured), `correlationId` (optional, for request/reply), `createdAt`.
+  - **FR-2**: The system MUST expose a port `IAgentMessageBus` in
+    `application/ports/output/agents/` with at minimum `publish(message)`, `subscribe(filter, handler)`,
+    and `listFor(agentRunId | featureId, since)`.
+  - **FR-3**: The default `IAgentMessageBus` adapter MUST persist messages in a new
+    `agent_messages` SQLite table and be observable via the existing SSE pipeline (new
+    event kind `agent_message`).
+  - **FR-4**: The feature-agent worker MUST publish lifecycle messages (started,
+    phase-changed, blocked, completed) on the bus so other agents and the supervisor can
+    observe them.
+  - **FR-5**: Inter-agent communication MUST flow through the supervisor (hub-and-spoke).
+    When no supervisor is configured for the scope, a logical hub still mediates and audits
+    messages but performs no policy evaluation.
+
+  ### Agent Questions (unified ask flow)
+
+  - **FR-6**: The system MUST provide a domain entity `AgentQuestion` defined in TypeSpec
+    with fields: `id`, `agentRunId`, `featureId`, `kind` (enum: info, question, blocking),
+    `prompt` (string), `options` (optional array for multiple-choice), `defaultAnswer`
+    (optional, used on timeout for non-blocking), `answerer` (enum: user, supervisor, either),
+    `status` (enum: pending, answered, expired, cancelled), `answer` (optional), `answeredBy`
+    (optional), `answeredAt` (optional), `createdAt`, `expiresAt` (optional).
+  - **FR-7**: The Claude SDK V2 `canUseTool` interception in
+    `claude-code-interactive-executor.service.ts` MUST route `AskUserQuestion` invocations
+    through `AskAgentQuestionUseCase` so a single inbox covers both interactive and
+    background modes.
+  - **FR-8**: Background-agent approval gates MUST emit a corresponding `AgentQuestion` of
+    kind `blocking` so they appear alongside interactive questions in the unified inbox.
+    The existing approve/reject use cases continue to be the underlying answer mechanism.
+  - **FR-9**: The web UI MUST expose an `/agent-questions` page that lists pending
+    questions across all apps/features with filters by urgency, app, and agent type.
+  - **FR-10**: The CLI MUST expose `shep agent questions list|answer|cancel` commands
+    operating on the same use cases as the web UI.
+  - **FR-11**: Blocking questions MUST trigger a notification via `INotificationService`
+    using new event kinds `agent_question_pending` and `agent_question_blocking`.
+  - **FR-12**: Non-blocking `AgentQuestion`s with a `defaultAnswer` and `expiresAt` MUST
+    auto-resolve to the default after expiration; the resolution MUST be recorded with
+    `answeredBy = 'auto-default'`.
+
+  ### Supervisor Agent
+
+  - **FR-13**: The system MUST provide a domain entity `SupervisorPolicy` defined in
+    TypeSpec with fields: `id`, `appId` (required), `featureId` (optional override),
+    `enabled`, `autonomyLevel` (enum: advisory, co-sign, autonomous), `gateAuthority`
+    (per-gate map: prd/plan/merge → autonomy override), `model` (free-form, agent-agnostic),
+    `policyRules` (array of structured rules), `createdAt`, `updatedAt`.
+  - **FR-14**: The system MUST provide a port `ISupervisorAgent` with at minimum
+    `evaluate(event)` returning a `SupervisorDecision` (`{ verdict: approve|reject|escalate|advise,
+    rationale: string, modelVersion, promptVersion, ruleRef? }`).
+  - **FR-15**: The default `ISupervisorAgent` adapter MUST be a LangGraph workflow that
+    resolves the agent executor through `IAgentExecutorProvider` (no hardcoded provider).
+  - **FR-16**: When a feature-agent reaches an approval gate, the system MUST consult the
+    configured supervisor before the human user is paged. The supervisor's decision is
+    appended to the gate's audit trail.
+  - **FR-17**: In `advisory` mode (default), the supervisor MAY only emit `advise` or
+    `escalate` verdicts; the human user is still required to act on the gate.
+  - **FR-18**: In `co-sign` mode, the supervisor's `approve` is necessary but not
+    sufficient; the human user must also approve.
+  - **FR-19**: In `autonomous` mode for a given gate, the supervisor's `approve`/`reject`
+    is final unless the human user invokes the existing reject/stop primitives.
+  - **FR-20**: If the user takes action on a gate after the supervisor has acted, the
+    user's decision MUST always win (`User always wins` invariant). The conflict MUST be
+    audited.
+  - **FR-21**: Every `SupervisorDecision` MUST be persisted in a new `supervisor_decisions`
+    table and appended to `activity_log` with full rationale and model/prompt version.
+  - **FR-22**: A failure inside the supervisor (timeout, model error, exception) MUST NOT
+    block the underlying agent; it MUST fall back to standard human approval and surface
+    the failure as a notification with `kind = supervisor_failed`.
+
+  ### Configuration & Presentation
+
+  - **FR-23**: The web UI MUST expose a Supervisor configuration surface at the app level
+    (and feature override) with: enable toggle, autonomy level, per-gate authority,
+    model selector (using existing model picker), and rule editor.
+  - **FR-24**: The CLI MUST expose `shep supervisor configure|status|enable|disable|approve|reject`
+    commands.
+  - **FR-25**: The web UI MUST expose a "Why?" affordance on every supervisor decision
+    that reveals rationale, model+prompt version, and the policy rule referenced.
+  - **FR-26**: The web UI MUST display agent-to-agent messages in a per-feature "Agent
+    activity" feed, distinguishable from user-facing notifications.
+  - **FR-27**: All new presentation surfaces MUST consume the same use cases — no
+    presentation-specific business logic.
+
+  ### Cross-cutting
+
+  - **FR-28**: All new TypeSpec entities MUST be defined in `tsp/agents/` and re-generated;
+    no hand-edits to `packages/core/src/domain/generated/output.ts`.
+  - **FR-29**: Every new database table MUST have a forward migration in
+    `packages/core/src/infrastructure/persistence/sqlite/migrations/` and be covered by
+    repository tests.
+  - **FR-30**: The entire feature MUST be gated behind a feature flag (e.g.,
+    `collaboration`) so it can be rolled out progressively. With the flag off, behavior
+    is byte-identical to today's main.
+
+  ## Non-Functional Requirements
+
+  - **NFR-1 (Performance)**: Message-bus publish-to-subscriber latency MUST be ≤ 750ms
+    p95 (matches existing 500ms SSE poll plus serialization budget).
+  - **NFR-2 (Performance)**: Supervisor evaluation MUST complete in ≤ 30s p95 for a
+    standard approval gate; a timeout MUST trigger fallback to human-only.
+  - **NFR-3 (Scalability)**: A single feature with up to 5 concurrent agents MUST NOT
+    degrade message-bus latency by > 2x.
+  - **NFR-4 (Reliability)**: Message persistence MUST be durable (SQLite WAL mode);
+    no message MAY be silently dropped. Bus delivery MUST be at-least-once with
+    idempotent consumers via `correlationId`.
+  - **NFR-5 (Reliability)**: A crash in the supervisor agent MUST NOT crash the feature
+    agent or worker process; supervisor calls MUST be isolated.
+  - **NFR-6 (Auditability)**: 100% of supervisor decisions and inter-agent messages MUST
+    be recorded in `activity_log` and reversible via existing reject/stop primitives.
+  - **NFR-7 (Security)**: Supervisor and agent messages MUST NOT leak across apps.
+    All bus queries MUST be scoped by app/feature; cross-scope subscription is forbidden.
+  - **NFR-8 (Security)**: Supervisor model selection MUST respect existing API-key
+    isolation (per-app credentials).
+  - **NFR-9 (UX)**: A configured supervisor MUST be discoverable — its presence and
+    autonomy level MUST be visible on every AgentRun detail view.
+  - **NFR-10 (UX)**: Pending blocking questions MUST appear in the user's notification
+    surface within 2s of being raised.
+  - **NFR-11 (Maintainability)**: All new code MUST follow Clean Architecture rules
+    in `.claude/rules/code-quality.md` — no infrastructure imports in
+    application/presentation, no singletons, no magic literals, no hardcoded providers.
+  - **NFR-12 (Maintainability)**: Files >300 lines MUST be split before merge; new use
+    cases live in their own files with colocated tests.
+  - **NFR-13 (Observability)**: Every supervisor decision and every blocking question
+    MUST emit a structured event consumable by the existing SSE event stream.
+  - **NFR-14 (Backwards compatibility)**: With the feature flag off, all existing
+    AgentRun, ApprovalGate, InteractiveSession, and SSE behavior MUST be unchanged.
+  - **NFR-15 (Testability)**: Every port MUST have an in-memory fake adapter for
+    unit/integration tests. Supervisor evaluation MUST be testable without an LLM call
+    (deterministic stub adapter).
+
+  ## Product Questions & AI Recommendations
+
+  | # | Question | AI Recommendation | Rationale |
+  | - | -------- | ----------------- | --------- |
+  | 1 | Collaboration topology? | Hub-and-spoke via supervisor | Centralizes policy/audit; matches spec 014 EM model; defer P2P until proven need. |
+  | 2 | Bus implementation? | SQLite-backed with polling | Reuses proven SSE pattern; cross-process; zero new infra; preserves local-first. |
+  | 3 | Default supervisor autonomy? | Advisory | Safe default; doesn't silently change trust contract; users opt into stronger autonomy. |
+  | 4 | AgentQuestion entity? | New first-class entity | Unified inbox across modes; small schema cost; avoids dual-table queries everywhere. |
+  | 5 | Supervisor scope? | Per-app with per-feature override | Matches existing AgentRun/ApprovalGate scoping; balanced expressiveness. |
+  | 6 | User vs supervisor conflict? | User always wins | Preserves agency; easy to explain; matches "delegated guardian" mental model. |
+  | 7 | Escalation routing? | Reuse notification system | Free per-event preferences; no parallel delivery infra. |
+  | 8 | Supervisor implementation? | LangGraph + LLM evaluator | Respects agent-agnostic rule; reuses worker/checkpointing; keeps stateful context. |
+  | 9 | Cross-worktree direct messaging in v1? | Not required — supervisor as bridge | SQLite bus is already cross-process; defer P2P addressing. |
+  | 10 | Audit & explainability scope? | Full audit + rationale per decision | Trust depends on inspectability; activity_log makes persistence ~free. |
+  | 11 | Question urgency model? | Three-tier (info/question/blocking) | Distinct UX per tier; maps to existing approval-gate semantics. |
+  | 12 | v1 release strategy? | Phased rollout under feature flag | Maintains small-PR cadence; partial work doesn't expose half-built UI. |
 
   ## Codebase Analysis
 
@@ -159,16 +515,16 @@ content: |
   | `tsp/domain/entities/settings.tsp` | Medium | New `SupervisorConfig` block (enabled, model, policy ref, autonomy level, escalation rules). |
   | `packages/core/src/application/ports/output/agents/` | High | New ports: `IAgentMessageBus`, `IAgentQuestionService`, `ISupervisorAgent`, `IAgentInbox`. |
   | `packages/core/src/application/use-cases/agents/` | High | New use cases: `SendAgentMessage`, `AskAgentQuestion`, `AnswerAgentQuestion`, `EscalateToUser`, `EvaluateSupervisorDecision`, `ConfigureSupervisor`. |
-  | `packages/core/src/infrastructure/services/agents/` | High | New adapters: in-process or SQLite-backed message bus, supervisor agent runner (LangGraph or LLM-evaluator), question routing. |
+  | `packages/core/src/infrastructure/services/agents/` | High | New adapters: SQLite-backed message bus, supervisor agent runner (LangGraph), question routing. |
   | `packages/core/src/infrastructure/persistence/sqlite/migrations/` | High | New tables: `agent_messages`, `agent_questions`, `supervisor_policies`, `supervisor_decisions`, plus `activity_log` extensions. |
   | `packages/core/src/infrastructure/services/agents/feature-agent/feature-agent-worker.ts` | Medium | Worker must publish lifecycle events to the message bus and consult supervisor for gates if configured. |
   | `packages/core/src/infrastructure/services/agents/common/executors/claude-code-interactive-executor.service.ts` | Medium | `canUseTool` for `AskUserQuestion` must route through the question service so supervisor can answer. |
-  | `packages/core/src/application/use-cases/agents/stream-agent-events.use-case.ts` | Medium | Add new event kinds: `AgentMessage`, `AgentQuestion`, `SupervisorDecision`. |
+  | `packages/core/src/application/use-cases/agents/stream-agent-events.use-case.ts` | Medium | Add new event kinds: `agent_message`, `agent_question`, `supervisor_decision`. |
   | `src/presentation/web/` | High | New surfaces: supervisor configuration page, agent-questions inbox, optional collaboration graph; notification surface for escalations. |
-  | `src/presentation/cli/commands/` | Medium | New commands: `shep supervisor configure|status|approve|reject`, `shep agent ask|answer`. |
+  | `src/presentation/cli/commands/` | Medium | New commands: `shep supervisor configure|status|approve|reject`, `shep agent questions list|answer|cancel`. |
   | `src/presentation/tui/` | Low | Optional: TUI panel for live agent questions / supervisor decisions. |
-  | `docs/architecture/agent-system.md`, `AGENTS.md` | Medium | Document the new collaboration & supervision model. |
-  | Notifications & SSE | Medium | New notification events: `agent_question_pending`, `supervisor_escalated`, `agent_message_received`. |
+  | `docs/architecture/agent-system.md`, `AGENTS.md`, new `docs/architecture/supervision.md` | Medium | Document the new collaboration & supervision model. |
+  | Notifications & SSE | Medium | New notification events: `agent_question_pending`, `agent_question_blocking`, `supervisor_escalated`, `supervisor_failed`. |
 
   ## Dependencies
 
@@ -191,6 +547,8 @@ content: |
     `[BLOCKED]`, `[USER-UPDATE]`) we can adopt for structured agent messages.
   - **Activity log + audit migrations (064, 082)** — every supervisor decision and
     cross-agent message must be recorded; tables already exist.
+  - **Feature flag infrastructure (PR #557)** — gates the entire surface behind one flag
+    so we can ship phased.
 
   ## Size Estimate
 
@@ -206,7 +564,7 @@ content: |
     agent, interactive session, deploy agent).
   - **Policy & safety surface**: supervisor authority levels, conflict resolution between
     user and supervisor, audit/explainability — these are product decisions that need
-    careful design before implementation.
+    careful design before implementation (resolved in this spec's open questions).
   - **Realistic phasing** (to be confirmed in /shep-kit:plan):
     1. Foundation — `AgentMessage` + `IAgentMessageBus` + activity-log integration (S–M).
     2. Question pipeline — unified `AgentQuestion` model bridging interactive
@@ -219,18 +577,16 @@ content: |
   ## Notes for Research Phase
 
   Topics worth deep-diving in `/shep-kit:research`:
-  - LangGraph supervisor patterns (supervisor-as-router vs supervisor-as-evaluator).
-  - Bus options: SQLite-polled (matches existing SSE pattern, zero new infra) vs
-    in-process EventEmitter (faster, but only for single-process scenarios) vs
-    file-based pub/sub for cross-worktree communication.
-  - Whether peer-to-peer messaging is needed at all, or whether all coordination
-    can flow through the supervisor as the hub (simpler model, matches spec 014).
-  - Reuse vs extend: should `AgentQuestion` be a new entity, or just a typed
-    `InteractiveMessage` + `WorkflowStep` combo?
-  - Supervisor autonomy levels (advisory / co-sign / autonomous) and how the user
-    configures them per app/feature.
-  - Audit & rollback: ensure every supervisor decision is reversible via the
-    existing reject/stop primitives.
+  - LangGraph supervisor patterns (supervisor-as-router vs supervisor-as-evaluator) and
+    how to implement them via `IAgentExecutorProvider`.
+  - SQLite-bus polling cadence and indexing strategy for `agent_messages` to keep p95
+    publish-to-subscriber under 750ms with multiple worktrees.
+  - Schema design for `supervisor_policies` — JSON blob vs normalized rules table.
+  - UI patterns for the unified Agent Questions inbox: reuse notifications surface or
+    build a dedicated route.
+  - Safe defaults for supervisor model and prompt versioning so audits remain reproducible
+    if the user upgrades models.
+  - End-to-end timing budget when supervisor evaluation is on the critical path of a gate.
 
   ---
 
