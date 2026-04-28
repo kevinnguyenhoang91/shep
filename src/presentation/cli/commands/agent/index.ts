@@ -22,6 +22,8 @@ import { createLogsCommand } from './logs.command.js';
 import { createDeleteCommand } from './delete.command.js';
 import { createApproveCommand } from './approve.command.js';
 import { createRejectCommand } from './reject.command.js';
+import { createQuestionsCommand } from './questions/index.js';
+import { createMessageCommand } from './message/index.js';
 import { getCliI18n } from '../../i18n.js';
 
 /**
@@ -37,7 +39,9 @@ export function createAgentCommand(): Command {
     .addCommand(createLogsCommand())
     .addCommand(createDeleteCommand())
     .addCommand(createApproveCommand())
-    .addCommand(createRejectCommand());
+    .addCommand(createRejectCommand())
+    .addCommand(createQuestionsCommand())
+    .addCommand(createMessageCommand());
 
   return agent;
 }
