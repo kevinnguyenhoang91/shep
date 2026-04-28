@@ -81,6 +81,10 @@ import { PostCodeReviewUseCase } from '../../../application/use-cases/code-revie
 // Collaboration (feature 093) use cases
 import { SendAgentMessageUseCase } from '../../../application/use-cases/agents/send-agent-message.use-case.js';
 import { ListAgentMessagesUseCase } from '../../../application/use-cases/agents/list-agent-messages.use-case.js';
+import { AskAgentQuestionUseCase } from '../../../application/use-cases/agents/ask-agent-question.use-case.js';
+import { AnswerAgentQuestionUseCase } from '../../../application/use-cases/agents/answer-agent-question.use-case.js';
+import { CancelAgentQuestionUseCase } from '../../../application/use-cases/agents/cancel-agent-question.use-case.js';
+import { ListAgentQuestionsUseCase } from '../../../application/use-cases/agents/list-agent-questions.use-case.js';
 
 /**
  * Register the main body of application use cases (settings, agents, features,
@@ -175,6 +179,10 @@ export function registerUseCases(container: DependencyContainer): void {
   // ─── Collaboration (feature 093) use cases ──────────────────────────────
   container.registerSingleton(SendAgentMessageUseCase);
   container.registerSingleton(ListAgentMessagesUseCase);
+  container.registerSingleton(AskAgentQuestionUseCase);
+  container.registerSingleton(AnswerAgentQuestionUseCase);
+  container.registerSingleton(CancelAgentQuestionUseCase);
+  container.registerSingleton(ListAgentQuestionsUseCase);
 
   // ─── String-token aliases for web routes ─────────────────────────────────
   // Turbopack can't resolve .js→.ts imports inside @shepai/core, so routes use

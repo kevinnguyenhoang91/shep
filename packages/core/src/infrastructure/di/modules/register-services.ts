@@ -77,6 +77,8 @@ import { parseReviewOutput } from '../../services/code-review/review-output-pars
 // Collaboration (feature 093) — agent message bus
 import type { IAgentMessageBus } from '../../../application/ports/output/agents/agent-message-bus.interface.js';
 import { SQLiteAgentMessageBus } from '../../services/agents/agent-message-bus/sqlite-agent-message-bus.js';
+import type { IDeferredQuestionRegistry } from '../../../application/ports/output/agents/agent-question-service.interface.js';
+import { DeferredQuestionRegistry } from '../../services/agents/agent-question-service/deferred-question-registry.js';
 
 /**
  * Register core infrastructure services: validators, filesystem, git, notifications,
@@ -261,4 +263,13 @@ export function registerServices(container: DependencyContainer): void {
   // by virtue of the WAL-mode database file. Singleton so subscriptions
   // share one poll loop per process (research decision 2).
   container.registerSingleton<IAgentMessageBus>('IAgentMessageBus', SQLiteAgentMessageBus);
+
+  // ─── Collaboration (feature 093) — deferred question registry ───────
+  // In-process bridge between the SDK V2 canUseTool callback and the
+  // DB-backed answer that may arrive from another process. Singleton so
+  // every use case in this process shares one map of awaiters (task 16).
+  container.registerSingleton<IDeferredQuestionRegistry>(
+    'IDeferredQuestionRegistry',
+    DeferredQuestionRegistry
+  );
 }
