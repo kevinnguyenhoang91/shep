@@ -80,6 +80,21 @@ enum NotificationEventType {
 
   @doc("A new OperationLogEntry was appended for a long-running operation (scaffold, cloud deploy, git publish, repo sync)")
   OperationLogAppended: "operation_log_appended",
+
+  @doc("A non-blocking AgentQuestion was raised by a running agent and is awaiting an answer (spec 093)")
+  AgentQuestionPending: "agent_question_pending",
+
+  @doc("A blocking AgentQuestion was raised by a running agent — the agent is paused and MUST be answered (spec 093)")
+  AgentQuestionBlocking: "agent_question_blocking",
+
+  @doc("An inter-agent message could not be delivered or was rejected by the hub (spec 093)")
+  AgentMessageBlocked: "agent_message_blocked",
+
+  @doc("Supervisor agent escalated a decision back to the user (spec 093)")
+  SupervisorEscalated: "supervisor_escalated",
+
+  @doc("Supervisor agent evaluation failed (timeout, model error, exception); fell back to standard human approval (spec 093, FR-22)")
+  SupervisorFailed: "supervisor_failed",
 }
 
 /**

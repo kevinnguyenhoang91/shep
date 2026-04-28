@@ -532,6 +532,21 @@ model NotificationEventConfig {
 
   @doc("Notify when a new operation log entry is appended (spec 090)")
   operationLogAppended?: boolean = true;
+
+  @doc("Notify when a non-blocking AgentQuestion is raised by a running agent (spec 093). Default OFF — info-tier events go to the activity feed only unless the user opts in.")
+  agentQuestionPending?: boolean = false;
+
+  @doc("Notify when a blocking AgentQuestion pauses an agent and requires an answer (spec 093). Default ON — blocking-tier events MUST reach the user.")
+  agentQuestionBlocking?: boolean = true;
+
+  @doc("Notify when an inter-agent message is rejected or undeliverable (spec 093). Default OFF — info-tier event.")
+  agentMessageBlocked?: boolean = false;
+
+  @doc("Notify when the supervisor escalates a decision back to the user (spec 093). Default ON — actionable.")
+  supervisorEscalated?: boolean = true;
+
+  @doc("Notify when the supervisor evaluator fails and the system falls back to standard human approval (spec 093, FR-22). Default ON — actionable.")
+  supervisorFailed?: boolean = true;
 }
 
 /**

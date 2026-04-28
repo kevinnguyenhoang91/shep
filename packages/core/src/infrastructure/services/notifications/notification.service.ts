@@ -34,6 +34,11 @@ const EVENT_TYPE_TO_CONFIG_KEY: Record<NotificationEventType, keyof Notification
   [NotificationEventType.CloudDeploymentUpdated]: 'cloudDeploymentUpdated',
   [NotificationEventType.ApplicationUpdated]: 'applicationUpdated',
   [NotificationEventType.OperationLogAppended]: 'operationLogAppended',
+  [NotificationEventType.AgentQuestionPending]: 'agentQuestionPending',
+  [NotificationEventType.AgentQuestionBlocking]: 'agentQuestionBlocking',
+  [NotificationEventType.AgentMessageBlocked]: 'agentMessageBlocked',
+  [NotificationEventType.SupervisorEscalated]: 'supervisorEscalated',
+  [NotificationEventType.SupervisorFailed]: 'supervisorFailed',
 };
 
 export class NotificationService implements INotificationService {

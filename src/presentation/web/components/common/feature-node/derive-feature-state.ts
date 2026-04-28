@@ -147,6 +147,15 @@ export function mapEventTypeToState(eventType: NotificationEventType): FeatureNo
       // harmless no-op because the callers compare this against feature
       // node state and never match on application events.
       return 'running';
+    case NotificationEventType.AgentQuestionPending:
+    case NotificationEventType.AgentQuestionBlocking:
+    case NotificationEventType.AgentMessageBlocked:
+    case NotificationEventType.SupervisorEscalated:
+    case NotificationEventType.SupervisorFailed:
+      // Collaboration-fabric events (spec 093) surface in the Agent
+      // Questions inbox and supervisor "Why?" drawer rather than mutating
+      // feature-node state directly.
+      return 'running';
   }
 }
 
