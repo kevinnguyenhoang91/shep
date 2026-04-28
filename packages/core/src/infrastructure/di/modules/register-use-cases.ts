@@ -386,4 +386,33 @@ export function registerUseCases(container: DependencyContainer): void {
   container.register('PostCodeReviewUseCase', {
     useFactory: (c) => c.resolve(PostCodeReviewUseCase),
   });
+
+  // ─── Collaboration (feature 093) string aliases ─────────────────────────
+  container.register('SendAgentMessageUseCase', {
+    useFactory: (c) => c.resolve(SendAgentMessageUseCase),
+  });
+  container.register('ListAgentMessagesUseCase', {
+    useFactory: (c) => c.resolve(ListAgentMessagesUseCase),
+  });
+  container.register('AnswerAgentQuestionUseCase', {
+    useFactory: (c) => c.resolve(AnswerAgentQuestionUseCase),
+  });
+  container.register('CancelAgentQuestionUseCase', {
+    useFactory: (c) => c.resolve(CancelAgentQuestionUseCase),
+  });
+  container.register('ListAgentQuestionsUseCase', {
+    useFactory: (c) => c.resolve(ListAgentQuestionsUseCase),
+  });
+  container.register('ConfigureSupervisorUseCase', {
+    useFactory: (c) => c.resolve(ConfigureSupervisorUseCase),
+  });
+  container.register('EnableSupervisorUseCase', {
+    useFactory: (c) => c.resolve(EnableSupervisorUseCase),
+  });
+  container.register('DisableSupervisorUseCase', {
+    useFactory: (c) => c.resolve(DisableSupervisorUseCase),
+  });
+  container.register('GetSupervisorPolicyUseCase', {
+    useFactory: (c) => c.resolve(GetSupervisorPolicyUseCase),
+  });
 }
