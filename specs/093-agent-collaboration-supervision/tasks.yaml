@@ -1,0 +1,1261 @@
+# Task Breakdown (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: "agent-collaboration-supervision"
+summary: |
+  47 tasks across 9 phases. Each phase ships independently to main behind the
+  still-off `collaboration` feature flag; the flag flips on after Phase 9.
+  Every code task follows TDD (RED → GREEN → REFACTOR). Non-code tasks (docs,
+  config, registration wiring) skip the cycle. Tasks are ordered by
+  dependency so no task references a later one.
+
+relatedFeatures:
+  - "014-ui-sidebar"
+  - "057-feature-flags"
+
+technologies:
+  - "TypeSpec"
+  - "SQLite + custom migrations"
+  - "tsyringe DI"
+  - "LangGraph"
+  - "Claude Code SDK V2 canUseTool"
+  - "Server-Sent Events"
+  - "Next.js + React + Storybook"
+  - "Commander"
+
+relatedLinks:
+  - title: "Implementation plan for spec 093"
+    url: "specs/093-agent-collaboration-supervision/plan.yaml"
+  - title: "Research artifact for spec 093"
+    url: "specs/093-agent-collaboration-supervision/research.yaml"
+
+tasks:
+  # =====================================================================
+  # PHASE 1 — Foundation: TypeSpec models, migrations, repositories
+  # =====================================================================
+  - id: "task-1"
+    phaseId: "phase-1"
+    title: "Define TypeSpec entities and enums for messaging, questions, and supervision"
+    description: |
+      Add four new TypeSpec models — AgentMessage, AgentQuestion,
+      SupervisorPolicy, SupervisorDecision — with all enums (AgentMessageKind,
+      AgentQuestionKind, AgentQuestionAnswerer, AgentQuestionStatus,
+      SupervisorAutonomy, SupervisorVerdict). Re-run pnpm tsp:compile to
+      regenerate packages/core/src/domain/generated/output.ts.
+    state: "Todo"
+    dependencies: []
+    acceptanceCriteria:
+      - "Four new tsp files compile cleanly under tsp/agents/"
+      - "Generated output.ts contains all four entity types and all six enums"
+      - "Existing pnpm validate passes"
+      - "No hand edits to generated/output.ts"
+    tdd:
+      red:
+        - "No test phase — TypeSpec is declarative; correctness is verified by codegen and downstream typecheck"
+      green:
+        - "Author the four .tsp files; run pnpm tsp:compile; commit generated/output.ts"
+      refactor:
+        - "Verify enum values match the values referenced in research.yaml decisions; ensure shared enums are not duplicated across files"
+    estimatedEffort: "1.5h"
+
+  - id: "task-2"
+    phaseId: "phase-1"
+    title: "Extend FeatureFlags and Settings TypeSpec with collaboration flag and SupervisorConfig block"
+    description: |
+      Add `collaboration: boolean` to FeatureFlags in tsp/domain/entities/feature-flags.tsp
+      and a SupervisorConfig sub-block on Settings in tsp/domain/entities/settings.tsp
+      (default-disabled enabled, autonomy, model, prompt version). Regenerate.
+    state: "Todo"
+    dependencies:
+      - "task-1"
+    acceptanceCriteria:
+      - "FeatureFlags type now exposes a collaboration: boolean field"
+      - "Settings exposes a supervisor sub-object with the documented fields"
+      - "Existing settings flag tests still pass"
+    tdd:
+      red:
+        - "No test phase — declarative type addition"
+      green:
+        - "Edit the two tsp files; run pnpm tsp:compile"
+      refactor:
+        - "Confirm flag naming is consistent with existing FeatureFlags entries"
+    estimatedEffort: "30min"
+
+  - id: "task-3"
+    phaseId: "phase-1"
+    title: "Create SupervisorActor value object and tests"
+    description: |
+      Add packages/core/src/domain/value-objects/supervisor-actor.ts encoding
+      the supervisor:<id> and user:<id> actor namespaces with parse, equals,
+      and isUserOverrideOf semantics. The "user always wins" invariant is
+      modelled here — isUserOverrideOf(prior) returns true when self is a user
+      actor and prior is a supervisor actor for the same scope.
+    state: "Todo"
+    dependencies:
+      - "task-1"
+    acceptanceCriteria:
+      - "SupervisorActor.parse rejects malformed strings with a typed domain error"
+      - "isUserOverrideOf returns true exactly for user-overrides-supervisor pairs"
+      - "100% branch coverage on the value object"
+    tdd:
+      red:
+        - "Write supervisor-actor.test.ts asserting parse rejects 'foo:1', accepts 'user:abc' and 'supervisor:xyz', and isUserOverrideOf returns true for user actor over supervisor actor and false in every other pairing"
+      green:
+        - "Implement SupervisorActor with namespace, id, fromString, toString, equals, isUserOverrideOf"
+      refactor:
+        - "Extract namespace constants; ensure no magic strings; align error class with existing domain errors"
+    estimatedEffort: "1h"
+
+  - id: "task-4"
+    phaseId: "phase-1"
+    title: "Write SQLite migrations for agent_messages, agent_questions, supervisor_policies, supervisor_decisions"
+    description: |
+      Four new timestamped migrations under
+      packages/core/src/infrastructure/persistence/sqlite/migrations/. Each
+      uses idempotent existence checks (matching migrations 040, 064, 078).
+      Indexes per research.yaml decision 2: composite (app_id, feature_id,
+      created_at) on agent_messages plus correlation_id and partial
+      undelivered; (agent_run_id, status, expires_at) on agent_questions;
+      unique (app_id, feature_id) on supervisor_policies;
+      (source_event_id, supervisor_run_id, created_at) on supervisor_decisions.
+      Both up() and down() implemented.
+    state: "Todo"
+    dependencies:
+      - "task-1"
+    acceptanceCriteria:
+      - "All four migrations apply cleanly on a fresh DB"
+      - "Each migration is idempotent — running it twice is a no-op"
+      - "down() drops the table and indexes cleanly"
+      - "Migration test verifies up→down→up round-trip"
+    tdd:
+      red:
+        - "Write a migration round-trip test for each migration that asserts table exists after up(), is gone after down(), and indexes are present after up()"
+      green:
+        - "Implement each migration; run pnpm test:int to verify"
+      refactor:
+        - "Extract shared existence-check helper if duplication exceeds the rule-of-three threshold"
+    estimatedEffort: "2h"
+
+  - id: "task-5"
+    phaseId: "phase-1"
+    title: "Write SQLite migration adding feature_flag_collaboration column to settings"
+    description: |
+      Idempotent ALTER TABLE settings ADD COLUMN feature_flag_collaboration
+      INTEGER NOT NULL DEFAULT 0. Mirrors the pattern from existing
+      feature-flag column migrations.
+    state: "Todo"
+    dependencies:
+      - "task-2"
+    acceptanceCriteria:
+      - "Column exists after up(), defaults to 0 on existing rows"
+      - "Migration is idempotent"
+      - "down() removes the column safely on a copy-rename or no-op if not supported"
+    tdd:
+      red:
+        - "Write a migration test asserting column presence + default + idempotency"
+      green:
+        - "Implement using the existing ALTER pattern in feature-flag column migrations"
+      refactor:
+        - "Confirm the migration doesn't accidentally rebuild settings if not necessary"
+    estimatedEffort: "30min"
+
+  - id: "task-6"
+    phaseId: "phase-1"
+    title: "Define repository ports for the four new entities"
+    description: |
+      Four port files under
+      packages/core/src/application/ports/output/repositories/:
+      IAgentMessageRepository, IAgentQuestionRepository,
+      ISupervisorPolicyRepository, ISupervisorDecisionRepository. Methods
+      cover create, listByScope (always app_id-scoped), and entity-specific
+      queries (e.g., findByCorrelationId, findPolicyForScope with
+      feature→app fallback).
+    state: "Todo"
+    dependencies:
+      - "task-1"
+    acceptanceCriteria:
+      - "Each port is a pure interface — no implementation imports"
+      - "Every list/find method takes app_id (and feature_id where applicable) for scope safety (NFR-7)"
+      - "JSDoc on each method describes the contract"
+    tdd:
+      red:
+        - "No test phase — interface-only files; contract is verified by adapter tests in task-7 and task-8"
+      green:
+        - "Author the four port interfaces"
+      refactor:
+        - "Ensure naming, parameter order, and Result/Error types match existing repository ports"
+    estimatedEffort: "1h"
+
+  - id: "task-7"
+    phaseId: "phase-1"
+    title: "Implement in-memory adapters for the four new repositories"
+    description: |
+      In-memory adapters under
+      packages/core/src/infrastructure/adapters/in-memory/. Each enforces
+      app_id scoping at the SELECT layer (Map keyed by composite scope key).
+      Used by every unit test that needs a repository.
+    state: "Todo"
+    dependencies:
+      - "task-6"
+    acceptanceCriteria:
+      - "create + list round-trip works for all four"
+      - "Cross-app reads return empty (no leakage)"
+      - "Test verifies SupervisorPolicyRepository.findPolicyForScope falls back app→feature exactly per research decision 7"
+    tdd:
+      red:
+        - "Write adapter tests asserting round-trip, cross-app isolation, and supervisor-policy scope fallback"
+      green:
+        - "Implement four in-memory adapters using Map<scopeKey, Entity[]>"
+      refactor:
+        - "Extract a shared scope-key helper if duplicated across all four adapters"
+    estimatedEffort: "2h"
+
+  - id: "task-8"
+    phaseId: "phase-1"
+    title: "Implement SQLite adapters for the four new repositories"
+    description: |
+      Concrete adapters under
+      packages/core/src/infrastructure/persistence/sqlite/repositories/.
+      Each implements its port using better-sqlite3 prepared statements,
+      app_id-scoped SELECTs, and parameterised inserts. JSON columns
+      (gate_authority_json, policy_rules_json, payload_json,
+      notification_overrides_json) parsed with zod at adapter boundaries.
+    state: "Todo"
+    dependencies:
+      - "task-4"
+      - "task-6"
+      - "task-7"
+    acceptanceCriteria:
+      - "Integration tests against a temp SQLite DB pass for create + list + scope-fallback"
+      - "Cross-app SELECTs return empty"
+      - "JSON-column round-trip preserves shape"
+      - "Each adapter is < 300 lines"
+    tdd:
+      red:
+        - "Write integration tests that mirror the in-memory adapter tests but use a temp DB; assert identical results"
+      green:
+        - "Implement the four SQLite adapters"
+      refactor:
+        - "Extract shared statement-cache helper if duplicated; ensure no SQL string concatenation with inputs"
+    estimatedEffort: "3h"
+
+  # =====================================================================
+  # PHASE 2 — Agent message bus
+  # =====================================================================
+  - id: "task-9"
+    phaseId: "phase-2"
+    title: "Define IAgentMessageBus port"
+    description: |
+      Port under
+      packages/core/src/application/ports/output/agents/agent-message-bus.port.ts
+      with publish(message), subscribe(filter, handler), and listFor({
+      agentRunId | featureId, since }). Filter rejects to_target='peer'
+      addressing — research decision 3.
+    state: "Todo"
+    dependencies:
+      - "task-1"
+    acceptanceCriteria:
+      - "Port is a pure interface — no implementation imports"
+      - "JSDoc spells out the hub-and-spoke addressing rule"
+    tdd:
+      red:
+        - "No test phase — interface-only file"
+      green:
+        - "Author the interface and document allowed to_target values"
+      refactor:
+        - "Confirm naming consistency with existing IAgentRunner / IInteractiveAgentExecutor"
+    estimatedEffort: "30min"
+
+  - id: "task-10"
+    phaseId: "phase-2"
+    title: "Implement InMemoryAgentMessageBus"
+    description: |
+      In-memory adapter under
+      packages/core/src/infrastructure/adapters/in-memory/in-memory-agent-message-bus.ts.
+      Used by all unit tests for the message bus pipeline.
+    state: "Todo"
+    dependencies:
+      - "task-9"
+    acceptanceCriteria:
+      - "publish then listFor returns the message"
+      - "subscribe handler is called on each subsequent publish that matches the filter"
+      - "Cross-app filter is enforced — messages from app A do not appear for app B"
+    tdd:
+      red:
+        - "Write tests for publish/listFor round-trip, subscribe fan-out, cross-app isolation, and rejection of peer addressing"
+      green:
+        - "Implement using a simple Map + EventEmitter for in-process subscribers"
+      refactor:
+        - "Ensure the EventEmitter is process-local — explicitly NOT used as the cross-process bus (that is the SQLite adapter's job)"
+    estimatedEffort: "1.5h"
+
+  - id: "task-11"
+    phaseId: "phase-2"
+    title: "Implement SQLiteAgentMessageBus"
+    description: |
+      SQLite-backed adapter under
+      packages/core/src/infrastructure/services/agents/agent-message-bus/sqlite-agent-message-bus.ts.
+      Wraps IAgentMessageRepository (publish = insert + commit) and the
+      existing SSE polling cadence (subscribe internally polls every 2s,
+      configurable to 500ms via constructor option). Marks
+      delivered_at on read for partial-index efficiency.
+    state: "Todo"
+    dependencies:
+      - "task-8"
+      - "task-10"
+    acceptanceCriteria:
+      - "Cross-process round-trip test: write from one BetterSqlite3 instance, read from another, observe message"
+      - "Latency p95 ≤ 750ms with default 2s poll under no contention (NFR-1 budget)"
+      - "delivered_at is populated after first read"
+    tdd:
+      red:
+        - "Integration test using two separate Database connections to the same temp DB asserts cross-process delivery"
+      green:
+        - "Implement publish, listFor, and a subscribe loop using the existing 500ms/2s pattern from StreamAgentEventsUseCase"
+      refactor:
+        - "Extract poll-cadence constant; ensure file < 300 lines; reuse the existing scheduler helper if one exists in stream-agent-events"
+    estimatedEffort: "3h"
+
+  - id: "task-12"
+    phaseId: "phase-2"
+    title: "Implement SendAgentMessageUseCase and ListAgentMessagesUseCase"
+    description: |
+      Two use cases under
+      packages/core/src/application/use-cases/agents/. SendAgentMessage
+      enforces the hub-and-spoke addressing rule and the feature flag
+      short-circuit. ListAgentMessages is a thin scope-safe read.
+    state: "Todo"
+    dependencies:
+      - "task-9"
+      - "task-10"
+    acceptanceCriteria:
+      - "With flag off, SendAgentMessage returns NoOpResult and writes nothing"
+      - "With flag on, message is published via IAgentMessageBus"
+      - "Peer addressing returns a typed validation error"
+      - "ListAgentMessages always filters by app_id"
+    tdd:
+      red:
+        - "Write tests asserting flag-off no-op, flag-on publish, peer-addressing rejection, and cross-app isolation on list"
+      green:
+        - "Implement both use cases injecting IAgentMessageBus and a flag-resolution port"
+      refactor:
+        - "Extract flag-check guard if reused in later use cases"
+    estimatedEffort: "1.5h"
+
+  - id: "task-13"
+    phaseId: "phase-2"
+    title: "Add agent_message SSE event kind via computeMessageDeltas"
+    description: |
+      New helper under
+      packages/core/src/application/use-cases/agents/stream-agent-events/compute-message-deltas.ts
+      mirroring computeFeatureDeltas / computePrDeltas pattern. Wire it into
+      StreamAgentEventsUseCase. The event payload includes message id, kind,
+      from, to, and createdAt.
+    state: "Todo"
+    dependencies:
+      - "task-11"
+    acceptanceCriteria:
+      - "Polling against a DB that has new messages produces an agent_message event for each"
+      - "Already-seen messages are not re-emitted (since cursor honored)"
+      - "Web hook useAgentEvents type narrows agent_message correctly"
+    tdd:
+      red:
+        - "Write a unit test for computeMessageDeltas that seeds messages and asserts the produced event sequence"
+      green:
+        - "Implement compute helper; wire into StreamAgentEventsUseCase output union"
+      refactor:
+        - "Confirm pattern matches existing helpers exactly; no divergence"
+    estimatedEffort: "1.5h"
+
+  - id: "task-14"
+    phaseId: "phase-2"
+    title: "Emit lifecycle messages from feature-agent-worker.ts"
+    description: |
+      Modify
+      packages/core/src/infrastructure/services/agents/feature-agent/feature-agent-worker.ts
+      to publish lifecycle messages (started, phase-changed, blocked,
+      completed) on IAgentMessageBus. Behind the collaboration flag.
+      Existing behavior unchanged with flag off.
+    state: "Todo"
+    dependencies:
+      - "task-12"
+    acceptanceCriteria:
+      - "With flag off, no agent_messages rows are written by the worker"
+      - "With flag on, four lifecycle messages appear during a feature-agent run"
+      - "Existing feature-agent tests still pass"
+    tdd:
+      red:
+        - "Write a unit/integration test that runs the worker with the flag on and asserts four lifecycle rows"
+      green:
+        - "Add publish calls behind a flag check; inject IAgentMessageBus through the existing DI container"
+      refactor:
+        - "Extract a tiny FeatureAgentLifecyclePublisher helper if the call sites become repetitive"
+    estimatedEffort: "2h"
+
+  # =====================================================================
+  # PHASE 3 — Agent question pipeline
+  # =====================================================================
+  - id: "task-15"
+    phaseId: "phase-3"
+    title: "Define IAgentQuestionService port and DeferredQuestionRegistry"
+    description: |
+      Port under application/ports/output/agents/agent-question-service.port.ts
+      and a sibling DeferredQuestionRegistry contract for in-process Promise
+      bridging. Registry has register(id, timeoutMs), resolve(id, answer),
+      reject(id, reason), cancelAll(scope).
+    state: "Todo"
+    dependencies:
+      - "task-1"
+    acceptanceCriteria:
+      - "Port and registry are pure interfaces"
+      - "JSDoc documents timeout + cancellation contract"
+    tdd:
+      red:
+        - "No test phase — interface-only files"
+      green:
+        - "Author the interfaces"
+      refactor:
+        - "Align naming with existing question + interactive primitives"
+    estimatedEffort: "30min"
+
+  - id: "task-16"
+    phaseId: "phase-3"
+    title: "Implement DeferredQuestionRegistry with timeout and cancellation"
+    description: |
+      Concrete registry under
+      infrastructure/services/agents/agent-question-service/deferred-question-registry.ts.
+      Each Deferred is registered with a hard timeout (default 30 min) that
+      auto-rejects with a typed AgentQuestionTimeoutError. cancelAll(scope)
+      rejects every Deferred matching the scope with AgentQuestionCancelledError.
+    state: "Todo"
+    dependencies:
+      - "task-15"
+    acceptanceCriteria:
+      - "register/resolve round-trip resolves the Promise"
+      - "Unanswered Deferred rejects with timeout after the configured duration"
+      - "cancelAll rejects matching Deferreds and leaves others alone"
+      - "No leaked timers after resolve/reject (verified with fake timers)"
+    tdd:
+      red:
+        - "Write tests for resolve, reject, timeout-auto-reject, cancelAll, and timer cleanup using vi.useFakeTimers"
+      green:
+        - "Implement registry with Map<id, { resolve, reject, timer, scope }>"
+      refactor:
+        - "Centralise timer cleanup in a single helper; ensure no double-reject"
+    estimatedEffort: "1.5h"
+
+  - id: "task-17"
+    phaseId: "phase-3"
+    title: "Implement AskAgentQuestion / AnswerAgentQuestion / CancelAgentQuestion / ListAgentQuestions use cases"
+    description: |
+      Four use cases under application/use-cases/agents/. AskAgentQuestion
+      writes the row, registers a Deferred for blocking-kind questions, and
+      returns the registered Promise. AnswerAgentQuestion validates the
+      answer against the question (e.g., option must match if options array
+      provided), updates status, resolves the Deferred if registered, and —
+      for background-emitted questions tied to a gate — forwards to
+      ApproveAgentRunUseCase / RejectAgentRunUseCase. CancelAgentQuestion is
+      a status transition. ListAgentQuestions is scope-safe read.
+    state: "Todo"
+    dependencies:
+      - "task-7"
+      - "task-15"
+      - "task-16"
+    acceptanceCriteria:
+      - "AskAgentQuestion (blocking) returns a Promise that resolves on AnswerAgentQuestion"
+      - "AskAgentQuestion (info/question) returns immediately with the persisted row"
+      - "AnswerAgentQuestion forwards to ApproveAgentRunUseCase when the question is gate-linked and answer maps to approve/reject"
+      - "Cancellation rejects the Deferred and updates status"
+      - "All use cases short-circuit when collaboration flag is off"
+    tdd:
+      red:
+        - "Write tests for each use case: blocking round-trip, non-blocking immediate return, gate-link forwarding, cancellation, flag-off no-op"
+      green:
+        - "Implement four use cases; inject IAgentQuestionService, DeferredQuestionRegistry, ApproveAgentRunUseCase, RejectAgentRunUseCase, flag port"
+      refactor:
+        - "Extract validateAnswerAgainstOptions helper; keep each file < 300 lines"
+    estimatedEffort: "4h"
+
+  - id: "task-18"
+    phaseId: "phase-3"
+    title: "Add agent_question SSE event kind via computeQuestionDeltas"
+    description: |
+      Helper under stream-agent-events/compute-question-deltas.ts mirroring
+      compute-message-deltas pattern. Emits agent_question events for
+      pending and status-transitioned questions.
+    state: "Todo"
+    dependencies:
+      - "task-17"
+    acceptanceCriteria:
+      - "Pending question yields one event"
+      - "Answered question yields a status-transition event with the answer"
+      - "Already-seen questions not re-emitted"
+    tdd:
+      red:
+        - "Write unit test seeding question rows and asserting expected event sequence"
+      green:
+        - "Implement helper; wire into StreamAgentEventsUseCase union"
+      refactor:
+        - "Confirm parity with compute-message-deltas shape"
+    estimatedEffort: "1h"
+
+  - id: "task-19"
+    phaseId: "phase-3"
+    title: "Route AskUserQuestion through AskAgentQuestionUseCase in claude-code-interactive-executor"
+    description: |
+      Modify
+      infrastructure/services/agents/common/executors/claude-code-interactive-executor.service.ts
+      so the canUseTool callback for AskUserQuestion calls
+      AskAgentQuestionUseCase and awaits its returned Promise. With the flag
+      off, fall through to the existing direct-prompt path (NFR-14
+      preservation).
+    state: "Todo"
+    dependencies:
+      - "task-17"
+    acceptanceCriteria:
+      - "With flag on, an AskUserQuestion tool call from the SDK lands as an agent_questions row of kind=blocking"
+      - "Resolving the row via AnswerAgentQuestion makes the SDK callback return"
+      - "With flag off, existing AskUserQuestion behavior is byte-identical"
+    tdd:
+      red:
+        - "Integration test simulating the SDK callback with a fake tool input; assert row written + callback resolution"
+      green:
+        - "Wire AskAgentQuestionUseCase into the canUseTool callback; flag-gate the new path"
+      refactor:
+        - "Avoid changing the surrounding executor's other code paths"
+    estimatedEffort: "2h"
+
+  - id: "task-20"
+    phaseId: "phase-3"
+    title: "Emit AgentQuestion of kind=blocking from feature-agent-worker on every approval-gate transition"
+    description: |
+      In feature-agent-worker.ts, whenever AgentRun.status transitions to
+      waiting_approval, also write a parallel AgentQuestion of kind=blocking
+      describing the gate. This makes the unified inbox cover background
+      gates without changing the existing approval flow.
+    state: "Todo"
+    dependencies:
+      - "task-17"
+    acceptanceCriteria:
+      - "Every gate transition produces exactly one AgentQuestion row"
+      - "The AgentQuestion is linked to the AgentRun via agentRunId"
+      - "With flag off, no AgentQuestion is emitted"
+    tdd:
+      red:
+        - "Integration test that transitions a run to waiting_approval and asserts a paired AgentQuestion"
+      green:
+        - "Add a single AskAgentQuestionUseCase call at the transition point, gated by the flag"
+      refactor:
+        - "Confirm the row's lifecycle is bound to the gate (cancellation when gate is rejected/cancelled is handled in Phase 6)"
+    estimatedEffort: "2h"
+
+  # =====================================================================
+  # PHASE 4 — Supervisor policy CRUD
+  # =====================================================================
+  - id: "task-21"
+    phaseId: "phase-4"
+    title: "Implement ConfigureSupervisor / EnableSupervisor / DisableSupervisor / GetSupervisorPolicy use cases"
+    description: |
+      Four CRUD use cases under application/use-cases/agents/. Validate
+      autonomy enum, gate authority map, and policy rules array via zod.
+      GetSupervisorPolicy implements the feature→app fallback resolution
+      from research decision 7.
+    state: "Todo"
+    dependencies:
+      - "task-7"
+    acceptanceCriteria:
+      - "Configure persists a SupervisorPolicy row scoped to (app_id, feature_id?)"
+      - "Enable/Disable toggle the enabled flag without touching other fields"
+      - "GetSupervisorPolicy returns feature-scoped policy when present, else app-scoped, else null"
+      - "Validation errors are typed domain errors"
+    tdd:
+      red:
+        - "Tests for create + update round-trip, scope fallback, enable/disable toggle, and validation rejections"
+      green:
+        - "Implement four use cases injecting ISupervisorPolicyRepository and a clock port"
+      refactor:
+        - "Extract zod schemas to a shared validation module"
+    estimatedEffort: "3h"
+
+  - id: "task-22"
+    phaseId: "phase-4"
+    title: "Register collaboration ports in DI container via register-collaboration.ts"
+    description: |
+      New module
+      packages/core/src/infrastructure/di/registrations/register-collaboration.ts
+      called from container.ts initializeContainer. Registers
+      IAgentMessageBus, IAgentQuestionService, IAgentMessageRepository,
+      IAgentQuestionRepository, ISupervisorPolicyRepository,
+      ISupervisorDecisionRepository with string tokens.
+    state: "Todo"
+    dependencies:
+      - "task-8"
+      - "task-11"
+      - "task-17"
+      - "task-21"
+    acceptanceCriteria:
+      - "container.resolve('IAgentMessageBus') returns the SQLite adapter"
+      - "container.resolve('ISupervisorPolicyRepository') returns the SQLite adapter"
+      - "register-collaboration.ts < 300 lines"
+    tdd:
+      red:
+        - "DI integration test that resolves each token and asserts the concrete class type"
+      green:
+        - "Author the registration module; call from initializeContainer"
+      refactor:
+        - "Group by topic (bus, questions, supervisor) for readability"
+    estimatedEffort: "1h"
+
+  # =====================================================================
+  # PHASE 5 — Supervisor agent (LangGraph evaluator)
+  # =====================================================================
+  - id: "task-23"
+    phaseId: "phase-5"
+    title: "Define ISupervisorAgent port and SupervisorDecision shape"
+    description: |
+      Port under application/ports/output/agents/supervisor-agent.port.ts:
+      evaluate(event) → SupervisorDecision. SupervisorDecision is the
+      generated TypeSpec type from task-1.
+    state: "Todo"
+    dependencies:
+      - "task-1"
+    acceptanceCriteria:
+      - "Port is a pure interface"
+      - "evaluate's input event type is a discriminated union of gate event, question event, message event"
+    tdd:
+      red:
+        - "No test phase — interface only"
+      green:
+        - "Author the interface and the event-input type"
+      refactor:
+        - "Confirm event-input parity with SSE event kinds emitted in Phase 2/3"
+    estimatedEffort: "30min"
+
+  - id: "task-24"
+    phaseId: "phase-5"
+    title: "Implement StubSupervisorAgentExecutor and InMemorySupervisorAgent"
+    description: |
+      Deterministic stub under
+      infrastructure/services/agents/supervisor-agent/stub-supervisor-executor.ts
+      returning canned verdicts keyed by event kind. InMemorySupervisorAgent
+      adapter wraps the stub and persists decisions via
+      InMemorySupervisorDecisionRepository.
+    state: "Todo"
+    dependencies:
+      - "task-7"
+      - "task-23"
+    acceptanceCriteria:
+      - "Stub returns the configured verdict for each event kind"
+      - "Each evaluate call writes a SupervisorDecision row with rationale and modelVersion"
+    tdd:
+      red:
+        - "Tests asserting stub verdicts and that decision rows are persisted with all required fields"
+      green:
+        - "Implement stub and adapter"
+      refactor:
+        - "Centralise rationale formatting helpers"
+    estimatedEffort: "1.5h"
+
+  - id: "task-25"
+    phaseId: "phase-5"
+    title: "Implement supervisor LangGraph workflow"
+    description: |
+      Graph under
+      infrastructure/services/agents/supervisor-agent/supervisor-graph.ts
+      with nodes ingest-event → load-policy → evaluate (LLM via
+      IAgentExecutorProvider) → emit-decision → optionally publish-message.
+      Hard 25s evaluator timeout per research perf section. Evaluator prompt
+      under evaluator-prompt.ts treats payload_json as untrusted user
+      content.
+    state: "Todo"
+    dependencies:
+      - "task-23"
+      - "task-24"
+    acceptanceCriteria:
+      - "Graph with stub executor produces deterministic decisions in unit tests"
+      - "On 25s timeout, a verdict='escalate' decision is published with reason='timeout'"
+      - "No direct provider SDK imports under supervisor-agent/"
+    tdd:
+      red:
+        - "Tests asserting full graph happy path with stub executor; tests asserting timeout path"
+      green:
+        - "Implement graph and timeout wrapper"
+      refactor:
+        - "Split per-node functions into separate files if any exceeds 100 lines"
+    estimatedEffort: "4h"
+
+  - id: "task-26"
+    phaseId: "phase-5"
+    title: "Implement supervisor-agent-worker.ts with lazy per-scope startup"
+    description: |
+      Worker under
+      infrastructure/services/agents/supervisor-agent/supervisor-agent-worker.ts
+      mirroring feature-agent-worker.ts shape: subscribes to SSE, starts
+      lazily per (app_id, feature_id?) scope, owns its own AgentRun row
+      with agent_type='supervisor', heartbeat, idle TTL of 10 minutes.
+    state: "Todo"
+    dependencies:
+      - "task-25"
+    acceptanceCriteria:
+      - "Worker starts on first event for a new scope"
+      - "Heartbeat updates run row at the same cadence as feature-agent worker"
+      - "Idle worker reaped after 10 minutes"
+    tdd:
+      red:
+        - "Integration test that starts a worker, sends one event, asserts decision is published, idles, and gets reaped"
+      green:
+        - "Implement worker reusing existing worker primitives"
+      refactor:
+        - "Extract idle-reaper helper if duplicated with feature-agent-worker"
+    estimatedEffort: "3h"
+
+  - id: "task-27"
+    phaseId: "phase-5"
+    title: "Implement EvaluateSupervisorDecisionUseCase"
+    description: |
+      Use case under
+      application/use-cases/agents/evaluate-supervisor-decision.use-case.ts
+      that loads the policy via GetSupervisorPolicyUseCase, calls
+      ISupervisorAgent.evaluate, persists the decision via
+      ISupervisorDecisionRepository, and mirrors to activity_log with
+      actor_id='supervisor:<id>'. Short-circuits when no policy exists or
+      flag is off.
+    state: "Todo"
+    dependencies:
+      - "task-21"
+      - "task-24"
+    acceptanceCriteria:
+      - "When no policy exists, the use case returns null and writes nothing"
+      - "When flag is off, the use case returns null"
+      - "When policy exists, decision is persisted and mirrored to activity_log"
+    tdd:
+      red:
+        - "Tests for no-policy short-circuit, flag-off short-circuit, persistence + activity-log mirroring"
+      green:
+        - "Implement use case wiring repository, agent port, and activity-log writer"
+      refactor:
+        - "Centralise activity-log mirroring helper"
+    estimatedEffort: "2h"
+
+  # =====================================================================
+  # PHASE 6 — Approval-gate integration (supervisor as actor)
+  # =====================================================================
+  - id: "task-28"
+    phaseId: "phase-6"
+    title: "Extend ApproveAgentRunUseCase / RejectAgentRunUseCase with supervisor actor namespace"
+    description: |
+      Modify both use cases to accept a SupervisorActor parameter, persist
+      the actor namespace on the gate decision, and enforce "user always
+      wins" — a user actor on the same gate as a prior supervisor actor
+      overrides cleanly with an audit entry.
+    state: "Todo"
+    dependencies:
+      - "task-3"
+    acceptanceCriteria:
+      - "Approve/Reject called with SupervisorActor records actor_id='supervisor:<id>'"
+      - "Subsequent user action on the same gate overrides; both decisions remain in activity_log"
+      - "Existing user-only callers compile unchanged (default actor = current user)"
+    tdd:
+      red:
+        - "Tests for: supervisor-only approve, user-only approve, user-overrides-supervisor sequence, supervisor-cannot-override-user sequence"
+      green:
+        - "Add actor parameter (defaulted) and override-detection guard"
+      refactor:
+        - "Extract user-override detection into a SupervisorActor.isUserOverrideOf call (already in task-3)"
+    estimatedEffort: "3h"
+
+  - id: "task-29"
+    phaseId: "phase-6"
+    title: "Wire supervisor evaluation into feature-agent-worker on waiting_approval transition"
+    description: |
+      In feature-agent-worker.ts, when transitioning to waiting_approval,
+      call EvaluateSupervisorDecisionUseCase before WaitingApproval
+      notification fires. Per autonomy: advisory attaches decision; co-sign
+      requires both votes; autonomous calls Approve/Reject directly with
+      supervisor:<id>.
+    state: "Todo"
+    dependencies:
+      - "task-20"
+      - "task-27"
+      - "task-28"
+    acceptanceCriteria:
+      - "Advisory: notification still fires; decision attached to gate"
+      - "Co-sign: gate completion requires both supervisor approve and user approve"
+      - "Autonomous: gate is auto-resolved by supervisor; user override still possible via reject/stop"
+    tdd:
+      red:
+        - "Three integration tests covering each autonomy mode end-to-end with the stub executor"
+      green:
+        - "Add the call site behind the flag; route by autonomy level"
+      refactor:
+        - "Extract autonomy router into a small helper if branching grows"
+    estimatedEffort: "3h"
+
+  - id: "task-30"
+    phaseId: "phase-6"
+    title: "Add supervisor_decision SSE event kind via computeDecisionDeltas"
+    description: |
+      Helper under stream-agent-events/compute-decision-deltas.ts mirroring
+      compute-message-deltas / compute-question-deltas.
+    state: "Todo"
+    dependencies:
+      - "task-27"
+    acceptanceCriteria:
+      - "Each decision yields exactly one event"
+      - "Already-seen decisions not re-emitted"
+    tdd:
+      red:
+        - "Unit test seeding decisions and asserting event sequence"
+      green:
+        - "Implement helper; wire into StreamAgentEventsUseCase union"
+      refactor:
+        - "Confirm parity with sibling helpers"
+    estimatedEffort: "1h"
+
+  - id: "task-31"
+    phaseId: "phase-6"
+    title: "Wire supervisor evaluation into question pipeline for non-gate questions"
+    description: |
+      AskAgentQuestionUseCase, when answerer === 'supervisor' or 'either'
+      and a policy exists for the scope, invokes
+      EvaluateSupervisorDecisionUseCase with kind='question' so the
+      supervisor can answer or escalate. Advisory mode emits
+      verdict='advise'; only autonomous mode produces an actual answer.
+    state: "Todo"
+    dependencies:
+      - "task-17"
+      - "task-27"
+    acceptanceCriteria:
+      - "Question with answerer=supervisor under autonomous policy gets answered by supervisor"
+      - "Same question under advisory policy emits an advise decision but stays pending until user answers"
+      - "Question with answerer=user is never routed to supervisor"
+    tdd:
+      red:
+        - "Tests for each routing path"
+      green:
+        - "Add the routing call behind a flag check; honor autonomy level"
+      refactor:
+        - "Avoid duplicating the autonomy routing logic from task-29 — share a helper"
+    estimatedEffort: "2h"
+
+  # =====================================================================
+  # PHASE 7 — Notifications and escalation
+  # =====================================================================
+  - id: "task-32"
+    phaseId: "phase-7"
+    title: "Add NotificationEventType values and NotificationEventConfig booleans in TypeSpec"
+    description: |
+      Five new values in NotificationEventType: AgentQuestionPending,
+      AgentQuestionBlocking, AgentMessageBlocked, SupervisorEscalated,
+      SupervisorFailed. Matching booleans in NotificationEventConfig with
+      sensible defaults (blocking ON, info OFF). Regenerate.
+    state: "Todo"
+    dependencies:
+      - "task-1"
+    acceptanceCriteria:
+      - "Generated types include the five new enum values"
+      - "Existing notification preference UI still compiles"
+    tdd:
+      red:
+        - "No test phase — declarative addition"
+      green:
+        - "Edit tsp; pnpm tsp:compile"
+      refactor:
+        - "Confirm naming consistency with existing event-type values"
+    estimatedEffort: "30min"
+
+  - id: "task-33"
+    phaseId: "phase-7"
+    title: "Implement EscalateToUserUseCase"
+    description: |
+      Thin use case under application/use-cases/agents/escalate-to-user.use-case.ts
+      that wraps SendNotificationUseCase with the right NotificationEventType
+      and mirrors to activity_log.
+    state: "Todo"
+    dependencies:
+      - "task-32"
+    acceptanceCriteria:
+      - "Calling EscalateToUser writes a notification of the right kind"
+      - "Activity-log entry is created"
+      - "Flag-off short-circuit"
+    tdd:
+      red:
+        - "Tests for happy path and flag-off no-op"
+      green:
+        - "Implement use case"
+      refactor:
+        - "Centralise notification-emit + activity-log helper if reused across other phase-7 wirings"
+    estimatedEffort: "1h"
+
+  - id: "task-34"
+    phaseId: "phase-7"
+    title: "Wire AskAgentQuestion to fire notifications for blocking questions"
+    description: |
+      When AskAgentQuestion creates a blocking question, fire
+      AgentQuestionBlocking via SendNotificationUseCase; for non-blocking,
+      AgentQuestionPending. NFR-10: blocking questions reach the user
+      within 2s.
+    state: "Todo"
+    dependencies:
+      - "task-17"
+      - "task-32"
+    acceptanceCriteria:
+      - "Blocking question creates exactly one AgentQuestionBlocking notification"
+      - "Non-blocking creates AgentQuestionPending"
+      - "Notification respects per-event preferences"
+    tdd:
+      red:
+        - "Integration test against in-memory notification adapter for both kinds"
+      green:
+        - "Add notification call inside AskAgentQuestion after persistence"
+      refactor:
+        - "Share notification-emit helper with task-33"
+    estimatedEffort: "1.5h"
+
+  - id: "task-35"
+    phaseId: "phase-7"
+    title: "Wire EvaluateSupervisorDecision to fire SupervisorEscalated / SupervisorFailed"
+    description: |
+      EvaluateSupervisorDecision emits SupervisorEscalated when
+      verdict='escalate', SupervisorFailed when the evaluator throws or
+      times out. Failure path falls back to standard human approval (FR-22).
+    state: "Todo"
+    dependencies:
+      - "task-27"
+      - "task-32"
+    acceptanceCriteria:
+      - "Escalate verdict produces SupervisorEscalated notification"
+      - "Evaluator failure produces SupervisorFailed notification and does not crash the caller"
+      - "Failure does not write a SupervisorDecision verdict row (only a failure-record row)"
+    tdd:
+      red:
+        - "Tests for both paths with stub throwing/escalating"
+      green:
+        - "Add notification calls inside the use case"
+      refactor:
+        - "Confirm fallback path mirrors existing approval-gate notification timing"
+    estimatedEffort: "1.5h"
+
+  # =====================================================================
+  # PHASE 8 — Presentation (Web + CLI)
+  # =====================================================================
+  - id: "task-36"
+    phaseId: "phase-8"
+    title: "Build /apps/[id]/supervisor web page with SupervisorConfigForm"
+    description: |
+      Next.js page at src/presentation/web/app/apps/[id]/supervisor/page.tsx.
+      Component SupervisorConfigForm at
+      src/presentation/web/components/supervisor/supervisor-config-form.tsx
+      with colocated .stories.tsx (Default, Loading, Error variants
+      mandatory). Form consumes ConfigureSupervisorUseCase.
+    state: "Todo"
+    dependencies:
+      - "task-21"
+      - "task-22"
+    acceptanceCriteria:
+      - "Loading and saving a SupervisorPolicy round-trips correctly"
+      - "Validation errors render inline"
+      - "Stories exist for Default, Loading, Error"
+      - "Hidden when collaboration flag is off"
+    tdd:
+      red:
+        - "Component test rendering form, submitting, asserting use-case invocation"
+      green:
+        - "Implement page + form using existing form patterns + shadcn/ui"
+      refactor:
+        - "Extract per-field components if the form exceeds 250 lines"
+    estimatedEffort: "4h"
+
+  - id: "task-37"
+    phaseId: "phase-8"
+    title: "Build SupervisorDecisionWhyDrawer component"
+    description: |
+      Component at supervisor-decision-why-drawer.tsx (with .stories.tsx)
+      shown inline on every gate and question that has at least one
+      SupervisorDecision. Displays verdict, rationale, model+prompt
+      version, optional rule reference and confidence.
+    state: "Todo"
+    dependencies:
+      - "task-30"
+    acceptanceCriteria:
+      - "Drawer renders all SupervisorDecision fields"
+      - "Stories cover Default + LongRationale + WithRuleRef variants"
+      - "Hidden when collaboration flag is off"
+    tdd:
+      red:
+        - "Render test asserting rationale, model, prompt-version visible"
+      green:
+        - "Implement using shadcn/ui Drawer"
+      refactor:
+        - "Confirm a11y attributes are present"
+    estimatedEffort: "2h"
+
+  - id: "task-38"
+    phaseId: "phase-8"
+    title: "Build /agent-questions unified inbox page with AgentQuestionsInbox component"
+    description: |
+      Next.js page at src/presentation/web/app/agent-questions/page.tsx
+      backed by ListAgentQuestionsUseCase. Component at
+      agent-questions-inbox.tsx with colocated .stories.tsx. Filter by app,
+      urgency, agent.
+    state: "Todo"
+    dependencies:
+      - "task-17"
+      - "task-22"
+    acceptanceCriteria:
+      - "Pending questions list loads"
+      - "Answering a question via the inbox calls AnswerAgentQuestionUseCase"
+      - "Filters update the URL and the list"
+      - "Stories: Empty, Default, Many, Error"
+    tdd:
+      red:
+        - "Component test for empty state, listing, answering"
+      green:
+        - "Implement page + component using existing list patterns"
+      refactor:
+        - "Extract filter chips into a shared component if reused"
+    estimatedEffort: "4h"
+
+  - id: "task-39"
+    phaseId: "phase-8"
+    title: "Build per-feature Agent Activity feed component"
+    description: |
+      Component agent-activity-feed.tsx (with .stories.tsx) embedded on the
+      feature-detail page; consumes agent_message SSE events and renders
+      lifecycle + collaboration messages. NOT React Flow — vanilla list.
+    state: "Todo"
+    dependencies:
+      - "task-13"
+    acceptanceCriteria:
+      - "Streams new messages via the existing useAgentEvents hook"
+      - "Renders kind, from, payload preview"
+      - "Stories: Empty, FewMessages, ManyMessages, Error"
+    tdd:
+      red:
+        - "Component test asserting render of seed messages and live append on new event"
+      green:
+        - "Implement consuming the existing useAgentEvents hook + new agent_message kind"
+      refactor:
+        - "Extract message-row into its own component"
+    estimatedEffort: "3h"
+
+  - id: "task-40"
+    phaseId: "phase-8"
+    title: "Update useAgentEvents hook and agent-events-provider for the three new event kinds"
+    description: |
+      Modify
+      src/presentation/web/hooks/use-agent-events.ts
+      and src/presentation/web/components/agent-events/agent-events-provider.tsx
+      to handle agent_message, agent_question, supervisor_decision events
+      with proper TypeScript narrowing.
+    state: "Todo"
+    dependencies:
+      - "task-13"
+      - "task-18"
+      - "task-30"
+    acceptanceCriteria:
+      - "TypeScript narrowing works for each new kind"
+      - "Service Worker fan-out delivers each new kind to subscribers"
+    tdd:
+      red:
+        - "Hook test asserting narrowed payload shape for each new kind"
+      green:
+        - "Add the three new arms to the discriminated union"
+      refactor:
+        - "Confirm pattern matches existing kinds exactly"
+    estimatedEffort: "1h"
+
+  - id: "task-41"
+    phaseId: "phase-8"
+    title: "Build CLI commands shep supervisor configure|status|enable|disable|approve|reject"
+    description: |
+      Command file src/presentation/cli/commands/supervisor.ts wired into
+      cli-program.ts. Each subcommand consumes the matching use case via
+      the DI container.
+    state: "Todo"
+    dependencies:
+      - "task-21"
+      - "task-22"
+      - "task-28"
+    acceptanceCriteria:
+      - "All six subcommands are reachable via shep supervisor <verb>"
+      - "approve/reject use SupervisorActor namespace"
+      - "Output uses the shared ui module for color"
+      - "Hidden from help when flag is off"
+    tdd:
+      red:
+        - "Integration test invoking each subcommand against in-memory adapters"
+      green:
+        - "Implement command file"
+      refactor:
+        - "Extract a shared command-options helper if duplicated"
+    estimatedEffort: "3h"
+
+  - id: "task-42"
+    phaseId: "phase-8"
+    title: "Build CLI commands shep agent questions list|answer|cancel"
+    description: |
+      Command file src/presentation/cli/commands/agent-questions.ts wired
+      into cli-program.ts. Consumes ListAgentQuestions, AnswerAgentQuestion,
+      CancelAgentQuestion use cases.
+    state: "Todo"
+    dependencies:
+      - "task-17"
+      - "task-22"
+    acceptanceCriteria:
+      - "list shows pending questions filtered by scope"
+      - "answer applies an answer + resolves the Deferred for interactive-mode bridges"
+      - "cancel transitions status"
+      - "Hidden from help when flag is off"
+    tdd:
+      red:
+        - "Integration test invoking each subcommand against in-memory adapters"
+      green:
+        - "Implement command file"
+      refactor:
+        - "Share output formatter with web inbox if applicable"
+    estimatedEffort: "2h"
+
+  - id: "task-43"
+    phaseId: "phase-8"
+    title: "Build dev-only CLI command shep agent message send"
+    description: |
+      Debug aid src/presentation/cli/commands/agent-message.ts wired into
+      cli-program.ts behind a dev-mode guard. Consumes SendAgentMessageUseCase.
+    state: "Todo"
+    dependencies:
+      - "task-12"
+      - "task-22"
+    acceptanceCriteria:
+      - "Command is hidden in production builds"
+      - "Successfully publishes a message to the bus in dev mode"
+    tdd:
+      red:
+        - "Integration test invoking the command against in-memory bus"
+      green:
+        - "Implement command"
+      refactor:
+        - "Share dev-mode guard with other dev-only commands"
+    estimatedEffort: "1h"
+
+  # =====================================================================
+  # PHASE 9 — Docs, E2E, flag-flip readiness
+  # =====================================================================
+  - id: "task-44"
+    phaseId: "phase-9"
+    title: "Write docs/architecture/supervision.md"
+    description: |
+      New doc covering the collaboration & supervision model: entities,
+      hub-and-spoke topology, autonomy ladder, "user always wins"
+      invariant, audit trail, feature-flag gating.
+    state: "Todo"
+    dependencies: []
+    acceptanceCriteria:
+      - "Doc covers all three capabilities (messaging, questions, supervisor)"
+      - "References research and plan YAMLs"
+      - "Includes a sequence diagram (mermaid) for the gate-with-supervisor flow"
+    tdd: null
+    estimatedEffort: "2h"
+
+  - id: "task-45"
+    phaseId: "phase-9"
+    title: "Update AGENTS.md and docs/architecture/agent-system.md"
+    description: |
+      AGENTS.md gains a Supervisor section and the supervisor:<id> actor
+      namespace rule. agent-system.md gains the four new entities and the
+      bus + question pipeline.
+    state: "Todo"
+    dependencies:
+      - "task-44"
+    acceptanceCriteria:
+      - "Both docs reflect the new entities, ports, and use cases"
+      - "Cross-links to supervision.md added"
+    tdd: null
+    estimatedEffort: "1h"
+
+  - id: "task-46"
+    phaseId: "phase-9"
+    title: "Write Playwright e2e: supervisor configuration round-trip"
+    description: |
+      tests/e2e/supervisor-config.spec.ts covering navigate to
+      /apps/[id]/supervisor → configure policy → reload → assert
+      persistence. Tests with the flag on.
+    state: "Todo"
+    dependencies:
+      - "task-36"
+    acceptanceCriteria:
+      - "Test passes locally and in CI"
+      - "Test cleans up its app/policy after"
+    tdd:
+      red:
+        - "Author the e2e (it will fail until everything is wired)"
+      green:
+        - "Run end-to-end, fix any wiring gaps"
+      refactor:
+        - "Extract page-object if duplicated with other supervisor tests later"
+    estimatedEffort: "2h"
+
+  - id: "task-47"
+    phaseId: "phase-9"
+    title: "Write Playwright e2e: blocking question round-trip"
+    description: |
+      tests/e2e/agent-question-roundtrip.spec.ts covering a feature agent
+      hitting waiting_approval → blocking question appears in
+      /agent-questions → user answers → flow continues. Tests with flag
+      on. Uses StubSupervisorAgentExecutor so the supervisor is silent.
+    state: "Todo"
+    dependencies:
+      - "task-29"
+      - "task-38"
+    acceptanceCriteria:
+      - "Test passes locally and in CI"
+      - "Verifies notification fires (NFR-10 ≤ 2s)"
+    tdd:
+      red:
+        - "Author the e2e (it will fail until everything is wired)"
+      green:
+        - "Run end-to-end, fix any wiring gaps"
+      refactor:
+        - "Extract feature-bootstrap helper if reused"
+    estimatedEffort: "3h"
+
+totalEstimate: "~85h (≈ 11 working days for one developer)"
+
+openQuestions: []
+
+content: |
+  ## Summary
+
+  47 tasks across 9 sequential phases. Phase 1 lays the data foundation
+  (TypeSpec, migrations, repositories, in-memory adapters, the
+  SupervisorActor value object, and the FeatureFlags.collaboration flag).
+  Phase 2 introduces the agent message bus and its SSE event kind, lighting
+  up the first observable behavior behind the still-off flag. Phase 3 builds
+  the unified question pipeline, including the in-process
+  DeferredQuestionRegistry that bridges the SDK V2 canUseTool callback to
+  the DB-backed answer surface, and the parallel AgentQuestion emitted by
+  feature-agent-worker.ts on every approval-gate transition. Phase 4 ships
+  supervisor policy CRUD with feature→app fallback resolution and registers
+  every new port in DI. Phase 5 implements the LangGraph-based supervisor
+  evaluator (resolved through IAgentExecutorProvider per AGENTS.md) along
+  with the lazy per-scope worker. Phase 6 wires the supervisor into the
+  approval-gate flow as an actor inside the existing state machine,
+  enforcing the "user always wins" invariant via the SupervisorActor value
+  object. Phase 7 hooks the new notification kinds into the existing
+  INotificationService so blocking questions and supervisor escalations
+  reach the user within the NFR-10 2s budget. Phase 8 ships the web
+  surfaces (supervisor config page, unified questions inbox, "Why?" drawer,
+  Agent Activity feed) and the CLI commands (`shep supervisor *`,
+  `shep agent questions *`, dev-only `shep agent message send`). Phase 9
+  closes the loop with documentation, two narrow but representative
+  Playwright e2e tests, and final off-flag NFR-14 validation; the actual
+  flag flip ships as a separate small PR after this validation.
+
+  Every code task follows TDD (RED → GREEN → REFACTOR). Tasks are ordered
+  by dependency — no task references a later task — so the plan is safe to
+  execute strictly top-to-bottom. The total estimate (~85h) is consistent
+  with the L sizing in spec.yaml.
+
+  ---
+
+  _Generated by /shep-kit:plan — proceed to /shep-kit:implement_

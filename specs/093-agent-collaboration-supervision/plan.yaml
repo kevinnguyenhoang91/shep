@@ -1,0 +1,478 @@
+# Implementation Plan (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: "agent-collaboration-supervision"
+summary: |
+  Phased implementation of three intertwined capabilities — agent-to-agent
+  messaging, a delegated supervisor agent, and a unified question/escalation
+  pipeline — gated behind a single `collaboration` feature flag. The plan
+  reuses every existing primitive (TypeSpec → migration → repository → port →
+  use case → adapter → SSE → presentation), introduces no new external
+  dependencies, and follows Shep's Clean Architecture layering exactly. Work
+  is decomposed into nine sequential phases that each ship independently to
+  main while the flag stays off; the flag flips on once the final
+  end-to-end / docs phase lands.
+
+# Relationships
+relatedFeatures:
+  - "014-ui-sidebar — team-execution protocol vocabulary reused for message kinds"
+  - "057-feature-flags — collaboration flag added to FeatureFlags singleton"
+  - "Approval gates on AgentRun (allowPrd/allowPlan/allowMerge) — supervisor's primary surface"
+  - "Interactive sessions (canUseTool + AskUserQuestion) — unified with background gates"
+
+technologies:
+  - "TypeSpec — domain model source of truth for new entities"
+  - "SQLite + WAL + custom timestamped migrations — durable cross-process persistence"
+  - "tsyringe DI with string tokens"
+  - "LangGraph + checkpointer — supervisor as a graph node"
+  - "Claude Code SDK V2 unstable_v2_createSession + canUseTool — interactive question interception"
+  - "Server-Sent Events via StreamAgentEventsUseCase — three new event kinds"
+  - "INotificationService + NotificationEventType — escalation routing"
+  - "Next.js + React — supervisor config + agent-questions inbox"
+  - "Commander — new CLI surfaces"
+  - "IAgentExecutorProvider — agent-agnostic LLM resolution"
+
+relatedLinks:
+  - title: "Research artifact for spec 093"
+    url: "specs/093-agent-collaboration-supervision/research.yaml"
+  - title: "Spec 014 team-execution protocol"
+    url: "specs/014-ui-sidebar/team-execution.md"
+  - title: "Agent system architecture"
+    url: "docs/architecture/agent-system.md"
+  - title: "Anthropic Claude Code SDK V2 — canUseTool / AskUserQuestion"
+    url: "https://docs.anthropic.com/en/docs/claude-code/sdk"
+  - title: "LangGraph multi-agent supervision patterns"
+    url: "https://langchain-ai.github.io/langgraph/concepts/multi_agent/"
+
+# Structured implementation phases
+phases:
+  - id: "phase-1"
+    name: "Foundation — TypeSpec models, migrations, repositories"
+    description: |
+      Define the four new domain entities (AgentMessage, AgentQuestion,
+      SupervisorPolicy, SupervisorDecision) plus enums in TypeSpec, generate
+      types, write idempotent SQLite migrations, and ship repository ports +
+      SQLite + in-memory adapters. Add the FeatureFlags.collaboration flag and
+      the SupervisorActor value object. No behavior is observable yet; this
+      phase exists so every later phase has a typed, tested data layer to
+      build on.
+    parallel: false
+  - id: "phase-2"
+    name: "Agent message bus — port, adapters, SSE event"
+    description: |
+      Introduce IAgentMessageBus and the SendAgentMessage / ListAgentMessages
+      use cases. Wire the SQLite-backed adapter (cross-process by virtue of
+      shared DB) and the InMemory adapter for tests. Extend
+      StreamAgentEventsUseCase with the agent_message kind via a new
+      computeMessageDeltas helper. With this phase, agents can publish and
+      observe each other's lifecycle events under the flag.
+    parallel: false
+  - id: "phase-3"
+    name: "Agent question pipeline — unified inbox"
+    description: |
+      Introduce IAgentQuestionService, AskAgentQuestion / AnswerAgentQuestion /
+      CancelAgentQuestion / ListAgentQuestions use cases, the in-process
+      Deferred registry for canUseTool-bridged blocking questions, and the
+      agent_question SSE event kind. Extend
+      claude-code-interactive-executor.service.ts to route AskUserQuestion
+      through the new pipeline. Extend feature-agent-worker.ts to emit a
+      parallel AgentQuestion of kind 'blocking' on every approval-gate
+      transition. Single unified inbox is queryable end-to-end.
+    parallel: false
+  - id: "phase-4"
+    name: "Supervisor policy CRUD"
+    description: |
+      Implement ConfigureSupervisor / EnableSupervisor / DisableSupervisor /
+      GetSupervisorPolicy use cases over SupervisorPolicyRepository with
+      app→feature scope resolution. Define the SupervisorActor value object's
+      validation rules. No evaluator exists yet; this phase is policy
+      persistence and resolution only.
+    parallel: false
+  - id: "phase-5"
+    name: "Supervisor agent — LangGraph evaluator"
+    description: |
+      Implement ISupervisorAgent backed by a LangGraph workflow under
+      infrastructure/services/agents/supervisor-agent/. Add the lazy per-scope
+      worker process with heartbeat / checkpointing matching
+      feature-agent-worker.ts. Resolve the LLM via IAgentExecutorProvider.
+      Persist every decision via SupervisorDecisionRepository and mirror to
+      activity_log with actor_id='supervisor:<id>'. Provide a
+      StubSupervisorAgentExecutor for deterministic tests.
+    parallel: false
+  - id: "phase-6"
+    name: "Approval-gate integration — supervisor as actor"
+    description: |
+      Extend ApproveAgentRunUseCase / RejectAgentRunUseCase to recognise the
+      supervisor:<id> actor namespace and enforce the "user always wins"
+      invariant. Trigger the supervisor evaluator on every
+      waiting_approval transition (advisory: attach decision to gate;
+      co-sign: gate completion requires both votes; autonomous: supervisor
+      may close gate directly). Add the supervisor_decision SSE event kind.
+      Wire the EvaluateSupervisorDecision use case from feature-agent-worker
+      and from the question pipeline.
+    parallel: false
+  - id: "phase-7"
+    name: "Notifications and escalation"
+    description: |
+      Add NotificationEventType values (AgentQuestionPending,
+      AgentQuestionBlocking, AgentMessageBlocked, SupervisorEscalated,
+      SupervisorFailed) plus matching NotificationEventConfig booleans in
+      TypeSpec. Wire INotificationService emissions from AskAgentQuestion,
+      EvaluateSupervisorDecision, and the supervisor-failure fallback path
+      (FR-22). Implement EscalateToUser as a thin use case that wraps the
+      notification path with audit-log mirroring.
+    parallel: false
+  - id: "phase-8"
+    name: "Presentation — Web + CLI"
+    description: |
+      Build the web supervisor configuration page at
+      /apps/[id]/supervisor with per-feature drill-down, the unified
+      /agent-questions inbox, the inline "Why?" drawer, and the per-feature
+      "Agent Activity" panel. Ship colocated .stories.tsx for every new
+      component (mandatory). Build the CLI commands `shep supervisor *`,
+      `shep agent questions *`, and a dev-only `shep agent message send`.
+      All surfaces consume use cases — zero presentation business logic.
+    parallel: false
+  - id: "phase-9"
+    name: "Docs, E2E, flag flip"
+    description: |
+      Update AGENTS.md and docs/architecture/agent-system.md, write the new
+      docs/architecture/supervision.md. Add one Playwright e2e for the
+      supervisor configuration round-trip and one for the blocking-question
+      answer round-trip. Run the off-flag suite to confirm NFR-14
+      (byte-identical default behavior). Flip
+      featureFlagCollaboration default to false (still off) but expose the
+      override in settings UI. The flag flip itself ships behind a
+      separate small PR after validation.
+    parallel: false
+
+# File change tracking
+filesToCreate:
+  - "tsp/agents/agent-message.tsp"
+  - "tsp/agents/agent-question.tsp"
+  - "tsp/agents/supervisor-policy.tsp"
+  - "tsp/agents/supervisor-decision.tsp"
+  - "packages/core/src/domain/value-objects/supervisor-actor.ts"
+  - "packages/core/src/domain/value-objects/supervisor-actor.test.ts"
+  - "packages/core/src/application/ports/output/agents/agent-message-bus.port.ts"
+  - "packages/core/src/application/ports/output/agents/agent-question-service.port.ts"
+  - "packages/core/src/application/ports/output/agents/supervisor-agent.port.ts"
+  - "packages/core/src/application/ports/output/agents/agent-inbox.port.ts"
+  - "packages/core/src/application/ports/output/repositories/agent-message-repository.port.ts"
+  - "packages/core/src/application/ports/output/repositories/agent-question-repository.port.ts"
+  - "packages/core/src/application/ports/output/repositories/supervisor-policy-repository.port.ts"
+  - "packages/core/src/application/ports/output/repositories/supervisor-decision-repository.port.ts"
+  - "packages/core/src/application/use-cases/agents/send-agent-message.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/send-agent-message.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/list-agent-messages.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/list-agent-messages.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/ask-agent-question.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/ask-agent-question.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/answer-agent-question.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/answer-agent-question.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/cancel-agent-question.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/cancel-agent-question.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/list-agent-questions.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/list-agent-questions.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/escalate-to-user.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/escalate-to-user.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/configure-supervisor.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/configure-supervisor.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/enable-supervisor.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/enable-supervisor.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/disable-supervisor.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/disable-supervisor.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/get-supervisor-policy.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/get-supervisor-policy.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/evaluate-supervisor-decision.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/evaluate-supervisor-decision.use-case.test.ts"
+  - "packages/core/src/infrastructure/adapters/in-memory/in-memory-agent-message-bus.ts"
+  - "packages/core/src/infrastructure/adapters/in-memory/in-memory-agent-message-bus.test.ts"
+  - "packages/core/src/infrastructure/adapters/in-memory/in-memory-agent-question-service.ts"
+  - "packages/core/src/infrastructure/adapters/in-memory/in-memory-agent-question-service.test.ts"
+  - "packages/core/src/infrastructure/adapters/in-memory/in-memory-supervisor-agent.ts"
+  - "packages/core/src/infrastructure/adapters/in-memory/in-memory-supervisor-agent.test.ts"
+  - "packages/core/src/infrastructure/adapters/in-memory/in-memory-agent-message-repository.ts"
+  - "packages/core/src/infrastructure/adapters/in-memory/in-memory-agent-question-repository.ts"
+  - "packages/core/src/infrastructure/adapters/in-memory/in-memory-supervisor-policy-repository.ts"
+  - "packages/core/src/infrastructure/adapters/in-memory/in-memory-supervisor-decision-repository.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/repositories/agent-message-repository.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/repositories/agent-message-repository.test.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/repositories/agent-question-repository.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/repositories/agent-question-repository.test.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/repositories/supervisor-policy-repository.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/repositories/supervisor-policy-repository.test.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/repositories/supervisor-decision-repository.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/repositories/supervisor-decision-repository.test.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/migrations/NNN-create-agent-messages.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/migrations/NNN-create-agent-questions.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/migrations/NNN-create-supervisor-policies.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/migrations/NNN-create-supervisor-decisions.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/migrations/NNN-add-feature-flag-collaboration.ts"
+  - "packages/core/src/infrastructure/services/agents/agent-message-bus/sqlite-agent-message-bus.ts"
+  - "packages/core/src/infrastructure/services/agents/agent-message-bus/sqlite-agent-message-bus.test.ts"
+  - "packages/core/src/infrastructure/services/agents/agent-question-service/agent-question-service.ts"
+  - "packages/core/src/infrastructure/services/agents/agent-question-service/agent-question-service.test.ts"
+  - "packages/core/src/infrastructure/services/agents/agent-question-service/deferred-question-registry.ts"
+  - "packages/core/src/infrastructure/services/agents/agent-question-service/deferred-question-registry.test.ts"
+  - "packages/core/src/infrastructure/services/agents/supervisor-agent/supervisor-graph.ts"
+  - "packages/core/src/infrastructure/services/agents/supervisor-agent/supervisor-graph.test.ts"
+  - "packages/core/src/infrastructure/services/agents/supervisor-agent/supervisor-agent-worker.ts"
+  - "packages/core/src/infrastructure/services/agents/supervisor-agent/supervisor-agent-worker.test.ts"
+  - "packages/core/src/infrastructure/services/agents/supervisor-agent/evaluator-prompt.ts"
+  - "packages/core/src/infrastructure/services/agents/supervisor-agent/stub-supervisor-executor.ts"
+  - "packages/core/src/application/use-cases/agents/stream-agent-events/compute-message-deltas.ts"
+  - "packages/core/src/application/use-cases/agents/stream-agent-events/compute-message-deltas.test.ts"
+  - "packages/core/src/application/use-cases/agents/stream-agent-events/compute-question-deltas.ts"
+  - "packages/core/src/application/use-cases/agents/stream-agent-events/compute-question-deltas.test.ts"
+  - "packages/core/src/application/use-cases/agents/stream-agent-events/compute-decision-deltas.ts"
+  - "packages/core/src/application/use-cases/agents/stream-agent-events/compute-decision-deltas.test.ts"
+  - "packages/core/src/infrastructure/di/registrations/register-collaboration.ts"
+  - "src/presentation/web/app/apps/[id]/supervisor/page.tsx"
+  - "src/presentation/web/app/agent-questions/page.tsx"
+  - "src/presentation/web/components/supervisor/supervisor-config-form.tsx"
+  - "src/presentation/web/components/supervisor/supervisor-config-form.stories.tsx"
+  - "src/presentation/web/components/supervisor/supervisor-decision-why-drawer.tsx"
+  - "src/presentation/web/components/supervisor/supervisor-decision-why-drawer.stories.tsx"
+  - "src/presentation/web/components/agent-questions/agent-questions-inbox.tsx"
+  - "src/presentation/web/components/agent-questions/agent-questions-inbox.stories.tsx"
+  - "src/presentation/web/components/agent-activity/agent-activity-feed.tsx"
+  - "src/presentation/web/components/agent-activity/agent-activity-feed.stories.tsx"
+  - "src/presentation/cli/commands/supervisor.ts"
+  - "src/presentation/cli/commands/agent-questions.ts"
+  - "src/presentation/cli/commands/agent-message.ts"
+  - "tests/e2e/supervisor-config.spec.ts"
+  - "tests/e2e/agent-question-roundtrip.spec.ts"
+  - "docs/architecture/supervision.md"
+
+filesToModify:
+  - "tsp/domain/entities/settings.tsp"
+  - "tsp/domain/entities/feature-flags.tsp"
+  - "tsp/agents/approval-gates.tsp"
+  - "packages/core/src/infrastructure/services/agents/feature-agent/feature-agent-worker.ts"
+  - "packages/core/src/infrastructure/services/agents/common/executors/claude-code-interactive-executor.service.ts"
+  - "packages/core/src/application/use-cases/agents/approve-agent-run.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/reject-agent-run.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/stream-agent-events.use-case.ts"
+  - "packages/core/src/application/use-cases/notifications/send-notification.use-case.ts"
+  - "packages/core/src/infrastructure/di/container.ts"
+  - "src/presentation/web/lib/feature-flags.ts"
+  - "src/presentation/web/hooks/use-agent-events.ts"
+  - "src/presentation/web/components/agent-events/agent-events-provider.tsx"
+  - "src/presentation/cli/cli-program.ts"
+  - "AGENTS.md"
+  - "docs/architecture/agent-system.md"
+
+openQuestions: []
+
+content: |
+  ## Status
+
+  - **Phase:** Planning
+  - **Updated:** 2026-04-28
+
+  ## Architecture Overview
+
+  This feature lands inside the existing four-layer Clean Architecture
+  (`domain/` → `application/` → `infrastructure/` → `presentation/`) without
+  introducing a new layer or a new transport. Every new capability follows
+  the standard pipeline:
+
+  ```
+  TypeSpec model  →  generated domain type  →  output port (application)
+                  →  use case (application) →  SQLite + in-memory adapter (infrastructure)
+                  →  SSE event kind        →  Web + CLI surface (presentation)
+  ```
+
+  Three new conceptual surfaces are introduced — **agent message bus**,
+  **supervisor agent**, and **unified question pipeline** — but each one is
+  a port + use case + adapter triplet that mirrors patterns already in the
+  codebase (e.g., `IAgentRunner`, `IInteractiveAgentExecutor`,
+  `INotificationService`). No new dependency, no new transport, no new
+  process model. The supervisor reuses the **feature-agent-worker** shape
+  exactly: lazy per-scope worker, `agent_type='supervisor'` row in
+  `agent_runs`, heartbeat, LangGraph checkpointing, SSE-observable lifecycle.
+
+  Cross-process coordination — the user's actual ask ("can agents talk to
+  each other while they work?") — is solved structurally by the existing
+  shared SQLite database. Worktrees already share `~/.shep/<repo-hash>/shep.db`
+  in WAL mode; the new `agent_messages` table inherits that property and
+  becomes the cross-worktree bus with zero new IPC code.
+
+  The single integration point inside the Claude SDK V2 path is the
+  `canUseTool` callback in
+  `claude-code-interactive-executor.service.ts`. That callback is already
+  the interception point for `AskUserQuestion` (the tool is intentionally
+  excluded from auto-allow) — we simply route the invocation through
+  `AskAgentQuestionUseCase` instead of the current direct-prompt-the-user
+  path. A small in-process `DeferredQuestionRegistry` bridges the SDK's
+  Promise expectation with the asynchronous DB-backed answer.
+
+  Approval-gate integration is **interception, not replacement**: the
+  existing `waiting_approval` state machine remains the single source of
+  truth. The supervisor acts AS an actor inside it, using the namespace
+  `supervisor:<id>` recognised by `ApproveAgentRunUseCase` /
+  `RejectAgentRunUseCase`. The "user always wins" invariant is enforced by
+  treating any user action on the same gate as an override that wins —
+  both decisions stay in `activity_log` for audit.
+
+  The feature-flag gate (`FeatureFlags.collaboration`) lives in the
+  existing registry (PR #557 / spec 057). With the flag off, every new use
+  case short-circuits at its entry point and every new presentation surface
+  hides — no new tables are written, no new SSE events are emitted,
+  byte-identical with main (NFR-14).
+
+  ## Key Design Decisions
+
+  All major design decisions were resolved during research (see
+  `research.yaml`). The plan adopts each one as the implementation
+  contract; below summarises the load-bearing ones with their rationale.
+
+  **(1) Four first-class TypeSpec entities, four migrations, four
+  repositories.** Defying the per-entity-per-table pattern would create
+  Shep's first off-pattern model. Each entity has independent invariants
+  (messages append-only, questions state-machine, decisions immutable,
+  policies mutable) that match independent tables exactly. Alternatives
+  considered — JSON blob on `AgentRun.metadata`, polymorphic
+  `agent_event` table, reuse of `InteractiveMessage` + `WorkflowStep` —
+  all fail the unified-inbox UX or queryability requirements.
+
+  **(2) SQLite-backed message bus with SSE polling.** The proven
+  `StreamAgentEventsUseCase` pattern (default 2s, opt-in 500ms) provides
+  cross-process delivery for free via the shared DB. Redis or
+  EventEmitter would either break local-first positioning or fail the
+  parallel-worktree scenario. Three indexes on `agent_messages`
+  (composite scope + recency, correlation lookup, partial undelivered)
+  keep p95 publish-to-subscriber under the 750ms NFR-1 budget.
+
+  **(3) Hub-and-spoke topology via supervisor.** Aligns with spec 014's
+  EM hub design and gives one place to enforce policy and audit. The bus
+  rejects peer addressing in v1; reply round-trips remain direct via
+  `correlationId` so high-frequency exchanges aren't bottlenecked.
+
+  **(4) Supervisor as a LangGraph workflow resolved through
+  `IAgentExecutorProvider`.** Mandatory per AGENTS.md. LangGraph also
+  reuses every feature-agent guarantee (heartbeat, checkpointing, SSE,
+  phase timing) and lets the supervisor accumulate context across
+  decisions. The same shape supports a future deterministic-rule
+  fast-path as a graph node executed before the LLM call.
+
+  **(5) Approval-gate integration via supervisor-as-actor, not a new
+  pause primitive.** Keeps the existing state machine as the single
+  source of truth and produces a clean audit trail. "User always wins"
+  is enforced by `ApproveAgentRunUseCase` / `RejectAgentRunUseCase`
+  treating user actions as overrides of supervisor actions on the same
+  gate.
+
+  **(6) Unified `AgentQuestion` entity bridging SDK V2 and background
+  agents.** The user's real ask is one inbox. Two write paths converge:
+  (a) the `canUseTool` interception for `AskUserQuestion`, (b) a
+  parallel `AgentQuestion` emitted by `feature-agent-worker.ts`
+  alongside every `waiting_approval` transition. A single
+  `AnswerAgentQuestionUseCase` handles both modes — interactive mode
+  resolves a `Deferred` registered in an in-process registry; background
+  mode forwards to the existing approve/reject use cases.
+
+  **(7) Per-app + per-feature override scope for `SupervisorPolicy`.**
+  Matches every existing scoping decision (Settings, ApprovalGates,
+  AgentDefinition cascade app → feature). JSON columns
+  (`gate_authority_json`, `policy_rules_json`) are acceptable here
+  because they evolve independently and are never queried by content.
+
+  **(8) Full audit + rationale on every supervisor decision.**
+  `SupervisorDecision` rows include verdict, rationale, model name,
+  prompt version, optional confidence, and rule reference. Each row
+  mirrors into the immutable `activity_log` (migration 064). Lazy
+  rationale generation is rejected because model rotation between
+  decision and inspection breaks reproducibility.
+
+  **(9) Notification routing via `INotificationService` with new event
+  kinds.** Five new `NotificationEventType` values plus matching
+  `NotificationEventConfig` booleans; users get free per-channel mute
+  and priority controls. Building a parallel high-priority channel
+  duplicates infrastructure for no gain.
+
+  **(10) DI via tsyringe string tokens, registered in a dedicated
+  `register-collaboration.ts` module called from `initializeContainer`.**
+  Matches existing topic-grouped registration pattern and keeps each
+  registration file under the 300-line ceiling.
+
+  **(11) TDD with in-memory adapters for every port + a deterministic
+  `StubSupervisorAgentExecutor`.** Mandatory per CLAUDE.md and
+  `code-quality.md`. Supervisor logic (conflict resolution, audit
+  writes, autonomy ladder) is verified without any LLM call. e2e is
+  intentionally narrow: one supervisor-config flow, one
+  blocking-question round-trip.
+
+  **(12) One feature flag (`collaboration`).** Sub-flags are premature
+  granularity. NFR-14's byte-identical default is easiest to validate
+  with a single switch, and the existing flag registry provides the
+  whole envelope (env override, settings UI, runtime toggle).
+
+  ## Implementation Strategy
+
+  The nine phases are ordered by dependency, not by user value. Earlier
+  phases produce no observable behavior; they exist to remove risk from
+  later phases:
+
+  - **Phase 1 (foundation)** lands TypeSpec, migrations, repositories,
+    and the actor value object. Nothing is observable yet, but every
+    later phase has a typed, tested data layer.
+  - **Phase 2 (message bus)** is the first phase with a behavioral
+    surface — agents can publish and observe each other's lifecycle
+    events behind the flag.
+  - **Phase 3 (question pipeline)** unifies interactive and background
+    asks. `canUseTool` interception lands here; the background-side
+    parallel `AgentQuestion` is emitted from
+    `feature-agent-worker.ts` here.
+  - **Phase 4 (policy CRUD)** is required before the supervisor can
+    evaluate anything; configuration must precede execution.
+  - **Phase 5 (supervisor evaluator)** lands the LangGraph workflow,
+    the lazy worker, and the `EvaluateSupervisorDecision` use case.
+    The evaluator is callable but not yet wired into the gate flow.
+  - **Phase 6 (gate integration)** wires the supervisor into the
+    `waiting_approval` transition and into the question pipeline. This
+    is the highest-risk phase because it modifies two heavily-used use
+    cases (`ApproveAgentRunUseCase`, `RejectAgentRunUseCase`); it ships
+    with the supervisor-as-actor namespace and the "user always wins"
+    invariant.
+  - **Phase 7 (notifications)** adds the five new
+    `NotificationEventType` kinds and `EscalateToUser` use case so
+    blocking questions and supervisor escalations reach the user via
+    the existing notification surface.
+  - **Phase 8 (presentation)** ships Web (`/apps/[id]/supervisor`,
+    `/agent-questions`, "Why?" drawer, "Agent Activity" feed) and CLI
+    surfaces. Both consume the existing use cases. Storybook stories
+    are mandatory for every new web component.
+  - **Phase 9 (docs + e2e + flag readiness)** validates NFR-14
+    (byte-identical with flag off), writes the new
+    `docs/architecture/supervision.md`, updates `AGENTS.md` and the
+    agent-system architecture doc, and prepares the small flag-flip PR
+    that follows.
+
+  Inside every phase, every code task follows TDD: write the failing
+  test first (RED), implement the minimum to make it pass (GREEN),
+  refactor toward the established patterns and within the
+  300-line-per-file ceiling (REFACTOR). The in-memory adapters are
+  written first to give us fast unit-level coverage before the SQLite
+  adapter exercises the schema end-to-end.
+
+  ## Risk Mitigation
+
+  | Risk | Mitigation |
+  | ---- | ---------- |
+  | Modifying the heavily-used `ApproveAgentRunUseCase` / `RejectAgentRunUseCase` introduces a regression in the existing approval-gate flow. | Phase 6 adds a `SupervisorActor` value object and a single guard in each use case. The change is additive — the existing user-actor path is untouched. The phase ships with a regression test that exercises the pre-feature behavior with the flag off. |
+  | The in-process `DeferredQuestionRegistry` leaks Promises if the user never answers. | Every Deferred is registered with a hard timeout (default 30 min, configurable per question kind) that auto-rejects with a structured `AgentQuestionTimeoutError`. Cancellation is also surfaced on the bus so cross-process answers/cancels are honored. Phase 3 ships unit tests for both timeout and cancellation. |
+  | Supervisor LLM calls block the agent's critical path past the NFR-2 30s budget. | Evaluator runs with a hard 25s timeout (5s I/O buffer); on timeout the graph publishes a `SupervisorDecision { verdict: 'escalate' }` and the human path proceeds immediately. Failure surfaces as `SupervisorFailed` notification (FR-22). |
+  | Five concurrent agents per feature degrade message-bus latency past the NFR-1 750ms p95 budget. | Three indexes on `agent_messages` (composite scope+recency, correlation lookup, partial undelivered). Subscribers default to 2s poll; blocking-priority subscriptions opt into the existing 500ms cadence. Phase 2 includes a load test simulating five agents emitting at 1 msg/s. |
+  | Cross-app data leak through the bus or the inbox. | All repository SELECTs are scoped by `app_id` (and `feature_id` where applicable) at the SQL layer. Use cases assert scope at their entry. Phase 1 ships repository tests that explicitly verify cross-app isolation. |
+  | Migrations conflict with concurrent in-flight migrations on main. | Each migration uses idempotent existence checks (matching migrations 040, 064, 078). Migration filenames use timestamps assigned at PR-open time so ordering is deterministic. Phase 1 ships a rollback test for every migration. |
+  | Feature-flag check is forgotten in a use case, leaking behavior with the flag off. | The flag is checked at every new use case's entry guard, and the off-flag test suite (Phase 9) asserts byte-identical SSE event output, no new DB writes, and no new notifications. |
+  | Prompt injection via inter-agent message payloads reaches the supervisor evaluator. | Evaluator prompt treats `payload_json` as untrusted user content (existing prompt-hardening pattern in feature-agent prompts). Phase 5 includes a security-review checkpoint and a unit test exercising a payload that attempts to override the evaluator's persona. |
+  | Storybook stories missing on new web components blocks merge. | Phase 8 task acceptance includes a colocated `.stories.tsx` for every new component with at least Default + Loading + Error variants. CI's existing Storybook check enforces it. |
+  | LangGraph supervisor workflow accumulates state that violates the agent-agnostic rule. | All LLM calls inside the supervisor graph go through `IAgentExecutorProvider` resolved by token; no provider SDK is imported. Phase 5 includes a code-review checkpoint that greps for direct provider imports under `supervisor-agent/`. |
+  | Phased rollout deviates from research's "all-at-once big-bang" answer. | The release strategy IS still big-bang from the user's perspective — the flag flips on once. The internal phases exist to keep PRs small (CLAUDE.md cadence) but each phase ships behind the still-off flag. NFR-14 is verified at every phase boundary, not only at the end. |
+
+  ---
+
+  _Generated by /shep-kit:plan — proceed to /shep-kit:implement_
