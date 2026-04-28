@@ -58,6 +58,26 @@ properties:
     type: boolean
     default: true
     description: Notify when a new operation log entry is appended (spec 090)
+  agentQuestionPending:
+    type: boolean
+    default: false
+    description: Notify when a non-blocking AgentQuestion is raised by a running agent (spec 093). Default OFF — info-tier events go to the activity feed only unless the user opts in.
+  agentQuestionBlocking:
+    type: boolean
+    default: true
+    description: Notify when a blocking AgentQuestion pauses an agent and requires an answer (spec 093). Default ON — blocking-tier events MUST reach the user.
+  agentMessageBlocked:
+    type: boolean
+    default: false
+    description: Notify when an inter-agent message is rejected or undeliverable (spec 093). Default OFF — info-tier event.
+  supervisorEscalated:
+    type: boolean
+    default: true
+    description: Notify when the supervisor escalates a decision back to the user (spec 093). Default ON — actionable.
+  supervisorFailed:
+    type: boolean
+    default: true
+    description: Notify when the supervisor evaluator fails and the system falls back to standard human approval (spec 093, FR-22). Default ON — actionable.
 required:
   - agentStarted
   - phaseCompleted
