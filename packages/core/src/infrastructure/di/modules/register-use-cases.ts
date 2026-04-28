@@ -78,6 +78,10 @@ import { GetCodeReviewUseCase } from '../../../application/use-cases/code-review
 import { ListCodeReviewsUseCase } from '../../../application/use-cases/code-review/list-code-reviews.use-case.js';
 import { PostCodeReviewUseCase } from '../../../application/use-cases/code-review/post-code-review.use-case.js';
 
+// Collaboration (feature 093) use cases
+import { SendAgentMessageUseCase } from '../../../application/use-cases/agents/send-agent-message.use-case.js';
+import { ListAgentMessagesUseCase } from '../../../application/use-cases/agents/list-agent-messages.use-case.js';
+
 /**
  * Register the main body of application use cases (settings, agents, features,
  * tools, repositories, applications, projects, archival, upgrade, sessions) and
@@ -167,6 +171,10 @@ export function registerUseCases(container: DependencyContainer): void {
   container.registerSingleton(GetCodeReviewUseCase);
   container.registerSingleton(ListCodeReviewsUseCase);
   container.registerSingleton(PostCodeReviewUseCase);
+
+  // ─── Collaboration (feature 093) use cases ──────────────────────────────
+  container.registerSingleton(SendAgentMessageUseCase);
+  container.registerSingleton(ListAgentMessagesUseCase);
 
   // ─── String-token aliases for web routes ─────────────────────────────────
   // Turbopack can't resolve .js→.ts imports inside @shepai/core, so routes use

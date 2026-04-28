@@ -73,6 +73,16 @@ import { SQLitePmAuditLogRepository } from '../../repositories/sqlite-pm-audit-l
 import type { ICodeReviewRepository } from '../../../application/ports/output/repositories/code-review-repository.interface.js';
 import { SQLiteCodeReviewRepository } from '../../repositories/sqlite-code-review.repository.js';
 
+// Collaboration & supervision (feature 093) repositories
+import type { IAgentMessageRepository } from '../../../application/ports/output/repositories/agent-message-repository.interface.js';
+import { SQLiteAgentMessageRepository } from '../../repositories/sqlite-agent-message.repository.js';
+import type { IAgentQuestionRepository } from '../../../application/ports/output/repositories/agent-question-repository.interface.js';
+import { SQLiteAgentQuestionRepository } from '../../repositories/sqlite-agent-question.repository.js';
+import type { ISupervisorPolicyRepository } from '../../../application/ports/output/repositories/supervisor-policy-repository.interface.js';
+import { SQLiteSupervisorPolicyRepository } from '../../repositories/sqlite-supervisor-policy.repository.js';
+import type { ISupervisorDecisionRepository } from '../../../application/ports/output/repositories/supervisor-decision-repository.interface.js';
+import { SQLiteSupervisorDecisionRepository } from '../../repositories/sqlite-supervisor-decision.repository.js';
+
 /**
  * Register all SQLite-backed repositories.
  *
@@ -223,5 +233,21 @@ export function registerRepositories(container: DependencyContainer): void {
   // ─── Code review (feature 090) repository ─────────────────────────────
   container.register<ICodeReviewRepository>('ICodeReviewRepository', {
     useFactory: (c) => new SQLiteCodeReviewRepository(c.resolve<Database.Database>('Database')),
+  });
+
+  // ─── Collaboration & supervision (feature 093) repositories ──────────
+  container.register<IAgentMessageRepository>('IAgentMessageRepository', {
+    useFactory: (c) => new SQLiteAgentMessageRepository(c.resolve<Database.Database>('Database')),
+  });
+  container.register<IAgentQuestionRepository>('IAgentQuestionRepository', {
+    useFactory: (c) => new SQLiteAgentQuestionRepository(c.resolve<Database.Database>('Database')),
+  });
+  container.register<ISupervisorPolicyRepository>('ISupervisorPolicyRepository', {
+    useFactory: (c) =>
+      new SQLiteSupervisorPolicyRepository(c.resolve<Database.Database>('Database')),
+  });
+  container.register<ISupervisorDecisionRepository>('ISupervisorDecisionRepository', {
+    useFactory: (c) =>
+      new SQLiteSupervisorDecisionRepository(c.resolve<Database.Database>('Database')),
   });
 }

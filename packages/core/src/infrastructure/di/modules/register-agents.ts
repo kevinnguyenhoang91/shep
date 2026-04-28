@@ -29,6 +29,7 @@ import { CodexCliSessionRepository } from '../../services/agents/sessions/codex-
 import { StubSessionRepository } from '../../services/agents/sessions/stub-session.repository.js';
 import { AgentSessionRepositoryRegistry } from '../../services/agents/agent-session-repository.registry.js';
 import { AgentType } from '../../../domain/generated/output.js';
+import { FeatureAgentLifecyclePublisher } from '../../services/agents/feature-agent/feature-agent-lifecycle-publisher.js';
 
 /**
  * Register agent-execution infrastructure: executor factory/provider, runner,
@@ -128,4 +129,8 @@ export function registerAgents(container: DependencyContainer): void {
     'IAgentSessionRepositoryRegistry',
     AgentSessionRepositoryRegistry
   );
+
+  // Feature-agent worker uses this to broadcast lifecycle messages on the
+  // agent message bus (spec 093). Singleton so one publisher per process.
+  container.registerSingleton(FeatureAgentLifecyclePublisher);
 }

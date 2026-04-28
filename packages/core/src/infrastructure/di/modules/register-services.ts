@@ -74,6 +74,10 @@ import { annotateFileDiffs } from '../../services/code-review/diff-annotation.se
 import { buildReviewPrompt } from '../../services/code-review/review-prompt-builder.service.js';
 import { parseReviewOutput } from '../../services/code-review/review-output-parser.service.js';
 
+// Collaboration (feature 093) — agent message bus
+import type { IAgentMessageBus } from '../../../application/ports/output/agents/agent-message-bus.interface.js';
+import { SQLiteAgentMessageBus } from '../../services/agents/agent-message-bus/sqlite-agent-message-bus.js';
+
 /**
  * Register core infrastructure services: validators, filesystem, git, notifications,
  * logger, tool installer, attachment storage, shep-instance, browser opener, etc.
@@ -251,4 +255,10 @@ export function registerServices(container: DependencyContainer): void {
   container.registerInstance('DiffAnnotator', annotateFileDiffs);
   container.registerInstance('PromptBuilder', buildReviewPrompt);
   container.registerInstance('OutputParser', parseReviewOutput);
+
+  // ─── Collaboration (feature 093) — agent message bus ────────────────
+  // SQLite-backed bus reuses the shared shep.db so the bus is cross-process
+  // by virtue of the WAL-mode database file. Singleton so subscriptions
+  // share one poll loop per process (research decision 2).
+  container.registerSingleton<IAgentMessageBus>('IAgentMessageBus', SQLiteAgentMessageBus);
 }
