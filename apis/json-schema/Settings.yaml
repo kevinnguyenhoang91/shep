@@ -36,6 +36,9 @@ properties:
   fabLayout:
     $ref: FabLayoutConfig.yaml
     description: FAB layout configuration (optional, defaults applied at runtime)
+  supervisor:
+    $ref: SupervisorConfig.yaml
+    description: Supervisor agent default configuration (optional, defaults applied at runtime)
 required:
   - models
   - user

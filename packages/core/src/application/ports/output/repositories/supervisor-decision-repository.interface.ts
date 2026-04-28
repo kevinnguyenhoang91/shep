@@ -1,0 +1,52 @@
+/**
+ * SupervisorDecision Repository Interface (Output Port)
+ *
+ * Defines the contract for SupervisorDecision persistence (spec 093).
+ * Append-only audit records — no `update` method, no soft-delete.
+ * Every list query MUST be scoped by appId (NFR-7).
+ */
+
+import type { SupervisorDecision } from '../../../../domain/generated/output.js';
+
+/** Filter options for listing supervisor decisions. */
+export interface SupervisorDecisionListFilters {
+  /** Limit results to decisions with `created_at >= since` */
+  since?: Date;
+  /** Maximum number of rows to return */
+  limit?: number;
+}
+
+/**
+ * Repository contract for SupervisorDecision persistence.
+ *
+ * Implementations MUST treat rows as immutable — no update, no delete.
+ */
+export interface ISupervisorDecisionRepository {
+  /** Persist a new decision. Throws on duplicate id. */
+  create(decision: SupervisorDecision): Promise<void>;
+
+  /** Find one decision by id. */
+  findById(id: string): Promise<SupervisorDecision | null>;
+
+  /**
+   * List all decisions for a given source event ordered by createdAt asc
+   * (so the audit drawer can show them chronologically).
+   */
+  listBySourceEvent(sourceEventKind: string, sourceEventId: string): Promise<SupervisorDecision[]>;
+
+  /**
+   * List decisions produced by a specific supervisor run.
+   * Used by the per-run audit view.
+   */
+  listBySupervisorRun(supervisorRunId: string): Promise<SupervisorDecision[]>;
+
+  /**
+   * List decisions for an app (and optionally a feature) ordered by
+   * createdAt desc. Always app-scoped.
+   */
+  listByScope(
+    appId: string,
+    featureId: string | undefined,
+    filters?: SupervisorDecisionListFilters
+  ): Promise<SupervisorDecision[]>;
+}

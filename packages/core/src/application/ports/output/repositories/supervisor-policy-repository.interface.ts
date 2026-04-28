@@ -1,0 +1,51 @@
+/**
+ * SupervisorPolicy Repository Interface (Output Port)
+ *
+ * Defines the contract for SupervisorPolicy persistence (spec 093).
+ * Resolution is per-app with optional per-feature override:
+ * {@link findPolicyForScope} returns the feature-scoped policy first
+ * and falls back to the app-scoped policy when no feature row exists.
+ */
+
+import type { SupervisorPolicy } from '../../../../domain/generated/output.js';
+
+/**
+ * Repository contract for SupervisorPolicy persistence.
+ *
+ * Implementations MUST:
+ * - Enforce uniqueness on (appId, featureId) at the storage layer.
+ * - Implement scope fallback in {@link findPolicyForScope} —
+ *   feature row first, then app row.
+ */
+export interface ISupervisorPolicyRepository {
+  /** Create a new policy. Throws on uniqueness conflict. */
+  create(policy: SupervisorPolicy): Promise<void>;
+
+  /** Replace an existing policy in place by id. */
+  update(policy: SupervisorPolicy): Promise<void>;
+
+  /** Delete a policy by id. No-op if it does not exist. */
+  delete(id: string): Promise<void>;
+
+  /** Find one policy by id. */
+  findById(id: string): Promise<SupervisorPolicy | null>;
+
+  /** Find the app-scoped policy (featureId IS NULL). */
+  findByApp(appId: string): Promise<SupervisorPolicy | null>;
+
+  /** Find the feature-scoped policy. */
+  findByFeature(appId: string, featureId: string): Promise<SupervisorPolicy | null>;
+
+  /**
+   * Resolve the effective policy for a scope: feature-scoped row first,
+   * falling back to the app-scoped row when no feature override exists.
+   * Returns null when neither is configured.
+   */
+  findPolicyForScope(
+    appId: string,
+    featureId: string | undefined
+  ): Promise<SupervisorPolicy | null>;
+
+  /** List all policies for an app (both app- and feature-scoped). */
+  listByApp(appId: string): Promise<SupervisorPolicy[]>;
+}

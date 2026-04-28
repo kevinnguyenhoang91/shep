@@ -42,6 +42,10 @@ properties:
     type: boolean
     default: false
     description: Enable AI-powered code review for pull requests
+  collaboration:
+    type: boolean
+    default: false
+    description: Enable agent collaboration, supervisor agent, and unified question pipeline (spec 093)
 required:
   - skills
   - envDeploy
@@ -53,4 +57,5 @@ required:
   - inventory
   - projects
   - codeReview
+  - collaboration
 description: Feature flag toggles for runtime feature control

@@ -10,3 +10,16 @@ export type { IRepositoryRepository } from './repository-repository.interface.js
 export type { IInteractiveSessionRepository } from './interactive-session-repository.interface.js';
 export type { IInteractiveMessageRepository } from './interactive-message-repository.interface.js';
 export type { IApplicationRepository } from './application-repository.interface.js';
+export type {
+  IAgentMessageRepository,
+  AgentMessageListFilters,
+} from './agent-message-repository.interface.js';
+export type {
+  IAgentQuestionRepository,
+  AgentQuestionListFilters,
+} from './agent-question-repository.interface.js';
+export type { ISupervisorPolicyRepository } from './supervisor-policy-repository.interface.js';
+export type {
+  ISupervisorDecisionRepository,
+  SupervisorDecisionListFilters,
+} from './supervisor-decision-repository.interface.js';
