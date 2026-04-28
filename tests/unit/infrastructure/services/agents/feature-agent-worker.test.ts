@@ -103,6 +103,15 @@ function makeMockExecutorProvider() {
   };
 }
 
+function makeMockLifecyclePublisher() {
+  return {
+    publishStarted: vi.fn().mockResolvedValue(undefined),
+    publishPhaseChanged: vi.fn().mockResolvedValue(undefined),
+    publishBlocked: vi.fn().mockResolvedValue(undefined),
+    publishCompleted: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 describe('parseWorkerArgs', () => {
   it('should parse all required CLI arguments', () => {
     const args = [
@@ -310,16 +319,19 @@ describe('parseWorkerArgs', () => {
 describe('runWorker', () => {
   let mockRunRepo: ReturnType<typeof makeMockRunRepository>;
   let mockExecutorProvider: ReturnType<typeof makeMockExecutorProvider>;
+  let mockLifecyclePublisher: ReturnType<typeof makeMockLifecyclePublisher>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockRunRepo = makeMockRunRepository();
     mockExecutorProvider = makeMockExecutorProvider();
+    mockLifecyclePublisher = makeMockLifecyclePublisher();
     mockInitializeContainer.mockResolvedValue({ resolve: mockResolve });
     mockResolve.mockImplementation((token: unknown) => {
       const key = typeof token === 'string' ? token : (token as { name?: string })?.name;
       if (key === 'IAgentRunRepository') return mockRunRepo;
       if (key === 'IAgentExecutorProvider') return mockExecutorProvider;
+      if (key === 'FeatureAgentLifecyclePublisher') return mockLifecyclePublisher;
       // InitializeSettingsUseCase — return a mock with execute()
       if (key === 'InitializeSettingsUseCase') {
         return {
@@ -723,6 +735,50 @@ describe('runWorker', () => {
       AgentRunStatus.completed,
       expect.objectContaining({
         completedAt: expect.any(Date),
+      })
+    );
+  });
+
+  it('publishes started, phase-changed, and completed lifecycle messages on a normal run (spec 093)', async () => {
+    await runWorker({
+      featureId: 'feat-1',
+      runId: 'run-1',
+      repo: '/repo',
+      specDir: '/specs',
+    });
+
+    expect(mockLifecyclePublisher.publishStarted).toHaveBeenCalledTimes(1);
+    expect(mockLifecyclePublisher.publishPhaseChanged).toHaveBeenCalledTimes(1);
+    expect(mockLifecyclePublisher.publishCompleted).toHaveBeenCalledTimes(1);
+    expect(mockLifecyclePublisher.publishBlocked).not.toHaveBeenCalled();
+  });
+
+  it('publishes a blocked lifecycle message when graph returns __interrupt__ (spec 093)', async () => {
+    mockGraphInvoke.mockResolvedValue({
+      currentNode: 'analyze',
+      messages: ['[analyze] paused'],
+      error: null,
+      __interrupt__: [{ value: { node: 'analyze', message: 'Approve' } }],
+    });
+
+    await runWorker({
+      featureId: 'feat-1',
+      runId: 'run-1',
+      repo: '/repo',
+      specDir: '/specs',
+      approvalGates: { allowPrd: false, allowPlan: false, allowMerge: false },
+      resume: false,
+    });
+
+    expect(mockLifecyclePublisher.publishStarted).toHaveBeenCalledTimes(1);
+    expect(mockLifecyclePublisher.publishBlocked).toHaveBeenCalledTimes(1);
+    expect(mockLifecyclePublisher.publishCompleted).not.toHaveBeenCalled();
+    expect(mockLifecyclePublisher.publishBlocked).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: 'run-1',
+        featureId: 'feat-1',
+        repositoryPath: '/repo',
+        reason: 'waiting_approval:analyze',
       })
     );
   });

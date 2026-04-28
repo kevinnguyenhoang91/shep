@@ -33,6 +33,7 @@ import { setHeartbeatContext } from './heartbeat.js';
 import { setPhaseTimingContext, recordLifecycleEvent } from './phase-timing-context.js';
 import { setLifecycleContext } from './lifecycle-context.js';
 import { setLogPrefix, getLogPrefix } from './log-context.js';
+import { FeatureAgentLifecyclePublisher } from './feature-agent-lifecycle-publisher.js';
 import type { IPhaseTimingRepository } from '@/application/ports/output/agents/phase-timing-repository.interface.js';
 import { UpdateFeatureLifecycleUseCase } from '@/application/use-cases/features/update/update-feature-lifecycle.use-case.js';
 import { CleanupFeatureWorktreeUseCase } from '@/application/use-cases/features/cleanup-feature-worktree.use-case.js';
@@ -323,6 +324,17 @@ export async function runWorker(args: WorkerArgs): Promise<void> {
   // Record lifecycle event
   await recordLifecycleEvent(args.resume ? 'run:resumed' : 'run:started');
 
+  // Resolve the lifecycle publisher once. It is itself feature-flag-gated
+  // through SendAgentMessageUseCase, so when `featureFlags.collaboration`
+  // is off the calls below are no-ops and no rows are written.
+  const lifecyclePublisher = container.resolve(FeatureAgentLifecyclePublisher);
+  const lifecycleScope = {
+    runId: args.runId,
+    featureId: args.featureId,
+    repositoryPath: args.repo,
+  };
+  await lifecyclePublisher.publishStarted(lifecycleScope);
+
   try {
     const graphConfig = { configurable: { thread_id: checkpointId } };
 
@@ -413,6 +425,10 @@ export async function runWorker(args: WorkerArgs): Promise<void> {
       );
     } else {
       log('Starting graph invocation...');
+      await lifecyclePublisher.publishPhaseChanged({
+        ...lifecycleScope,
+        phase: 'graph-start',
+      });
       result = await graph.invoke(
         {
           featureId: args.featureId,
@@ -449,6 +465,10 @@ export async function runWorker(args: WorkerArgs): Promise<void> {
         updatedAt: now,
         ...(interruptNode ? { result: `node:${interruptNode}` } : {}),
       });
+      await lifecyclePublisher.publishBlocked({
+        ...lifecycleScope,
+        reason: interruptNode ? `waiting_approval:${interruptNode}` : 'waiting_approval',
+      });
       log('Run paused — waiting for human approval');
       return;
     }
@@ -473,6 +493,7 @@ export async function runWorker(args: WorkerArgs): Promise<void> {
       updatedAt: completedAt,
     });
     await recordLifecycleEvent('run:completed');
+    await lifecyclePublisher.publishCompleted(lifecycleScope);
     log('Run marked as completed');
   } catch (error: unknown) {
     stopHeartbeat();
