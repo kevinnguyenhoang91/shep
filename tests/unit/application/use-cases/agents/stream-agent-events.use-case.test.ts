@@ -24,6 +24,7 @@ import type { IOperationLogEventBus } from '@/application/ports/output/services/
 import type { IProcessLivenessProbe } from '@/application/ports/output/services/process-liveness.interface.js';
 import type { IAgentMessageBus } from '@/application/ports/output/agents/agent-message-bus.interface.js';
 import { InMemoryAgentQuestionRepository } from '@/infrastructure/adapters/in-memory/in-memory-agent-question-repository.js';
+import { InMemorySupervisorDecisionRepository } from '@/infrastructure/adapters/in-memory/in-memory-supervisor-decision-repository.js';
 
 import type { AgentRun, Feature } from '@/domain/generated/output.js';
 import {
@@ -168,7 +169,8 @@ function createUseCase(args: {
     operationLogEventBus,
     logger,
     agentMessageBus,
-    new InMemoryAgentQuestionRepository()
+    new InMemoryAgentQuestionRepository(),
+    new InMemorySupervisorDecisionRepository()
   );
 
   return { useCase, agentRunRepo, phaseTimingRepo };
@@ -313,7 +315,8 @@ describe('StreamAgentEventsUseCase', () => {
       operationLogEventBus,
       logger,
       agentMessageBus,
-      new InMemoryAgentQuestionRepository()
+      new InMemoryAgentQuestionRepository(),
+      new InMemorySupervisorDecisionRepository()
     );
 
     const events = await collectEvents(useCase);
@@ -419,7 +422,8 @@ describe('StreamAgentEventsUseCase', () => {
       operationLogEventBus,
       logger,
       agentMessageBus,
-      new InMemoryAgentQuestionRepository()
+      new InMemoryAgentQuestionRepository(),
+      new InMemorySupervisorDecisionRepository()
     );
 
     const events = await collectEvents(useCase);

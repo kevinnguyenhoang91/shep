@@ -15,6 +15,7 @@ import type {
   ApplicationStatus,
   CloudDeploymentProvider,
   NotificationEvent,
+  SupervisorVerdict,
 } from '../../../../domain/generated/output.js';
 import { AgentRunStatus, InteractiveSessionStatus } from '../../../../domain/generated/output.js';
 import {
@@ -102,11 +103,38 @@ export interface AgentQuestionStreamEvent {
   createdAt: string;
 }
 
+/**
+ * Envelope for a {@link SupervisorDecision} (spec 093, task 30).
+ *
+ * Forwarded to every connected client via the existing SSE pipeline so
+ * the supervisor "Why?" drawer and audit views can render decisions in
+ * real time. Decisions are immutable, so we only emit a `new` event —
+ * unlike {@link AgentQuestionStreamEvent} there is no status transition
+ * to track.
+ */
+export interface SupervisorDecisionStreamEvent {
+  kind: 'supervisor_decision';
+  decisionId: string;
+  appId: string;
+  featureId?: string;
+  supervisorRunId: string;
+  sourceEventKind: string;
+  sourceEventId: string;
+  verdict: SupervisorVerdict;
+  rationale: string;
+  modelId: string;
+  promptVersion: string;
+  ruleRef?: string;
+  confidence?: number;
+  createdAt: string;
+}
+
 export type StreamedAgentEvent =
   | NotificationStreamEvent
   | InteractiveSessionStreamEvent
   | AgentMessageStreamEvent
-  | AgentQuestionStreamEvent;
+  | AgentQuestionStreamEvent
+  | SupervisorDecisionStreamEvent;
 
 /** Per-connection cached state for a single feature. */
 export interface CachedFeatureState {

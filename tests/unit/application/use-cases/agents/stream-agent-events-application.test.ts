@@ -23,6 +23,7 @@ import type { IOperationLogEventBus } from '@/application/ports/output/services/
 import type { IProcessLivenessProbe } from '@/application/ports/output/services/process-liveness.interface.js';
 import type { IAgentMessageBus } from '@/application/ports/output/agents/agent-message-bus.interface.js';
 import { InMemoryAgentQuestionRepository } from '@/infrastructure/adapters/in-memory/in-memory-agent-question-repository.js';
+import { InMemorySupervisorDecisionRepository } from '@/infrastructure/adapters/in-memory/in-memory-supervisor-decision-repository.js';
 
 import type { Application, NotificationEvent } from '@/domain/generated/output.js';
 import { ApplicationStatus, NotificationEventType } from '@/domain/generated/output.js';
@@ -138,7 +139,8 @@ function buildUseCase(listMock: () => Promise<Application[]>): StreamAgentEvents
     operationLogEventBus,
     logger,
     agentMessageBus,
-    new InMemoryAgentQuestionRepository()
+    new InMemoryAgentQuestionRepository(),
+    new InMemorySupervisorDecisionRepository()
   );
 }
 

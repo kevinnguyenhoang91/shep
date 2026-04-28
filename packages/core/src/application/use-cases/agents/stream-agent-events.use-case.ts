@@ -31,6 +31,7 @@ import type { IPhaseTimingRepository } from '../../ports/output/agents/phase-tim
 import type { IAgentQuestionRepository } from '../../ports/output/repositories/agent-question-repository.interface.js';
 import type { IApplicationRepository } from '../../ports/output/repositories/application-repository.interface.js';
 import type { IInteractiveSessionRepository } from '../../ports/output/repositories/interactive-session-repository.interface.js';
+import type { ISupervisorDecisionRepository } from '../../ports/output/repositories/supervisor-decision-repository.interface.js';
 import type { ICloudDeploymentEventBus } from '../../ports/output/services/cloud-deployment-event-bus.interface.js';
 import type { ILogger } from '../../ports/output/services/logger.interface.js';
 import type { IOperationLogEventBus } from '../../ports/output/services/operation-log-event-bus.interface.js';
@@ -46,6 +47,10 @@ import {
 } from '../../../domain/generated/output.js';
 
 import { computeApplicationDeltas } from './stream-agent-events/compute-application-deltas.js';
+import {
+  computeDecisionDeltas,
+  type CachedSupervisorDecisionState,
+} from './stream-agent-events/compute-decision-deltas.js';
 import { computeFeatureDeltas } from './stream-agent-events/compute-feature-deltas.js';
 import {
   computeMessageDeltas,
@@ -74,6 +79,7 @@ export type {
   InteractiveSessionStreamEvent,
   NotificationStreamEvent,
   StreamedAgentEvent,
+  SupervisorDecisionStreamEvent,
 } from './stream-agent-events/stream-agent-events.types.js';
 
 /** Default delta poll interval. */
@@ -112,7 +118,9 @@ export class StreamAgentEventsUseCase {
     @inject('IAgentMessageBus')
     private readonly agentMessageBus: IAgentMessageBus,
     @inject('IAgentQuestionRepository')
-    private readonly agentQuestionRepo: IAgentQuestionRepository
+    private readonly agentQuestionRepo: IAgentQuestionRepository,
+    @inject('ISupervisorDecisionRepository')
+    private readonly supervisorDecisionRepo: ISupervisorDecisionRepository
   ) {}
 
   /**
@@ -133,6 +141,7 @@ export class StreamAgentEventsUseCase {
     const applicationCache = new Map<string, CachedApplicationState>();
     const agentMessageCache = new Map<string, CachedAgentMessageState>();
     const agentQuestionCache = new Map<string, CachedAgentQuestionState>();
+    const supervisorDecisionCache = new Map<string, CachedSupervisorDecisionState>();
 
     const queue: StreamedAgentEvent[] = [];
     let notify: (() => void) | null = null;
@@ -160,6 +169,7 @@ export class StreamAgentEventsUseCase {
             applicationCache,
             agentMessageCache,
             agentQuestionCache,
+            supervisorDecisionCache,
             enqueue,
           });
           pollErrorCount = 0;
@@ -312,6 +322,7 @@ export class StreamAgentEventsUseCase {
     applicationCache: Map<string, CachedApplicationState>;
     agentMessageCache: Map<string, CachedAgentMessageState>;
     agentQuestionCache: Map<string, CachedAgentQuestionState>;
+    supervisorDecisionCache: Map<string, CachedSupervisorDecisionState>;
     enqueue: (event: StreamedAgentEvent) => void;
   }): Promise<void> {
     const {
@@ -321,6 +332,7 @@ export class StreamAgentEventsUseCase {
       applicationCache,
       agentMessageCache,
       agentQuestionCache,
+      supervisorDecisionCache,
       enqueue,
     } = args;
 
@@ -451,6 +463,28 @@ export class StreamAgentEventsUseCase {
         }
       } catch {
         // Ignore question-poll failures; same posture as session polling.
+      }
+    }
+
+    // Supervisor decision polling (spec 093, task 30) — decisions are
+    // immutable, so we reuse the deliveredIds + lastSeenAt cache shape
+    // from messages. The since cursor lets the SQLite repo skip rows
+    // we've already emitted.
+    for (const appId of applicationIds) {
+      let cache = supervisorDecisionCache.get(appId);
+      if (!cache) {
+        cache = { lastSeenAt: 0, deliveredIds: new Set<string>() };
+        supervisorDecisionCache.set(appId, cache);
+      }
+      try {
+        const decisions = await this.supervisorDecisionRepo.listByScope(appId, undefined, {
+          since: cache.lastSeenAt > 0 ? new Date(cache.lastSeenAt) : undefined,
+        });
+        for (const event of computeDecisionDeltas({ decisions, cache })) {
+          enqueue(event);
+        }
+      } catch {
+        // Ignore decision-poll failures; same posture as session polling.
       }
     }
   }
