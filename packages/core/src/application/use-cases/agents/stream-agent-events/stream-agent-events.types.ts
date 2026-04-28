@@ -9,6 +9,9 @@
 
 import type {
   AgentMessageKind,
+  AgentQuestionAnswerer,
+  AgentQuestionKind,
+  AgentQuestionStatus,
   ApplicationStatus,
   CloudDeploymentProvider,
   NotificationEvent,
@@ -71,10 +74,39 @@ export interface AgentMessageStreamEvent {
   createdAt: string;
 }
 
+/**
+ * Envelope for an {@link AgentQuestion} lifecycle event (spec 093,
+ * task 18). Two `transition` values are emitted:
+ *  - `new`     — the question just appeared in the polled set.
+ *  - `status`  — the question's status changed from its previous value
+ *                (e.g., pending → answered).
+ *
+ * Forwarded to every connected client via the existing SSE pipeline so
+ * the unified question inbox can render the row in real time.
+ */
+export interface AgentQuestionStreamEvent {
+  kind: 'agent_question';
+  questionId: string;
+  appId: string;
+  featureId?: string;
+  agentRunId: string;
+  questionKind: AgentQuestionKind;
+  answerer: AgentQuestionAnswerer;
+  status: AgentQuestionStatus;
+  prompt: string;
+  optionsJson?: string;
+  answer?: string;
+  answeredBy?: string;
+  answeredAt?: string;
+  transition: 'new' | 'status';
+  createdAt: string;
+}
+
 export type StreamedAgentEvent =
   | NotificationStreamEvent
   | InteractiveSessionStreamEvent
-  | AgentMessageStreamEvent;
+  | AgentMessageStreamEvent
+  | AgentQuestionStreamEvent;
 
 /** Per-connection cached state for a single feature. */
 export interface CachedFeatureState {

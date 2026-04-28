@@ -28,6 +28,7 @@ import { inject, injectable } from 'tsyringe';
 import type { IAgentMessageBus } from '../../ports/output/agents/agent-message-bus.interface.js';
 import type { IAgentRunRepository } from '../../ports/output/agents/agent-run-repository.interface.js';
 import type { IPhaseTimingRepository } from '../../ports/output/agents/phase-timing-repository.interface.js';
+import type { IAgentQuestionRepository } from '../../ports/output/repositories/agent-question-repository.interface.js';
 import type { IApplicationRepository } from '../../ports/output/repositories/application-repository.interface.js';
 import type { IInteractiveSessionRepository } from '../../ports/output/repositories/interactive-session-repository.interface.js';
 import type { ICloudDeploymentEventBus } from '../../ports/output/services/cloud-deployment-event-bus.interface.js';
@@ -50,6 +51,10 @@ import {
   computeMessageDeltas,
   type CachedAgentMessageState,
 } from './stream-agent-events/compute-message-deltas.js';
+import {
+  computeQuestionDeltas,
+  type CachedAgentQuestionState,
+} from './stream-agent-events/compute-question-deltas.js';
 import { computePhaseCompletionDeltas } from './stream-agent-events/compute-phase-completion-deltas.js';
 import { computePrDeltas } from './stream-agent-events/compute-pr-deltas.js';
 import { computeSessionDeltas } from './stream-agent-events/compute-session-deltas.js';
@@ -65,6 +70,7 @@ import type {
 // from this module keep working.
 export type {
   AgentMessageStreamEvent,
+  AgentQuestionStreamEvent,
   InteractiveSessionStreamEvent,
   NotificationStreamEvent,
   StreamedAgentEvent,
@@ -104,7 +110,9 @@ export class StreamAgentEventsUseCase {
     @inject('ILogger')
     private readonly logger: ILogger,
     @inject('IAgentMessageBus')
-    private readonly agentMessageBus: IAgentMessageBus
+    private readonly agentMessageBus: IAgentMessageBus,
+    @inject('IAgentQuestionRepository')
+    private readonly agentQuestionRepo: IAgentQuestionRepository
   ) {}
 
   /**
@@ -124,6 +132,7 @@ export class StreamAgentEventsUseCase {
     const sessionCache = new Map<string, CachedSessionState>();
     const applicationCache = new Map<string, CachedApplicationState>();
     const agentMessageCache = new Map<string, CachedAgentMessageState>();
+    const agentQuestionCache = new Map<string, CachedAgentQuestionState>();
 
     const queue: StreamedAgentEvent[] = [];
     let notify: (() => void) | null = null;
@@ -150,6 +159,7 @@ export class StreamAgentEventsUseCase {
             sessionCache,
             applicationCache,
             agentMessageCache,
+            agentQuestionCache,
             enqueue,
           });
           pollErrorCount = 0;
@@ -301,6 +311,7 @@ export class StreamAgentEventsUseCase {
     sessionCache: Map<string, CachedSessionState>;
     applicationCache: Map<string, CachedApplicationState>;
     agentMessageCache: Map<string, CachedAgentMessageState>;
+    agentQuestionCache: Map<string, CachedAgentQuestionState>;
     enqueue: (event: StreamedAgentEvent) => void;
   }): Promise<void> {
     const {
@@ -309,6 +320,7 @@ export class StreamAgentEventsUseCase {
       sessionCache,
       applicationCache,
       agentMessageCache,
+      agentQuestionCache,
       enqueue,
     } = args;
 
@@ -419,6 +431,26 @@ export class StreamAgentEventsUseCase {
         }
       } catch {
         // Ignore message-bus poll failures; same posture as session polling.
+      }
+    }
+
+    // Agent question polling (spec 093, task 18) — same pattern as the
+    // message bus. Per-app cache keyed by appId tracks both a high-water
+    // mark and the last-known status per question id so status
+    // transitions emit a separate event.
+    for (const appId of applicationIds) {
+      let cache = agentQuestionCache.get(appId);
+      if (!cache) {
+        cache = { lastSeenAt: 0, lastStatus: new Map() };
+        agentQuestionCache.set(appId, cache);
+      }
+      try {
+        const questions = await this.agentQuestionRepo.listByScope(appId, undefined);
+        for (const event of computeQuestionDeltas({ questions, cache })) {
+          enqueue(event);
+        }
+      } catch {
+        // Ignore question-poll failures; same posture as session polling.
       }
     }
   }

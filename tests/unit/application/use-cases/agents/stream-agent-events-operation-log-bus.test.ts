@@ -21,6 +21,7 @@ import type { ICloudDeploymentEventBus } from '@/application/ports/output/servic
 import type { ILogger } from '@/application/ports/output/services/logger.interface.js';
 import type { IProcessLivenessProbe } from '@/application/ports/output/services/process-liveness.interface.js';
 import type { IAgentMessageBus } from '@/application/ports/output/agents/agent-message-bus.interface.js';
+import { InMemoryAgentQuestionRepository } from '@/infrastructure/adapters/in-memory/in-memory-agent-question-repository.js';
 
 import { InMemoryOperationLogEventBus } from '@/infrastructure/services/events/in-memory-operation-log-event-bus.js';
 
@@ -118,7 +119,8 @@ function buildUseCase(bus: InMemoryOperationLogEventBus): StreamAgentEventsUseCa
     applicationRepo,
     bus,
     logger,
-    agentMessageBus
+    agentMessageBus,
+    new InMemoryAgentQuestionRepository()
   );
 }
 

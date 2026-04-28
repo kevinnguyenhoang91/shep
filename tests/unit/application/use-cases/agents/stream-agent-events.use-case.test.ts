@@ -23,6 +23,7 @@ import type { ILogger } from '@/application/ports/output/services/logger.interfa
 import type { IOperationLogEventBus } from '@/application/ports/output/services/operation-log-event-bus.interface.js';
 import type { IProcessLivenessProbe } from '@/application/ports/output/services/process-liveness.interface.js';
 import type { IAgentMessageBus } from '@/application/ports/output/agents/agent-message-bus.interface.js';
+import { InMemoryAgentQuestionRepository } from '@/infrastructure/adapters/in-memory/in-memory-agent-question-repository.js';
 
 import type { AgentRun, Feature } from '@/domain/generated/output.js';
 import {
@@ -166,7 +167,8 @@ function createUseCase(args: {
     applicationRepo,
     operationLogEventBus,
     logger,
-    agentMessageBus
+    agentMessageBus,
+    new InMemoryAgentQuestionRepository()
   );
 
   return { useCase, agentRunRepo, phaseTimingRepo };
@@ -310,7 +312,8 @@ describe('StreamAgentEventsUseCase', () => {
       applicationRepo,
       operationLogEventBus,
       logger,
-      agentMessageBus
+      agentMessageBus,
+      new InMemoryAgentQuestionRepository()
     );
 
     const events = await collectEvents(useCase);
@@ -415,7 +418,8 @@ describe('StreamAgentEventsUseCase', () => {
       applicationRepo,
       operationLogEventBus,
       logger,
-      agentMessageBus
+      agentMessageBus,
+      new InMemoryAgentQuestionRepository()
     );
 
     const events = await collectEvents(useCase);
