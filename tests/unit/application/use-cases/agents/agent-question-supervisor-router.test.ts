@@ -132,7 +132,8 @@ function buildRouter(opts: { collaboration: boolean; verdict: SupervisorVerdict 
     decisionRepo,
     activityLog,
     settings,
-    getPolicy
+    getPolicy,
+    { execute: vi.fn().mockResolvedValue({ escalated: false }) } as any
   );
   const answer = new AnswerAgentQuestionUseCase(
     questionRepo,

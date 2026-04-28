@@ -209,7 +209,8 @@ function buildEvaluator(opts: {
     decisionRepo,
     activityLog,
     settingsRepo(opts.collaboration),
-    getPolicy
+    getPolicy,
+    { execute: vi.fn().mockResolvedValue({ escalated: false }) } as any
   );
 
   const runRepo = {

@@ -13,12 +13,16 @@ import 'reflect-metadata';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { EvaluateSupervisorDecisionUseCase } from '@/application/use-cases/agents/evaluate-supervisor-decision.use-case.js';
+import type { EscalateToUserUseCase } from '@/application/use-cases/agents/escalate-to-user.use-case.js';
 import { GetSupervisorPolicyUseCase } from '@/application/use-cases/agents/get-supervisor-policy.use-case.js';
 import { ConfigureSupervisorUseCase } from '@/application/use-cases/agents/configure-supervisor.use-case.js';
 import { InMemorySupervisorPolicyRepository } from '@/infrastructure/adapters/in-memory/in-memory-supervisor-policy-repository.js';
 import { InMemorySupervisorDecisionRepository } from '@/infrastructure/adapters/in-memory/in-memory-supervisor-decision-repository.js';
 import { InMemorySupervisorAgent } from '@/infrastructure/adapters/in-memory/in-memory-supervisor-agent.js';
+import { StubSupervisorAgentExecutor } from '@/infrastructure/services/agents/supervisor-agent/stub-supervisor-executor.js';
 import {
+  NotificationEventType,
+  NotificationSeverity,
   SupervisorAutonomy,
   SupervisorVerdict,
   type ActivityEntry,
@@ -26,6 +30,7 @@ import {
 } from '@/domain/generated/output.js';
 import type { ISettingsRepository } from '@/application/ports/output/repositories/settings.repository.interface.js';
 import type { IActivityLogRepository } from '@/application/ports/output/repositories/activity-log-repository.interface.js';
+import type { ISupervisorAgent } from '@/application/ports/output/agents/supervisor-agent.interface.js';
 import type { SupervisorGateEvent } from '@/application/ports/output/agents/supervisor-agent.interface.js';
 
 function makeSettingsRepo(collaboration: boolean): ISettingsRepository {
@@ -34,6 +39,12 @@ function makeSettingsRepo(collaboration: boolean): ISettingsRepository {
     load: vi.fn().mockResolvedValue({ featureFlags: { collaboration } } as unknown as Settings),
     update: vi.fn().mockResolvedValue(undefined),
   };
+}
+
+function makeEscalateToUserStub(): EscalateToUserUseCase {
+  return {
+    execute: vi.fn().mockResolvedValue({ escalated: false }),
+  } as unknown as EscalateToUserUseCase;
 }
 
 class InMemoryActivityLogRepository implements IActivityLogRepository {
@@ -73,13 +84,20 @@ describe('EvaluateSupervisorDecisionUseCase', () => {
     getPolicy = new GetSupervisorPolicyUseCase(policyRepo);
   });
 
-  function makeUseCase(flagOn: boolean): EvaluateSupervisorDecisionUseCase {
+  function makeUseCase(
+    flagOn: boolean,
+    overrides?: {
+      supervisorAgent?: ISupervisorAgent;
+      escalate?: EscalateToUserUseCase;
+    }
+  ): EvaluateSupervisorDecisionUseCase {
     return new EvaluateSupervisorDecisionUseCase(
-      supervisorAgent,
+      overrides?.supervisorAgent ?? supervisorAgent,
       decisionRepo,
       activityLog,
       makeSettingsRepo(flagOn),
-      getPolicy
+      getPolicy,
+      overrides?.escalate ?? makeEscalateToUserStub()
     );
   }
 
@@ -145,6 +163,84 @@ describe('EvaluateSupervisorDecisionUseCase', () => {
     expect(entry.workItemId).toBe('gate-1');
     expect(entry.fieldName).toBe('supervisor.gate');
     expect(entry.newValue).toBe(SupervisorVerdict.advise);
+  });
+
+  it('fires SupervisorEscalated notification when verdict is escalate', async () => {
+    await configure.execute({
+      appId: 'app-1',
+      autonomyLevel: SupervisorAutonomy.advisory,
+    });
+    const escalateAgent: ISupervisorAgent = new StubSupervisorAgentExecutor({
+      verdicts: {
+        gate: { verdict: SupervisorVerdict.escalate, rationale: 'needs human' },
+      },
+    });
+    const escalate = makeEscalateToUserStub();
+    const useCase = makeUseCase(true, { supervisorAgent: escalateAgent, escalate });
+
+    const result = await useCase.execute({
+      event: gateEvent(),
+      supervisorRunId: 'sup-run-1',
+    });
+
+    expect(result.evaluated).toBe(true);
+    expect(result.decision?.verdict).toBe(SupervisorVerdict.escalate);
+
+    expect(escalate.execute).toHaveBeenCalledTimes(1);
+    const call = (escalate.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.eventType).toBe(NotificationEventType.SupervisorEscalated);
+    expect(call.severity).toBe(NotificationSeverity.Warning);
+    expect(call.actorId).toBe('supervisor:sup-run-1');
+    expect(call.message).toBe('needs human');
+  });
+
+  it('does NOT fire SupervisorEscalated for non-escalate verdicts', async () => {
+    await configure.execute({
+      appId: 'app-1',
+      autonomyLevel: SupervisorAutonomy.advisory,
+    });
+    const escalate = makeEscalateToUserStub();
+    const useCase = makeUseCase(true, { escalate });
+
+    await useCase.execute({
+      event: gateEvent(),
+      supervisorRunId: 'sup-run-1',
+    });
+
+    expect(escalate.execute).not.toHaveBeenCalled();
+  });
+
+  it('absorbs evaluator failures, fires SupervisorFailed, and writes no decision row', async () => {
+    await configure.execute({
+      appId: 'app-1',
+      autonomyLevel: SupervisorAutonomy.advisory,
+    });
+    const throwingAgent: ISupervisorAgent = {
+      evaluate: vi.fn().mockRejectedValue(new Error('boom')),
+    };
+    const escalate = makeEscalateToUserStub();
+    const useCase = makeUseCase(true, { supervisorAgent: throwingAgent, escalate });
+
+    const result = await useCase.execute({
+      event: gateEvent(),
+      supervisorRunId: 'sup-run-1',
+    });
+
+    expect(result.evaluated).toBe(false);
+    expect(result.skippedReason).toBe('supervisor-failed');
+    expect(result.failureReason).toBe('boom');
+    expect(result.decision).toBeUndefined();
+
+    // No SupervisorDecision row was persisted on the failure path.
+    expect(await decisionRepo.listByScope('app-1', undefined)).toHaveLength(0);
+
+    // The failure surfaces as a SupervisorFailed notification through
+    // EscalateToUserUseCase.
+    expect(escalate.execute).toHaveBeenCalledTimes(1);
+    const call = (escalate.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.eventType).toBe(NotificationEventType.SupervisorFailed);
+    expect(call.severity).toBe(NotificationSeverity.Error);
+    expect(call.actorId).toBe('supervisor:sup-run-1');
   });
 
   it('uses the feature-scoped policy when both feature and app rows exist', async () => {

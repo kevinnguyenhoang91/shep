@@ -32,12 +32,16 @@ import type {
   ISupervisorAgent,
   SupervisorEvent,
 } from '../../ports/output/agents/supervisor-agent.interface.js';
-import type {
-  ActivityEntry,
-  SupervisorDecision,
-  SupervisorPolicy,
+import {
+  NotificationEventType,
+  NotificationSeverity,
+  SupervisorVerdict,
+  type ActivityEntry,
+  type SupervisorDecision,
+  type SupervisorPolicy,
 } from '../../../domain/generated/output.js';
 import { GetSupervisorPolicyUseCase } from './get-supervisor-policy.use-case.js';
+import { EscalateToUserUseCase } from './escalate-to-user.use-case.js';
 
 export interface EvaluateSupervisorDecisionInput {
   /** Source event being evaluated. */
@@ -58,7 +62,14 @@ export interface EvaluateSupervisorDecisionResult {
    * Diagnostic reason returned when `evaluated` is false. Stable string
    * so the caller can branch deterministically.
    */
-  skippedReason?: 'flag-off' | 'no-policy';
+  skippedReason?: 'flag-off' | 'no-policy' | 'supervisor-failed';
+  /**
+   * Populated when the underlying evaluator threw or timed out (FR-22). The
+   * use case absorbs the error so the caller is never crashed by a
+   * supervisor failure; the failure is surfaced via the
+   * `SupervisorFailed` notification and an audit-log entry instead.
+   */
+  failureReason?: string;
 }
 
 @injectable()
@@ -72,7 +83,9 @@ export class EvaluateSupervisorDecisionUseCase {
     private readonly activityLog: IActivityLogRepository,
     @inject('ISettingsRepository')
     private readonly settings: ISettingsRepository,
-    private readonly getPolicy: GetSupervisorPolicyUseCase
+    private readonly getPolicy: GetSupervisorPolicyUseCase,
+    @inject(EscalateToUserUseCase)
+    private readonly escalateToUser: EscalateToUserUseCase
   ) {}
 
   async execute(input: EvaluateSupervisorDecisionInput): Promise<EvaluateSupervisorDecisionResult> {
@@ -90,9 +103,33 @@ export class EvaluateSupervisorDecisionUseCase {
       return { evaluated: false, skippedReason: 'no-policy' };
     }
 
-    const result = await this.supervisorAgent.evaluate({ event, policy });
-
     const now = new Date();
+
+    let result;
+    try {
+      result = await this.supervisorAgent.evaluate({ event, policy });
+    } catch (err) {
+      // FR-22: a supervisor evaluator failure (timeout, model error,
+      // exception) MUST NOT crash the caller. Fall back to the standard
+      // human approval path by surfacing a SupervisorFailed notification
+      // and recording an audit-log entry. No SupervisorDecision row is
+      // written because there is no verdict to record.
+      const failureReason = err instanceof Error ? err.message : String(err);
+      await this.escalateToUser.execute({
+        eventType: NotificationEventType.SupervisorFailed,
+        severity: NotificationSeverity.Error,
+        message: `Supervisor evaluation failed: ${failureReason}`,
+        agentRunId: this.resolveAgentRunId(event),
+        featureId: event.featureId ?? '',
+        featureName: event.featureId ?? '',
+        sourceEventId: event.sourceEventId,
+        actorId: `supervisor:${supervisorRunId}`,
+        auditField: `supervisor.failed.${event.kind}`,
+        timestamp: now,
+      });
+      return { evaluated: false, skippedReason: 'supervisor-failed', failureReason };
+    }
+
     const decision: SupervisorDecision = {
       id: randomUUID(),
       appId: event.appId,
@@ -113,7 +150,32 @@ export class EvaluateSupervisorDecisionUseCase {
     await this.decisionRepository.create(decision);
     await this.mirrorToActivityLog(decision, policy, now);
 
+    if (result.verdict === SupervisorVerdict.escalate) {
+      // The supervisor punted back to the user — surface that via the
+      // notification surface so the user can pick up the gate / question
+      // promptly (research decision 9).
+      await this.escalateToUser.execute({
+        eventType: NotificationEventType.SupervisorEscalated,
+        severity: NotificationSeverity.Warning,
+        message: result.rationale,
+        agentRunId: this.resolveAgentRunId(event),
+        featureId: event.featureId ?? '',
+        featureName: event.featureId ?? '',
+        sourceEventId: event.sourceEventId,
+        actorId: `supervisor:${supervisorRunId}`,
+        auditField: `supervisor.escalated.${event.kind}`,
+        timestamp: now,
+      });
+    }
+
     return { evaluated: true, decision };
+  }
+
+  private resolveAgentRunId(event: SupervisorEvent): string {
+    if ('agentRunId' in event && typeof event.agentRunId === 'string') {
+      return event.agentRunId;
+    }
+    return '';
   }
 
   /**
