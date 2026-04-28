@@ -2,7 +2,7 @@
 
 > **Implementation Status**
 >
-> The **FeatureAgent LangGraph graph** is implemented at `packages/core/src/infrastructure/services/agents/feature-agent/` with background execution support, validation/repair loops, and human-in-the-loop approval. The **AnalyzeRepository graph** is implemented at `packages/core/src/infrastructure/services/agents/analyze-repo/`. The multi-agent supervisor pattern described later in this document remains **planned architecture**.
+> The **FeatureAgent LangGraph graph** is implemented at `packages/core/src/infrastructure/services/agents/feature-agent/` with background execution support, validation/repair loops, and human-in-the-loop approval. The **AnalyzeRepository graph** is implemented at `packages/core/src/infrastructure/services/agents/analyze-repo/`. The **Supervisor agent** (spec 093) is implemented at `packages/core/src/infrastructure/services/agents/supervisor-agent/` and is gated behind the `collaboration` feature flag — see [supervision](./supervision.md).
 >
 > See [AGENTS.md](../../AGENTS.md#current-implementation) for full implementation details including the directory structure, state schema, graph flow, and node descriptions.
 
@@ -135,9 +135,65 @@ Key files:
 - `feature-agent-graph.ts` -- Full SDLC graph definition
 - `fast-feature-agent-graph.ts` -- Simplified fast-mode graph
 - `feature-agent-process.service.ts` -- Process management
-- `feature-agent-worker.ts` -- Background worker
+- `feature-agent-worker.ts` -- Background worker (also emits parallel `AgentQuestion` of `kind = blocking` on every `waiting_approval` transition for the unified inbox)
 - `state.ts` -- State annotation
 - `nodes/` -- Individual node implementations
+
+### Supervisor Agent Graph (spec 093, flag-gated)
+
+Located at `packages/core/src/infrastructure/services/agents/supervisor-agent/`. A
+delegated guardian agent that evaluates approval gates and agent questions on
+behalf of the user. Gated behind `FeatureFlags.collaboration`. See
+[supervision.md](./supervision.md) for the full design.
+
+Key files:
+
+- `supervisor-graph.ts` -- LangGraph workflow: `ingest-event` → `load-policy` → `evaluate` (LLM via `IAgentExecutorProvider`) → `emit-decision` → optional `publish-message`
+- `supervisor-agent-worker.ts` -- Lazy per-`(appId, featureId?)` background worker, mirrors the feature-agent-worker shape (own `agent_runs` row with `agent_type='supervisor'`, heartbeat, checkpointing)
+- `evaluator-prompt.ts` -- Versioned prompt registry; the version is recorded on every `SupervisorDecision`
+- `stub-supervisor-executor.ts` -- Deterministic stub (`InMemorySupervisorAgent`) used by tests so unit / integration coverage runs without an LLM call
+
+## Collaboration & Question Pipeline (spec 093, flag-gated)
+
+Three new domain entities — defined in `tsp/agents/` — extend the agent system
+with structured inter-agent messaging and a unified question/escalation
+pipeline. All are gated behind the `collaboration` feature flag.
+
+| Entity | Source | Storage |
+|---|---|---|
+| `AgentMessage` | `tsp/agents/agent-message.tsp` | `agent_messages` (migration 087) |
+| `AgentQuestion` | `tsp/agents/agent-question.tsp` | `agent_questions` (migration 088) |
+| `SupervisorPolicy` | `tsp/agents/supervisor-policy.tsp` | `supervisor_policies` (migration 089) |
+| `SupervisorDecision` | `tsp/agents/supervisor-decision.tsp` | `supervisor_decisions` (migration 090) + mirrored to `activity_log` |
+
+New ports:
+
+| Port | Path |
+|---|---|
+| `IAgentMessageBus` | `packages/core/src/application/ports/output/agents/agent-message-bus.interface.ts` |
+| `IAgentQuestionService` | `packages/core/src/application/ports/output/agents/agent-question-service.interface.ts` |
+| `ISupervisorAgent` | `packages/core/src/application/ports/output/agents/supervisor-agent.interface.ts` |
+| `IAgentMessageRepository` | `packages/core/src/application/ports/output/repositories/agent-message-repository.interface.ts` |
+| `IAgentQuestionRepository` | `packages/core/src/application/ports/output/repositories/agent-question-repository.interface.ts` |
+| `ISupervisorPolicyRepository` | `packages/core/src/application/ports/output/repositories/supervisor-policy-repository.interface.ts` |
+| `ISupervisorDecisionRepository` | `packages/core/src/application/ports/output/repositories/supervisor-decision-repository.interface.ts` |
+
+New use cases (under `packages/core/src/application/use-cases/agents/`):
+
+`SendAgentMessage`, `ListAgentMessages`, `AskAgentQuestion`,
+`AnswerAgentQuestion`, `CancelAgentQuestion`, `ListAgentQuestions`,
+`EscalateToUser`, `ConfigureSupervisor`, `EnableSupervisor`,
+`DisableSupervisor`, `GetSupervisorPolicy`, `EvaluateSupervisorDecision`.
+
+`ApproveAgentRunUseCase` and `RejectAgentRunUseCase` are extended to recognise
+the `supervisor:<id>` actor namespace and to enforce the **"user always wins"**
+invariant. See [supervision.md](./supervision.md) for the full sequence
+diagrams.
+
+Three new SSE event kinds — `agent_message`, `agent_question`,
+`supervisor_decision` — are streamed through `StreamAgentEventsUseCase` via
+dedicated compute helpers (`compute-message-deltas.ts`,
+`compute-question-deltas.ts`, `compute-decision-deltas.ts`).
 
 ## Agent Executor Interfaces
 
@@ -182,3 +238,4 @@ For implementation details, see [docs/development/adding-agents.md](../developme
 
 - [AGENTS.md](../../AGENTS.md) - Detailed LangGraph implementation
 - [../development/adding-agents.md](../development/adding-agents.md) - Adding new nodes
+- [supervision.md](./supervision.md) - Agent collaboration & supervision (spec 093)
