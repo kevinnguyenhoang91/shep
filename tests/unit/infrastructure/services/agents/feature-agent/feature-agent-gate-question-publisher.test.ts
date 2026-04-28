@@ -46,7 +46,9 @@ describe('FeatureAgentGateQuestionPublisher', () => {
   });
 
   it('writes one blocking AgentQuestion when collaboration is on', async () => {
-    const ask = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(true));
+    const ask = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(true), {
+      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+    } as any);
     const publisher = new FeatureAgentGateQuestionPublisher(ask, makeAppRepo({ id: 'app-1' }));
 
     await publisher.publishWaitingApproval({
@@ -67,7 +69,9 @@ describe('FeatureAgentGateQuestionPublisher', () => {
   });
 
   it('writes nothing when collaboration is off (NFR-14)', async () => {
-    const ask = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(false));
+    const ask = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(false), {
+      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+    } as any);
     const publisher = new FeatureAgentGateQuestionPublisher(ask, makeAppRepo({ id: 'app-1' }));
 
     await publisher.publishWaitingApproval({
@@ -80,7 +84,9 @@ describe('FeatureAgentGateQuestionPublisher', () => {
   });
 
   it('falls back to the repository path when no Application is registered', async () => {
-    const ask = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(true));
+    const ask = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(true), {
+      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+    } as any);
     const publisher = new FeatureAgentGateQuestionPublisher(ask, makeAppRepo(null));
 
     await publisher.publishWaitingApproval({

@@ -40,7 +40,9 @@ describe('AskAgentQuestionUseCase', () => {
   });
 
   it('returns enabled=false and persists nothing when feature flag is off', async () => {
-    const useCase = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(false));
+    const useCase = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(false), {
+      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+    } as any);
 
     const result = await useCase.execute({
       appId: 'app-1',
@@ -56,7 +58,9 @@ describe('AskAgentQuestionUseCase', () => {
   });
 
   it('persists a non-blocking question and does NOT return an awaiter', async () => {
-    const useCase = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(true));
+    const useCase = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(true), {
+      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+    } as any);
 
     const result = await useCase.execute({
       appId: 'app-1',
@@ -79,7 +83,9 @@ describe('AskAgentQuestionUseCase', () => {
   });
 
   it('persists a blocking question AND registers an awaiter that resolves on registry.resolve', async () => {
-    const useCase = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(true));
+    const useCase = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(true), {
+      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+    } as any);
 
     const result = await useCase.execute({
       appId: 'app-1',

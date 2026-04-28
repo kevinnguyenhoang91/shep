@@ -6,6 +6,15 @@
  * `canUseTool` callback) can `await` until {@link AnswerAgentQuestionUseCase}
  * settles it.
  *
+ * After persistence, the question is forwarded to the
+ * {@link AgentQuestionSupervisorRouter} (spec 093, task 31). The router
+ * is a no-op when the question's `answerer` is `user`, when the
+ * question is gate-linked (the worker handles the gate path), or when
+ * no {@link SupervisorPolicy} is configured for the scope. In
+ * autonomous mode the router may settle the question via
+ * {@link AnswerAgentQuestionUseCase} before this method returns,
+ * which resolves the awaiter for blocking questions in the same tick.
+ *
  * Feature-flag short-circuit: with `featureFlags.collaboration` off, the
  * use case returns `{ enabled: false }` without persisting or registering
  * anything (NFR-14 byte-identical default).
@@ -20,6 +29,7 @@ import type {
   IDeferredQuestionRegistry,
   AskAgentQuestionInput,
 } from '../../ports/output/agents/agent-question-service.interface.js';
+import { AgentQuestionSupervisorRouter } from './agent-question-supervisor-router.js';
 import {
   AgentQuestionKind,
   AgentQuestionStatus,
@@ -48,7 +58,9 @@ export class AskAgentQuestionUseCase {
     @inject('IDeferredQuestionRegistry')
     private readonly deferredRegistry: IDeferredQuestionRegistry,
     @inject('ISettingsRepository')
-    private readonly settings: ISettingsRepository
+    private readonly settings: ISettingsRepository,
+    @inject(AgentQuestionSupervisorRouter)
+    private readonly supervisorRouter: AgentQuestionSupervisorRouter
   ) {}
 
   async execute(input: AskAgentQuestionInput): Promise<AskAgentQuestionResult> {
@@ -94,6 +106,15 @@ export class AskAgentQuestionUseCase {
         timeoutMs
       );
     }
+
+    // Route through the supervisor (spec 093, task 31). For non-gate
+    // questions with answerer ∈ {supervisor, either} and a configured
+    // policy, the supervisor evaluates the question. In autonomous
+    // mode the router may answer the question before this method
+    // returns, which resolves the awaiter for blocking questions in
+    // the same tick.
+    await this.supervisorRouter.routeIfApplicable(question);
+
     return result;
   }
 

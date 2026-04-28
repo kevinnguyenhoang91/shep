@@ -53,7 +53,9 @@ describe('CancelAgentQuestionUseCase', () => {
 
   it('cancels a pending blocking question and rejects the awaiter', async () => {
     const settings = makeSettingsRepo(true);
-    const ask = new AskAgentQuestionUseCase(repo, registry, settings);
+    const ask = new AskAgentQuestionUseCase(repo, registry, settings, {
+      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+    } as any);
     const askResult = await ask.execute({
       appId: 'app-1',
       agentRunId: 'run-1',
@@ -84,7 +86,9 @@ describe('CancelAgentQuestionUseCase', () => {
 
   it('is a no-op when the question is already cancelled', async () => {
     const settings = makeSettingsRepo(true);
-    const ask = new AskAgentQuestionUseCase(repo, registry, settings);
+    const ask = new AskAgentQuestionUseCase(repo, registry, settings, {
+      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+    } as any);
     const askResult = await ask.execute({
       appId: 'app-1',
       agentRunId: 'run-1',

@@ -40,7 +40,9 @@ describe('ListAgentQuestionsUseCase', () => {
   beforeEach(async () => {
     repo = new InMemoryAgentQuestionRepository();
     registry = new DeferredQuestionRegistry();
-    ask = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo());
+    ask = new AskAgentQuestionUseCase(repo, registry, makeSettingsRepo(), {
+      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+    } as any);
 
     await ask.execute({
       appId: 'app-1',
