@@ -111,7 +111,8 @@ describe('ApproveAgentRunUseCase', () => {
       mockFeatureRepo as any,
       mockTimingRepo as any,
       createFakeWorktreePaths(),
-      createFakeNodeHelpers()
+      createFakeNodeHelpers(),
+      { create: vi.fn(), listByWorkItem: vi.fn().mockResolvedValue([]) } as any
     );
   });
 

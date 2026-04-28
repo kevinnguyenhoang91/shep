@@ -4,24 +4,45 @@
  * Rejects a paused agent run (waiting_approval status) and
  * spawns a resume worker to iterate with user feedback.
  * Appends rejection feedback to spec.yaml for tracking.
+ *
+ * Optionally accepts a {@link SupervisorActor}. When provided, the
+ * rejection is attributed to that actor in the audit log
+ * (`actor_id = user:<id>` or `supervisor:<id>`) and the "user always
+ * wins" invariant from spec 093 is enforced — see
+ * {@link ApproveAgentRunUseCase} for the full description.
  */
 
 import { injectable, inject } from 'tsyringe';
 import yaml from 'js-yaml';
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { IAgentRunRepository } from '../../ports/output/agents/agent-run-repository.interface.js';
 import type { IFeatureAgentProcessService } from '../../ports/output/agents/feature-agent-process.interface.js';
 import type { IPhaseTimingRepository } from '../../ports/output/agents/phase-timing-repository.interface.js';
+import type { IActivityLogRepository } from '../../ports/output/repositories/activity-log-repository.interface.js';
 import type { IFeatureRepository } from '../../ports/output/repositories/feature-repository.interface.js';
 import type { IWorktreePathProvider } from '../../ports/output/services/worktree-path-provider.interface.js';
 import type { INodeHelpers } from '../../ports/output/services/node-helpers.interface.js';
 import type { IPhaseTimingContext } from '../../ports/output/services/phase-timing-context.interface.js';
 import { AgentRunStatus } from '../../../domain/generated/output.js';
 import type {
+  ActivityEntry,
   PrdRejectionPayload,
   RejectionFeedbackEntry,
 } from '../../../domain/generated/output.js';
+import {
+  SUPERVISOR_ACTOR_NAMESPACE_SUPERVISOR,
+  SUPERVISOR_ACTOR_NAMESPACE_USER,
+  type SupervisorActor,
+} from '../../../domain/value-objects/supervisor-actor.js';
+
+const GATE_DECISION_FIELD = 'gate.rejection';
+
+function isGateDecisionField(field: string | undefined): boolean {
+  if (!field) return false;
+  return field === 'gate.approval' || field === 'gate.rejection';
+}
 
 @injectable()
 export class RejectAgentRunUseCase {
@@ -39,13 +60,16 @@ export class RejectAgentRunUseCase {
     @inject('INodeHelpers')
     private readonly nodeHelpers: INodeHelpers,
     @inject('IPhaseTimingContext')
-    private readonly phaseTimingContext: IPhaseTimingContext
+    private readonly phaseTimingContext: IPhaseTimingContext,
+    @inject('IActivityLogRepository')
+    private readonly activityLog: IActivityLogRepository
   ) {}
 
   async execute(
     id: string,
     feedback: string,
-    attachments?: string[]
+    attachments?: string[],
+    actor?: SupervisorActor
   ): Promise<{
     rejected: boolean;
     reason: string;
@@ -55,6 +79,16 @@ export class RejectAgentRunUseCase {
     const run = await this.agentRunRepository.findById(id);
     if (!run) {
       return { rejected: false, reason: 'Agent run not found' };
+    }
+
+    if (actor?.namespace === SUPERVISOR_ACTOR_NAMESPACE_SUPERVISOR) {
+      const blockedBy = await this.findPriorUserGateDecision(id);
+      if (blockedBy) {
+        return {
+          rejected: false,
+          reason: 'User has already acted on this gate; supervisor cannot override',
+        };
+      }
     }
 
     const REJECTABLE_STATUSES = new Set([
@@ -183,11 +217,53 @@ export class RejectAgentRunUseCase {
       }
     );
 
+    if (actor) {
+      await this.recordGateDecision(id, actor, 'rejected', now);
+    }
+
     return {
       rejected: true,
       reason: 'Rejected and iterating',
       iteration,
       iterationWarning: iteration >= 5,
     };
+  }
+
+  /** See {@link ApproveAgentRunUseCase} for the rationale. */
+  private async findPriorUserGateDecision(runId: string): Promise<ActivityEntry | undefined> {
+    try {
+      const entries = await this.activityLog.listByWorkItem(runId);
+      return entries.find(
+        (e) =>
+          isGateDecisionField(e.fieldName) &&
+          typeof e.actorId === 'string' &&
+          e.actorId.startsWith(`${SUPERVISOR_ACTOR_NAMESPACE_USER}:`)
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async recordGateDecision(
+    runId: string,
+    actor: SupervisorActor,
+    verdict: 'approved' | 'rejected',
+    timestamp: Date
+  ): Promise<void> {
+    try {
+      const entry: ActivityEntry = {
+        id: randomUUID(),
+        workItemId: runId,
+        fieldName: GATE_DECISION_FIELD,
+        oldValue: undefined,
+        newValue: verdict,
+        actorId: actor.value,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      await this.activityLog.create(entry);
+    } catch {
+      // Audit-log outage must not block the gate transition itself.
+    }
   }
 }

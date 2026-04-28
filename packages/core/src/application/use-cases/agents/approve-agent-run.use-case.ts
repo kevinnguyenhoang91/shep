@@ -5,20 +5,47 @@
  * spawns a new resume worker to continue graph execution.
  * Optionally accepts a PrdApprovalPayload to update spec.yaml
  * selections before resuming.
+ *
+ * Optionally accepts a {@link SupervisorActor}. When provided, the
+ * approval is attributed to that actor in the audit log
+ * (`actor_id = user:<id>` or `supervisor:<id>`) and the "user always
+ * wins" invariant from spec 093 is enforced:
+ *  - a supervisor actor cannot override a prior user decision on the
+ *    same gate (the call returns `{ approved: false }`),
+ *  - a user actor proceeds even when a prior supervisor decision
+ *    exists; both rows remain in `activity_log` for audit.
+ *
+ * Existing user-only callers that omit `actor` are unaffected — no
+ * activity-log row is written and the behaviour is byte-identical to
+ * the pre-spec-093 implementation.
  */
 
 import { injectable, inject } from 'tsyringe';
 import yaml from 'js-yaml';
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { IAgentRunRepository } from '../../ports/output/agents/agent-run-repository.interface.js';
 import type { IFeatureAgentProcessService } from '../../ports/output/agents/feature-agent-process.interface.js';
 import type { IPhaseTimingRepository } from '../../ports/output/agents/phase-timing-repository.interface.js';
+import type { IActivityLogRepository } from '../../ports/output/repositories/activity-log-repository.interface.js';
 import type { IFeatureRepository } from '../../ports/output/repositories/feature-repository.interface.js';
 import type { IWorktreePathProvider } from '../../ports/output/services/worktree-path-provider.interface.js';
 import type { INodeHelpers } from '../../ports/output/services/node-helpers.interface.js';
 import { AgentRunStatus } from '../../../domain/generated/output.js';
-import type { PrdApprovalPayload } from '../../../domain/generated/output.js';
+import type { ActivityEntry, PrdApprovalPayload } from '../../../domain/generated/output.js';
+import {
+  SUPERVISOR_ACTOR_NAMESPACE_SUPERVISOR,
+  SUPERVISOR_ACTOR_NAMESPACE_USER,
+  type SupervisorActor,
+} from '../../../domain/value-objects/supervisor-actor.js';
+
+const GATE_DECISION_FIELD = 'gate.approval';
+
+function isGateDecisionField(field: string | undefined): boolean {
+  if (!field) return false;
+  return field === 'gate.approval' || field === 'gate.rejection';
+}
 
 @injectable()
 export class ApproveAgentRunUseCase {
@@ -34,16 +61,29 @@ export class ApproveAgentRunUseCase {
     @inject('IWorktreePathProvider')
     private readonly worktreePaths: IWorktreePathProvider,
     @inject('INodeHelpers')
-    private readonly nodeHelpers: INodeHelpers
+    private readonly nodeHelpers: INodeHelpers,
+    @inject('IActivityLogRepository')
+    private readonly activityLog: IActivityLogRepository
   ) {}
 
   async execute(
     id: string,
-    payload?: PrdApprovalPayload
+    payload?: PrdApprovalPayload,
+    actor?: SupervisorActor
   ): Promise<{ approved: boolean; reason: string }> {
     const run = await this.agentRunRepository.findById(id);
     if (!run) {
       return { approved: false, reason: 'Agent run not found' };
+    }
+
+    if (actor?.namespace === SUPERVISOR_ACTOR_NAMESPACE_SUPERVISOR) {
+      const blockedBy = await this.findPriorUserGateDecision(id);
+      if (blockedBy) {
+        return {
+          approved: false,
+          reason: 'User has already acted on this gate; supervisor cannot override',
+        };
+      }
     }
 
     const APPROVABLE_STATUSES = new Set([
@@ -148,6 +188,55 @@ export class ApproveAgentRunUseCase {
       }
     );
 
+    if (actor) {
+      await this.recordGateDecision(id, actor, 'approved', now);
+    }
+
     return { approved: true, reason: 'Approved and resumed' };
+  }
+
+  /**
+   * Returns the first user-actor gate decision recorded for `runId`, or
+   * `undefined` when no user has acted yet. Used to block a supervisor
+   * actor from overriding a prior user decision (the "user always wins"
+   * invariant runs in BOTH directions: user beats prior supervisor AND
+   * supervisor cannot beat prior user).
+   */
+  private async findPriorUserGateDecision(runId: string): Promise<ActivityEntry | undefined> {
+    try {
+      const entries = await this.activityLog.listByWorkItem(runId);
+      return entries.find(
+        (e) =>
+          isGateDecisionField(e.fieldName) &&
+          typeof e.actorId === 'string' &&
+          e.actorId.startsWith(`${SUPERVISOR_ACTOR_NAMESPACE_USER}:`)
+      );
+    } catch {
+      // Audit-log outages must not block legitimate gate progression.
+      return undefined;
+    }
+  }
+
+  private async recordGateDecision(
+    runId: string,
+    actor: SupervisorActor,
+    verdict: 'approved' | 'rejected',
+    timestamp: Date
+  ): Promise<void> {
+    try {
+      const entry: ActivityEntry = {
+        id: randomUUID(),
+        workItemId: runId,
+        fieldName: GATE_DECISION_FIELD,
+        oldValue: undefined,
+        newValue: verdict,
+        actorId: actor.value,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      await this.activityLog.create(entry);
+    } catch {
+      // Audit-log outage must not block the gate transition itself.
+    }
   }
 }

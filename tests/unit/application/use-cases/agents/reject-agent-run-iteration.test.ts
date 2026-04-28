@@ -139,7 +139,8 @@ describe('RejectAgentRunUseCase (iteration support)', () => {
       mockTimingRepo as any,
       createFakeWorktreePaths(),
       fakeNodeHelpers,
-      createFakePhaseTimingContext()
+      createFakePhaseTimingContext(),
+      { create: vi.fn(), listByWorkItem: vi.fn().mockResolvedValue([]) } as any
     );
   });
 

@@ -1,0 +1,41 @@
+feature:
+  id: "093-agent-collaboration-supervision"
+  name: "agent-collaboration-supervision"
+  number: 93
+  branch: "feat/093-agent-collaboration-supervision"
+  lifecycle: "research"
+  createdAt: "2026-04-26T20:18:27Z"
+status:
+  phase: "implementing-phase-6"
+  progress:
+    completed: 27
+    total: 47
+    percentage: 57
+  currentTask: "task-28"
+  lastUpdated: "2026-04-28T20:08:28.745Z"
+  lastUpdatedBy: "feature-agent:implement"
+  completedPhases:
+    - "analyze"
+    - "requirements"
+    - "research"
+    - "plan"
+    - "phase-1"
+    - "phase-2"
+    - "phase-3"
+    - "phase-4"
+    - "phase-5"
+validation:
+  lastRun: null
+  gatesPassed: []
+  autoFixesApplied: []
+tasks:
+  current: null
+  blocked: []
+  failed: []
+checkpoints:
+  - phase: "feature-created"
+    completedAt: "2026-04-26T20:18:27Z"
+    completedBy: "feature-agent"
+errors:
+  current: null
+  history: []
