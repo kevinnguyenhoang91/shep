@@ -84,9 +84,15 @@ describe('AnswerAgentQuestionUseCase', () => {
 
   it('returns enabled=false when feature flag is off', async () => {
     const settings = makeSettingsRepo(true);
-    const ask = new AskAgentQuestionUseCase(repo, registry, settings, {
-      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
-    } as any);
+    const ask = new AskAgentQuestionUseCase(
+      repo,
+      registry,
+      settings,
+      {
+        routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+      } as any,
+      { execute: vi.fn().mockResolvedValue({ escalated: false }) } as any
+    );
     const { question } = await ask.execute({
       appId: 'app-1',
       agentRunId: 'run-1',
@@ -118,9 +124,15 @@ describe('AnswerAgentQuestionUseCase', () => {
 
   it('answers a non-blocking question and transitions status to answered', async () => {
     const settings = makeSettingsRepo(true);
-    const ask = new AskAgentQuestionUseCase(repo, registry, settings, {
-      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
-    } as any);
+    const ask = new AskAgentQuestionUseCase(
+      repo,
+      registry,
+      settings,
+      {
+        routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+      } as any,
+      { execute: vi.fn().mockResolvedValue({ escalated: false }) } as any
+    );
     const { question } = await ask.execute({
       appId: 'app-1',
       agentRunId: 'run-1',
@@ -154,9 +166,15 @@ describe('AnswerAgentQuestionUseCase', () => {
 
   it('blocking round-trip: register awaiter, then answer resolves it', async () => {
     const settings = makeSettingsRepo(true);
-    const ask = new AskAgentQuestionUseCase(repo, registry, settings, {
-      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
-    } as any);
+    const ask = new AskAgentQuestionUseCase(
+      repo,
+      registry,
+      settings,
+      {
+        routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+      } as any,
+      { execute: vi.fn().mockResolvedValue({ escalated: false }) } as any
+    );
     const result = await ask.execute({
       appId: 'app-1',
       agentRunId: 'run-1',
@@ -186,9 +204,15 @@ describe('AnswerAgentQuestionUseCase', () => {
 
   it('rejects an answer that does not match provided options', async () => {
     const settings = makeSettingsRepo(true);
-    const ask = new AskAgentQuestionUseCase(repo, registry, settings, {
-      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
-    } as any);
+    const ask = new AskAgentQuestionUseCase(
+      repo,
+      registry,
+      settings,
+      {
+        routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+      } as any,
+      { execute: vi.fn().mockResolvedValue({ escalated: false }) } as any
+    );
     const { question } = await ask.execute({
       appId: 'app-1',
       agentRunId: 'run-1',
@@ -222,9 +246,15 @@ describe('AnswerAgentQuestionUseCase', () => {
 
   it('forwards approve answer to ApproveAgentRunUseCase when the run is waiting_approval', async () => {
     const settings = makeSettingsRepo(true);
-    const ask = new AskAgentQuestionUseCase(repo, registry, settings, {
-      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
-    } as any);
+    const ask = new AskAgentQuestionUseCase(
+      repo,
+      registry,
+      settings,
+      {
+        routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+      } as any,
+      { execute: vi.fn().mockResolvedValue({ escalated: false }) } as any
+    );
     const { question } = await ask.execute({
       appId: 'app-1',
       agentRunId: 'run-1',
@@ -258,9 +288,15 @@ describe('AnswerAgentQuestionUseCase', () => {
 
   it('forwards reject answer to RejectAgentRunUseCase when the run is waiting_approval', async () => {
     const settings = makeSettingsRepo(true);
-    const ask = new AskAgentQuestionUseCase(repo, registry, settings, {
-      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
-    } as any);
+    const ask = new AskAgentQuestionUseCase(
+      repo,
+      registry,
+      settings,
+      {
+        routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+      } as any,
+      { execute: vi.fn().mockResolvedValue({ escalated: false }) } as any
+    );
     const { question } = await ask.execute({
       appId: 'app-1',
       agentRunId: 'run-1',
@@ -294,9 +330,15 @@ describe('AnswerAgentQuestionUseCase', () => {
 
   it('does NOT forward when the agent run is not waiting_approval', async () => {
     const settings = makeSettingsRepo(true);
-    const ask = new AskAgentQuestionUseCase(repo, registry, settings, {
-      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
-    } as any);
+    const ask = new AskAgentQuestionUseCase(
+      repo,
+      registry,
+      settings,
+      {
+        routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+      } as any,
+      { execute: vi.fn().mockResolvedValue({ escalated: false }) } as any
+    );
     const { question } = await ask.execute({
       appId: 'app-1',
       agentRunId: 'run-1',

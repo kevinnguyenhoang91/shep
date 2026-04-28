@@ -59,9 +59,15 @@ describe('AgentQuestionExecutorBridge', () => {
 
   it('writes a blocking AgentQuestion and resolves on AnswerAgentQuestionUseCase (flag on)', async () => {
     const settings = makeSettingsRepo(true);
-    const ask = new AskAgentQuestionUseCase(repo, registry, settings, {
-      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
-    } as any);
+    const ask = new AskAgentQuestionUseCase(
+      repo,
+      registry,
+      settings,
+      {
+        routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+      } as any,
+      { execute: vi.fn().mockResolvedValue({ escalated: false }) } as any
+    );
     const answer = new AnswerAgentQuestionUseCase(
       repo,
       registry,
@@ -105,9 +111,15 @@ describe('AgentQuestionExecutorBridge', () => {
 
   it('returns null (flag-off) so the executor falls back to legacy path', async () => {
     const settings = makeSettingsRepo(false);
-    const ask = new AskAgentQuestionUseCase(repo, registry, settings, {
-      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
-    } as any);
+    const ask = new AskAgentQuestionUseCase(
+      repo,
+      registry,
+      settings,
+      {
+        routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+      } as any,
+      { execute: vi.fn().mockResolvedValue({ escalated: false }) } as any
+    );
     const bridge = new AgentQuestionExecutorBridge(ask, {
       appId: 'app-1',
       agentRunId: 'run-1',
@@ -124,9 +136,15 @@ describe('AgentQuestionExecutorBridge', () => {
 
   it('decodes a JSON-encoded answer object to the SDK-shaped map', async () => {
     const settings = makeSettingsRepo(true);
-    const ask = new AskAgentQuestionUseCase(repo, registry, settings, {
-      routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
-    } as any);
+    const ask = new AskAgentQuestionUseCase(
+      repo,
+      registry,
+      settings,
+      {
+        routeIfApplicable: vi.fn().mockResolvedValue({ evaluated: false, answered: false }),
+      } as any,
+      { execute: vi.fn().mockResolvedValue({ escalated: false }) } as any
+    );
     const answer = new AnswerAgentQuestionUseCase(
       repo,
       registry,

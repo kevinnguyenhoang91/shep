@@ -30,9 +30,12 @@ import type {
   AskAgentQuestionInput,
 } from '../../ports/output/agents/agent-question-service.interface.js';
 import { AgentQuestionSupervisorRouter } from './agent-question-supervisor-router.js';
+import { EscalateToUserUseCase } from './escalate-to-user.use-case.js';
 import {
   AgentQuestionKind,
   AgentQuestionStatus,
+  NotificationEventType,
+  NotificationSeverity,
   type AgentQuestion,
 } from '../../../domain/generated/output.js';
 
@@ -60,7 +63,9 @@ export class AskAgentQuestionUseCase {
     @inject('ISettingsRepository')
     private readonly settings: ISettingsRepository,
     @inject(AgentQuestionSupervisorRouter)
-    private readonly supervisorRouter: AgentQuestionSupervisorRouter
+    private readonly supervisorRouter: AgentQuestionSupervisorRouter,
+    @inject(EscalateToUserUseCase)
+    private readonly escalateToUser: EscalateToUserUseCase
   ) {}
 
   async execute(input: AskAgentQuestionInput): Promise<AskAgentQuestionResult> {
@@ -114,6 +119,29 @@ export class AskAgentQuestionUseCase {
     // returns, which resolves the awaiter for blocking questions in
     // the same tick.
     await this.supervisorRouter.routeIfApplicable(question);
+
+    // Surface the question to the user via the existing notification
+    // surface (spec 093, task 34). Three-tier urgency maps to the new
+    // NotificationEventType values: blocking interrupts, question goes
+    // to the inbox, info skips notification entirely (activity feed
+    // only — research decision 11).
+    if (question.kind !== AgentQuestionKind.info) {
+      const isBlocking = question.kind === AgentQuestionKind.blocking;
+      await this.escalateToUser.execute({
+        eventType: isBlocking
+          ? NotificationEventType.AgentQuestionBlocking
+          : NotificationEventType.AgentQuestionPending,
+        severity: isBlocking ? NotificationSeverity.Warning : NotificationSeverity.Info,
+        message: question.prompt,
+        agentRunId: question.agentRunId,
+        featureId: question.featureId ?? '',
+        featureName: question.featureId ?? '',
+        sourceEventId: question.id,
+        actorId: 'agent',
+        auditField: `agent.question.${question.kind}`,
+        timestamp: now,
+      });
+    }
 
     return result;
   }
