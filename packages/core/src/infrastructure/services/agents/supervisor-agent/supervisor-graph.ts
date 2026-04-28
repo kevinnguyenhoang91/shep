@@ -1,0 +1,233 @@
+/**
+ * Supervisor LangGraph workflow.
+ *
+ * Implements {@link ISupervisorAgent} as a graph with the nodes
+ *
+ *   ingest-event → evaluate → emit-decision
+ *
+ * Each node is a small pure function over the graph state; the graph is
+ * compiled with an optional checkpointer so the same workflow can be
+ * resumed across worker restarts (matches feature-agent worker shape).
+ *
+ * The evaluate node calls the supplied {@link IAgentExecutor} (resolved
+ * by the worker through {@link IAgentExecutorProvider} — never imports a
+ * provider SDK directly) with the prompt produced by
+ * {@link buildEvaluatorPrompt}. The call is wrapped in a hard
+ * {@link SUPERVISOR_EVALUATOR_SOFT_TIMEOUT_MS} timeout: on timeout the
+ * graph short-circuits to a deterministic
+ * {@link SUPERVISOR_TIMEOUT_DECISION} so the human path proceeds
+ * (FR-22 fail-safe).
+ *
+ * Persistence + activity-log mirroring are NOT done here — the use case
+ * layer owns those side effects.
+ */
+
+import { Annotation, StateGraph, START, END, type BaseCheckpointSaver } from '@langchain/langgraph';
+
+import type { IAgentExecutor } from '../../../../application/ports/output/agents/agent-executor.interface.js';
+import type {
+  ISupervisorAgent,
+  SupervisorDecisionResult,
+  SupervisorEvaluateInput,
+} from '../../../../application/ports/output/agents/supervisor-agent.interface.js';
+import { SUPERVISOR_EVALUATOR_SOFT_TIMEOUT_MS } from '../../../../application/ports/output/agents/supervisor-agent.interface.js';
+import { SupervisorVerdict, type SupervisorPolicy } from '../../../../domain/generated/output.js';
+import {
+  buildEvaluatorPrompt,
+  resolveEvaluatorModelId,
+  SUPERVISOR_EVALUATOR_PROMPT_VERSION,
+  SUPERVISOR_TIMEOUT_DECISION,
+} from './evaluator-prompt.js';
+
+/** Internal graph state. */
+const SupervisorGraphAnnotation = Annotation.Root({
+  input: Annotation<SupervisorEvaluateInput>(),
+  prompt: Annotation<string | undefined>({
+    reducer: (_prev, next) => next ?? _prev,
+    default: () => undefined,
+  }),
+  decision: Annotation<SupervisorDecisionResult | undefined>({
+    reducer: (_prev, next) => next ?? _prev,
+    default: () => undefined,
+  }),
+});
+type SupervisorGraphState = typeof SupervisorGraphAnnotation.State;
+
+export interface SupervisorGraphDeps {
+  executor: IAgentExecutor;
+  /** Override the soft timeout for the evaluator call (used by tests). */
+  evaluatorTimeoutMs?: number;
+  /** Fallback model id when the policy doesn't pin one. */
+  defaultModelId?: string;
+}
+
+const DEFAULT_FALLBACK_MODEL_ID = 'unknown-model';
+
+/**
+ * Race a Promise against a timeout. Resolves with the original Promise's
+ * value on success, rejects with a {@link SupervisorEvaluatorTimeoutError}
+ * after `timeoutMs`.
+ */
+class SupervisorEvaluatorTimeoutError extends Error {
+  constructor(public readonly timeoutMs: number) {
+    super(`Supervisor evaluator exceeded ${timeoutMs}ms`);
+    this.name = 'SupervisorEvaluatorTimeoutError';
+  }
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new SupervisorEvaluatorTimeoutError(timeoutMs)), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Try to extract a structured verdict + rationale from the executor's
+ * raw response. The executor returns free-form text; we look for an
+ * explicit "verdict: <value>" line and fall back to `advise` if the
+ * model failed to comply.
+ */
+function parseEvaluatorResponse(raw: string): { verdict: SupervisorVerdict; rationale: string } {
+  const verdicts: SupervisorVerdict[] = [
+    SupervisorVerdict.approve,
+    SupervisorVerdict.reject,
+    SupervisorVerdict.escalate,
+    SupervisorVerdict.advise,
+  ];
+  const lower = raw.toLowerCase();
+  let parsed: SupervisorVerdict = SupervisorVerdict.advise;
+  for (const candidate of verdicts) {
+    if (lower.includes(`verdict: ${candidate}`) || lower.includes(`verdict:${candidate}`)) {
+      parsed = candidate;
+      break;
+    }
+  }
+  const rationale = raw.trim().slice(0, 4000);
+  return {
+    verdict: parsed,
+    rationale: rationale.length > 0 ? rationale : 'no rationale supplied',
+  };
+}
+
+function ingestEventNode(): (state: SupervisorGraphState) => Partial<SupervisorGraphState> {
+  return (state) => {
+    const prompt = buildEvaluatorPrompt(state.input.event, state.input.policy);
+    return { prompt };
+  };
+}
+
+function evaluateNode(
+  deps: SupervisorGraphDeps
+): (state: SupervisorGraphState) => Promise<Partial<SupervisorGraphState>> {
+  const timeoutMs = deps.evaluatorTimeoutMs ?? SUPERVISOR_EVALUATOR_SOFT_TIMEOUT_MS;
+  const fallbackModel = deps.defaultModelId ?? DEFAULT_FALLBACK_MODEL_ID;
+
+  return async (state) => {
+    if (!state.prompt) {
+      throw new Error('SupervisorGraph: evaluate node ran without a prompt');
+    }
+    const policy = state.input.policy;
+    const modelId = resolveEvaluatorModelId(policy, fallbackModel);
+
+    try {
+      const response = await withTimeout(
+        deps.executor.execute(state.prompt, {
+          model: policy.modelId,
+          silent: true,
+        }),
+        timeoutMs
+      );
+      const parsed = parseEvaluatorResponse(response.result);
+      const decision: SupervisorDecisionResult = {
+        verdict: parsed.verdict,
+        rationale: parsed.rationale,
+        modelId,
+        promptVersion: SUPERVISOR_EVALUATOR_PROMPT_VERSION,
+      };
+      return { decision };
+    } catch (err) {
+      if (err instanceof SupervisorEvaluatorTimeoutError) {
+        const decision: SupervisorDecisionResult = {
+          verdict: SUPERVISOR_TIMEOUT_DECISION.verdict,
+          rationale: SUPERVISOR_TIMEOUT_DECISION.rationale,
+          modelId,
+          promptVersion: SUPERVISOR_EVALUATOR_PROMPT_VERSION,
+        };
+        return { decision };
+      }
+      throw err;
+    }
+  };
+}
+
+function emitDecisionNode(): (state: SupervisorGraphState) => Partial<SupervisorGraphState> {
+  return (state) => {
+    if (!state.decision) {
+      throw new Error('SupervisorGraph: emit-decision ran without a decision');
+    }
+    return {};
+  };
+}
+
+/**
+ * Compile the supervisor graph. The compiled graph satisfies
+ * {@link ISupervisorAgent} via {@link createSupervisorAgent} below.
+ */
+export function createSupervisorGraph(
+  deps: SupervisorGraphDeps,
+  checkpointer?: BaseCheckpointSaver
+) {
+  const graph = new StateGraph(SupervisorGraphAnnotation)
+    .addNode('ingest-event', ingestEventNode())
+    .addNode('evaluate', evaluateNode(deps))
+    .addNode('emit-decision', emitDecisionNode())
+    .addEdge(START, 'ingest-event')
+    .addEdge('ingest-event', 'evaluate')
+    .addEdge('evaluate', 'emit-decision')
+    .addEdge('emit-decision', END);
+
+  return graph.compile({ checkpointer });
+}
+
+/**
+ * Build an {@link ISupervisorAgent} backed by the compiled supervisor
+ * graph. The use-case layer depends on this port; the worker process
+ * resolves the executor and invokes this factory.
+ */
+export function createSupervisorAgent(
+  deps: SupervisorGraphDeps,
+  checkpointer?: BaseCheckpointSaver
+): ISupervisorAgent {
+  const compiled = createSupervisorGraph(deps, checkpointer);
+
+  return {
+    async evaluate(input: SupervisorEvaluateInput): Promise<SupervisorDecisionResult> {
+      const finalState = await compiled.invoke(
+        { input },
+        { configurable: { thread_id: `supervisor:${input.policy.id}:${input.event.kind}` } }
+      );
+      const decision = (finalState as SupervisorGraphState).decision;
+      if (!decision) {
+        const fallbackPolicy: SupervisorPolicy = input.policy;
+        return {
+          verdict: SUPERVISOR_TIMEOUT_DECISION.verdict,
+          rationale: 'evaluator did not return a decision',
+          modelId: resolveEvaluatorModelId(
+            fallbackPolicy,
+            deps.defaultModelId ?? DEFAULT_FALLBACK_MODEL_ID
+          ),
+          promptVersion: SUPERVISOR_EVALUATOR_PROMPT_VERSION,
+        };
+      }
+      return decision;
+    },
+  };
+}
+
+export { SupervisorEvaluatorTimeoutError };

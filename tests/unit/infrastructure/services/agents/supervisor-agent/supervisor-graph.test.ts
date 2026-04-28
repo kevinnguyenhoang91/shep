@@ -1,0 +1,143 @@
+/**
+ * Supervisor LangGraph workflow — unit tests
+ *
+ * Verifies the happy path with a stubbed executor, the 25s timeout
+ * fallback (verdict='escalate', rationale='timeout'), and that the
+ * graph snapshots modelId / promptVersion onto every produced
+ * decision.
+ */
+
+import 'reflect-metadata';
+import { describe, it, expect, vi } from 'vitest';
+import {
+  AgentFeature,
+  AgentType,
+  SupervisorAutonomy,
+  SupervisorVerdict,
+  type SupervisorPolicy,
+} from '@/domain/generated/output.js';
+import type {
+  IAgentExecutor,
+  AgentExecutionResult,
+} from '@/application/ports/output/agents/agent-executor.interface.js';
+import { createSupervisorAgent } from '@/infrastructure/services/agents/supervisor-agent/supervisor-graph.js';
+import { SUPERVISOR_EVALUATOR_PROMPT_VERSION } from '@/infrastructure/services/agents/supervisor-agent/evaluator-prompt.js';
+import type { SupervisorGateEvent } from '@/application/ports/output/agents/supervisor-agent.interface.js';
+
+function makePolicy(overrides: Partial<SupervisorPolicy> = {}): SupervisorPolicy {
+  const now = new Date();
+  return {
+    id: 'pol-1',
+    appId: 'app-1',
+    enabled: true,
+    autonomyLevel: SupervisorAutonomy.advisory,
+    modelId: 'claude-sonnet-4-6',
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  } as SupervisorPolicy;
+}
+
+function makeStubExecutor(result: string | Error, delayMs = 0): IAgentExecutor {
+  return {
+    agentType: AgentType.ClaudeCode,
+    async execute(): Promise<AgentExecutionResult> {
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      if (result instanceof Error) throw result;
+      return { result };
+    },
+    executeStream(): AsyncIterable<never> {
+      throw new Error('not used in supervisor graph tests');
+    },
+    supportsFeature(feature: AgentFeature): boolean {
+      return feature !== AgentFeature.streaming;
+    },
+  };
+}
+
+function gateEvent(): SupervisorGateEvent {
+  return {
+    kind: 'gate',
+    appId: 'app-1',
+    agentRunId: 'run-1',
+    gateId: 'plan',
+    sourceEventId: 'gate-1',
+  };
+}
+
+describe('createSupervisorAgent (LangGraph workflow)', () => {
+  it('happy path: executor verdict is parsed and audit metadata is snapshotted', async () => {
+    const executor = makeStubExecutor('verdict: advise\nLooks reasonable.');
+    const agent = createSupervisorAgent({ executor });
+
+    const decision = await agent.evaluate({
+      event: gateEvent(),
+      policy: makePolicy({ modelId: 'opus-4-7' }),
+    });
+
+    expect(decision.verdict).toBe(SupervisorVerdict.advise);
+    expect(decision.rationale).toContain('Looks reasonable');
+    expect(decision.modelId).toBe('opus-4-7');
+    expect(decision.promptVersion).toBe(SUPERVISOR_EVALUATOR_PROMPT_VERSION);
+  });
+
+  it('parses approve verdict from executor output', async () => {
+    const executor = makeStubExecutor('verdict: approve — diff is trivial.');
+    const agent = createSupervisorAgent({ executor });
+    const decision = await agent.evaluate({ event: gateEvent(), policy: makePolicy() });
+    expect(decision.verdict).toBe(SupervisorVerdict.approve);
+  });
+
+  it('parses reject verdict from executor output', async () => {
+    const executor = makeStubExecutor('verdict: reject — destructive change.');
+    const agent = createSupervisorAgent({ executor });
+    const decision = await agent.evaluate({ event: gateEvent(), policy: makePolicy() });
+    expect(decision.verdict).toBe(SupervisorVerdict.reject);
+  });
+
+  it('falls back to advise when the executor output omits a verdict line', async () => {
+    const executor = makeStubExecutor('I have no opinion.');
+    const agent = createSupervisorAgent({ executor });
+    const decision = await agent.evaluate({ event: gateEvent(), policy: makePolicy() });
+    expect(decision.verdict).toBe(SupervisorVerdict.advise);
+  });
+
+  it('on evaluator timeout publishes an escalate verdict with rationale="timeout"', async () => {
+    vi.useFakeTimers();
+    try {
+      // Executor sleeps for 1 minute; timeout is 25ms.
+      const executor = makeStubExecutor('verdict: approve\nshould never see this', 60_000);
+      const agent = createSupervisorAgent({ executor, evaluatorTimeoutMs: 25 });
+
+      const evaluatePromise = agent.evaluate({ event: gateEvent(), policy: makePolicy() });
+      // Advance virtual time past both the timeout and the executor delay so
+      // the race resolves deterministically.
+      await vi.advanceTimersByTimeAsync(30);
+      const decision = await evaluatePromise;
+
+      expect(decision.verdict).toBe(SupervisorVerdict.escalate);
+      expect(decision.rationale).toBe('timeout');
+      expect(decision.promptVersion).toBe(SUPERVISOR_EVALUATOR_PROMPT_VERSION);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses fallback model id when policy.modelId is unset', async () => {
+    const executor = makeStubExecutor('verdict: advise\nfine');
+    const agent = createSupervisorAgent({ executor, defaultModelId: 'fallback-model' });
+    const decision = await agent.evaluate({
+      event: gateEvent(),
+      policy: makePolicy({ modelId: undefined }),
+    });
+    expect(decision.modelId).toBe('fallback-model');
+  });
+
+  it('propagates non-timeout executor errors', async () => {
+    const executor = makeStubExecutor(new Error('upstream model unavailable'));
+    const agent = createSupervisorAgent({ executor });
+    await expect(agent.evaluate({ event: gateEvent(), policy: makePolicy() })).rejects.toThrow(
+      'upstream model unavailable'
+    );
+  });
+});
