@@ -112,6 +112,12 @@ function makeMockLifecyclePublisher() {
   };
 }
 
+function makeMockGateQuestionPublisher() {
+  return {
+    publishWaitingApproval: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 describe('parseWorkerArgs', () => {
   it('should parse all required CLI arguments', () => {
     const args = [
@@ -320,18 +326,21 @@ describe('runWorker', () => {
   let mockRunRepo: ReturnType<typeof makeMockRunRepository>;
   let mockExecutorProvider: ReturnType<typeof makeMockExecutorProvider>;
   let mockLifecyclePublisher: ReturnType<typeof makeMockLifecyclePublisher>;
+  let mockGateQuestionPublisher: ReturnType<typeof makeMockGateQuestionPublisher>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockRunRepo = makeMockRunRepository();
     mockExecutorProvider = makeMockExecutorProvider();
     mockLifecyclePublisher = makeMockLifecyclePublisher();
+    mockGateQuestionPublisher = makeMockGateQuestionPublisher();
     mockInitializeContainer.mockResolvedValue({ resolve: mockResolve });
     mockResolve.mockImplementation((token: unknown) => {
       const key = typeof token === 'string' ? token : (token as { name?: string })?.name;
       if (key === 'IAgentRunRepository') return mockRunRepo;
       if (key === 'IAgentExecutorProvider') return mockExecutorProvider;
       if (key === 'FeatureAgentLifecyclePublisher') return mockLifecyclePublisher;
+      if (key === 'FeatureAgentGateQuestionPublisher') return mockGateQuestionPublisher;
       // InitializeSettingsUseCase — return a mock with execute()
       if (key === 'InitializeSettingsUseCase') {
         return {
@@ -781,5 +790,48 @@ describe('runWorker', () => {
         reason: 'waiting_approval:analyze',
       })
     );
+  });
+
+  it('emits an AgentQuestion of kind=blocking on every waiting_approval transition (spec 093, task 20)', async () => {
+    mockGraphInvoke.mockResolvedValue({
+      currentNode: 'plan',
+      messages: ['[plan] paused'],
+      error: null,
+      __interrupt__: [{ value: { node: 'plan', message: 'Approve' } }],
+    });
+
+    await runWorker({
+      featureId: 'feat-1',
+      runId: 'run-1',
+      repo: '/repo',
+      specDir: '/specs',
+      approvalGates: { allowPrd: true, allowPlan: true, allowMerge: false },
+      resume: false,
+    });
+
+    expect(mockGateQuestionPublisher.publishWaitingApproval).toHaveBeenCalledTimes(1);
+    expect(mockGateQuestionPublisher.publishWaitingApproval).toHaveBeenCalledWith({
+      runId: 'run-1',
+      featureId: 'feat-1',
+      repositoryPath: '/repo',
+      interruptNode: 'plan',
+    });
+  });
+
+  it('does NOT emit an AgentQuestion when graph completes normally (no waiting_approval)', async () => {
+    mockGraphInvoke.mockResolvedValue({
+      currentNode: 'merge',
+      messages: ['[merge] done'],
+      error: null,
+    });
+
+    await runWorker({
+      featureId: 'feat-1',
+      runId: 'run-1',
+      repo: '/repo',
+      specDir: '/specs',
+    });
+
+    expect(mockGateQuestionPublisher.publishWaitingApproval).not.toHaveBeenCalled();
   });
 });

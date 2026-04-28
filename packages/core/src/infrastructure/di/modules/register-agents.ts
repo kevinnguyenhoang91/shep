@@ -30,6 +30,7 @@ import { StubSessionRepository } from '../../services/agents/sessions/stub-sessi
 import { AgentSessionRepositoryRegistry } from '../../services/agents/agent-session-repository.registry.js';
 import { AgentType } from '../../../domain/generated/output.js';
 import { FeatureAgentLifecyclePublisher } from '../../services/agents/feature-agent/feature-agent-lifecycle-publisher.js';
+import { FeatureAgentGateQuestionPublisher } from '../../services/agents/feature-agent/feature-agent-gate-question-publisher.js';
 
 /**
  * Register agent-execution infrastructure: executor factory/provider, runner,
@@ -133,4 +134,9 @@ export function registerAgents(container: DependencyContainer): void {
   // Feature-agent worker uses this to broadcast lifecycle messages on the
   // agent message bus (spec 093). Singleton so one publisher per process.
   container.registerSingleton(FeatureAgentLifecyclePublisher);
+
+  // Feature-agent worker emits a parallel AgentQuestion (kind=blocking)
+  // on every waiting_approval transition so the unified inbox covers
+  // background-mode gates (spec 093, task 20).
+  container.registerSingleton(FeatureAgentGateQuestionPublisher);
 }

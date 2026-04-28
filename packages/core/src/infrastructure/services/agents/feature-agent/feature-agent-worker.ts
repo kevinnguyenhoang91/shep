@@ -34,6 +34,7 @@ import { setPhaseTimingContext, recordLifecycleEvent } from './phase-timing-cont
 import { setLifecycleContext } from './lifecycle-context.js';
 import { setLogPrefix, getLogPrefix } from './log-context.js';
 import { FeatureAgentLifecyclePublisher } from './feature-agent-lifecycle-publisher.js';
+import { FeatureAgentGateQuestionPublisher } from './feature-agent-gate-question-publisher.js';
 import type { IPhaseTimingRepository } from '@/application/ports/output/agents/phase-timing-repository.interface.js';
 import { UpdateFeatureLifecycleUseCase } from '@/application/use-cases/features/update/update-feature-lifecycle.use-case.js';
 import { CleanupFeatureWorktreeUseCase } from '@/application/use-cases/features/cleanup-feature-worktree.use-case.js';
@@ -328,6 +329,11 @@ export async function runWorker(args: WorkerArgs): Promise<void> {
   // through SendAgentMessageUseCase, so when `featureFlags.collaboration`
   // is off the calls below are no-ops and no rows are written.
   const lifecyclePublisher = container.resolve(FeatureAgentLifecyclePublisher);
+  // Gate-question publisher: emits a parallel AgentQuestion of
+  // kind=blocking on every waiting_approval transition so the unified
+  // inbox covers background-mode gates (spec 093, task 20). Same flag
+  // gating — no-op when collaboration is off.
+  const gateQuestionPublisher = container.resolve(FeatureAgentGateQuestionPublisher);
   const lifecycleScope = {
     runId: args.runId,
     featureId: args.featureId,
@@ -468,6 +474,10 @@ export async function runWorker(args: WorkerArgs): Promise<void> {
       await lifecyclePublisher.publishBlocked({
         ...lifecycleScope,
         reason: interruptNode ? `waiting_approval:${interruptNode}` : 'waiting_approval',
+      });
+      await gateQuestionPublisher.publishWaitingApproval({
+        ...lifecycleScope,
+        interruptNode,
       });
       log('Run paused — waiting for human approval');
       return;
