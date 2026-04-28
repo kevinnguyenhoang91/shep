@@ -8,6 +8,7 @@
  */
 
 import type {
+  AgentMessageKind,
   ApplicationStatus,
   CloudDeploymentProvider,
   NotificationEvent,
@@ -49,7 +50,31 @@ export interface NotificationStreamEvent {
   };
 }
 
-export type StreamedAgentEvent = NotificationStreamEvent | InteractiveSessionStreamEvent;
+/**
+ * Envelope for an inter-agent message published on {@link IAgentMessageBus}
+ * (spec 093). Forwarded to every connected client via the existing SSE
+ * pipeline so the web UI can render the agent activity feed in real time.
+ */
+export interface AgentMessageStreamEvent {
+  kind: 'agent_message';
+  messageId: string;
+  appId: string;
+  featureId?: string;
+  fromActor: string;
+  fromAgentRunId?: string;
+  toTarget: string;
+  toKind: string;
+  messageKind: AgentMessageKind;
+  /** Raw JSON-encoded payload — clients parse on the receiving end. */
+  payload: string;
+  correlationId?: string;
+  createdAt: string;
+}
+
+export type StreamedAgentEvent =
+  | NotificationStreamEvent
+  | InteractiveSessionStreamEvent
+  | AgentMessageStreamEvent;
 
 /** Per-connection cached state for a single feature. */
 export interface CachedFeatureState {

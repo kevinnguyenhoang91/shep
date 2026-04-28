@@ -25,6 +25,7 @@
 
 import { inject, injectable } from 'tsyringe';
 
+import type { IAgentMessageBus } from '../../ports/output/agents/agent-message-bus.interface.js';
 import type { IAgentRunRepository } from '../../ports/output/agents/agent-run-repository.interface.js';
 import type { IPhaseTimingRepository } from '../../ports/output/agents/phase-timing-repository.interface.js';
 import type { IApplicationRepository } from '../../ports/output/repositories/application-repository.interface.js';
@@ -45,6 +46,10 @@ import {
 
 import { computeApplicationDeltas } from './stream-agent-events/compute-application-deltas.js';
 import { computeFeatureDeltas } from './stream-agent-events/compute-feature-deltas.js';
+import {
+  computeMessageDeltas,
+  type CachedAgentMessageState,
+} from './stream-agent-events/compute-message-deltas.js';
 import { computePhaseCompletionDeltas } from './stream-agent-events/compute-phase-completion-deltas.js';
 import { computePrDeltas } from './stream-agent-events/compute-pr-deltas.js';
 import { computeSessionDeltas } from './stream-agent-events/compute-session-deltas.js';
@@ -59,6 +64,7 @@ import type {
 // Re-export the public event types so existing consumers that import them
 // from this module keep working.
 export type {
+  AgentMessageStreamEvent,
   InteractiveSessionStreamEvent,
   NotificationStreamEvent,
   StreamedAgentEvent,
@@ -96,7 +102,9 @@ export class StreamAgentEventsUseCase {
     @inject('IOperationLogEventBus')
     private readonly operationLogEventBus: IOperationLogEventBus,
     @inject('ILogger')
-    private readonly logger: ILogger
+    private readonly logger: ILogger,
+    @inject('IAgentMessageBus')
+    private readonly agentMessageBus: IAgentMessageBus
   ) {}
 
   /**
@@ -115,6 +123,7 @@ export class StreamAgentEventsUseCase {
     const featureCache = new Map<string, CachedFeatureState>();
     const sessionCache = new Map<string, CachedSessionState>();
     const applicationCache = new Map<string, CachedApplicationState>();
+    const agentMessageCache = new Map<string, CachedAgentMessageState>();
 
     const queue: StreamedAgentEvent[] = [];
     let notify: (() => void) | null = null;
@@ -140,6 +149,7 @@ export class StreamAgentEventsUseCase {
             featureCache,
             sessionCache,
             applicationCache,
+            agentMessageCache,
             enqueue,
           });
           pollErrorCount = 0;
@@ -290,9 +300,17 @@ export class StreamAgentEventsUseCase {
     featureCache: Map<string, CachedFeatureState>;
     sessionCache: Map<string, CachedSessionState>;
     applicationCache: Map<string, CachedApplicationState>;
+    agentMessageCache: Map<string, CachedAgentMessageState>;
     enqueue: (event: StreamedAgentEvent) => void;
   }): Promise<void> {
-    const { runIdFilter, featureCache, sessionCache, applicationCache, enqueue } = args;
+    const {
+      runIdFilter,
+      featureCache,
+      sessionCache,
+      applicationCache,
+      agentMessageCache,
+      enqueue,
+    } = args;
 
     const features = await this.listFeatures.execute();
 
@@ -360,9 +378,11 @@ export class StreamAgentEventsUseCase {
 
     // Application row polling — diff against per-connection cache and emit
     // `ApplicationUpdated` on any watched-field change. Seed is silent.
+    let applicationIds: string[] = [];
     try {
       const applications = await this.applicationRepo.list();
       for (const app of applications) {
+        applicationIds.push(app.id);
         if (runIdFilter && app.id !== runIdFilter) continue;
         const prev = applicationCache.get(app.id);
         for (const event of computeApplicationDeltas({ application: app, prev })) {
@@ -377,6 +397,29 @@ export class StreamAgentEventsUseCase {
       }
     } catch {
       // Ignore application-poll failures; same posture as session polling.
+      applicationIds = [];
+    }
+
+    // Agent message bus polling (spec 093) — for each known app scope, fetch
+    // new messages since the cached high-water mark and forward them as
+    // `agent_message` SSE events. Skipped silently if the bus is unavailable.
+    for (const appId of applicationIds) {
+      let cache = agentMessageCache.get(appId);
+      if (!cache) {
+        cache = { lastSeenAt: 0, deliveredIds: new Set<string>() };
+        agentMessageCache.set(appId, cache);
+      }
+      try {
+        const messages = await this.agentMessageBus.listFor({
+          appId,
+          since: cache.lastSeenAt > 0 ? new Date(cache.lastSeenAt) : undefined,
+        });
+        for (const event of computeMessageDeltas({ messages, cache })) {
+          enqueue(event);
+        }
+      } catch {
+        // Ignore message-bus poll failures; same posture as session polling.
+      }
     }
   }
 

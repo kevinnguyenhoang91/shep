@@ -20,6 +20,7 @@ import type { IInteractiveSessionRepository } from '@/application/ports/output/r
 import type { ICloudDeploymentEventBus } from '@/application/ports/output/services/cloud-deployment-event-bus.interface.js';
 import type { ILogger } from '@/application/ports/output/services/logger.interface.js';
 import type { IProcessLivenessProbe } from '@/application/ports/output/services/process-liveness.interface.js';
+import type { IAgentMessageBus } from '@/application/ports/output/agents/agent-message-bus.interface.js';
 
 import { InMemoryOperationLogEventBus } from '@/infrastructure/services/events/in-memory-operation-log-event-bus.js';
 
@@ -101,6 +102,12 @@ function buildUseCase(bus: InMemoryOperationLogEventBus): StreamAgentEventsUseCa
     error: vi.fn(),
   };
 
+  const agentMessageBus: IAgentMessageBus = {
+    publish: vi.fn(),
+    subscribe: vi.fn().mockReturnValue(() => undefined),
+    listFor: vi.fn().mockResolvedValue([]),
+  };
+
   return new StreamAgentEventsUseCase(
     listFeaturesStub,
     agentRunRepo,
@@ -110,7 +117,8 @@ function buildUseCase(bus: InMemoryOperationLogEventBus): StreamAgentEventsUseCa
     cloudEventBus,
     applicationRepo,
     bus,
-    logger
+    logger,
+    agentMessageBus
   );
 }
 

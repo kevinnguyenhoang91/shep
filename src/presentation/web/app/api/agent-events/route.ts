@@ -67,13 +67,18 @@ export function GET(request: Request): Response {
               }`
             );
             enqueue(`event: notification\ndata: ${JSON.stringify(event.event)}\n\n`);
-          } else {
+          } else if (event.kind === 'interactive-session') {
             const payload: InteractiveSessionEvent = {
               type: event.type,
               sessionId: event.sessionId,
               featureId: event.featureId,
             };
             enqueue(`event: interactive_session\ndata: ${JSON.stringify(payload)}\n\n`);
+          } else if (event.kind === 'agent_message') {
+            // Agent message bus event (spec 093) — forwarded as its own SSE
+            // channel so the web client can render the agent activity feed
+            // without overloading the notification channel.
+            enqueue(`event: agent_message\ndata: ${JSON.stringify(event)}\n\n`);
           }
         };
 

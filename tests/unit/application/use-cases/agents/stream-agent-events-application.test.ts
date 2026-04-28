@@ -21,6 +21,7 @@ import type { ICloudDeploymentEventBus } from '@/application/ports/output/servic
 import type { ILogger } from '@/application/ports/output/services/logger.interface.js';
 import type { IOperationLogEventBus } from '@/application/ports/output/services/operation-log-event-bus.interface.js';
 import type { IProcessLivenessProbe } from '@/application/ports/output/services/process-liveness.interface.js';
+import type { IAgentMessageBus } from '@/application/ports/output/agents/agent-message-bus.interface.js';
 
 import type { Application, NotificationEvent } from '@/domain/generated/output.js';
 import { ApplicationStatus, NotificationEventType } from '@/domain/generated/output.js';
@@ -119,6 +120,12 @@ function buildUseCase(listMock: () => Promise<Application[]>): StreamAgentEvents
     error: vi.fn(),
   };
 
+  const agentMessageBus: IAgentMessageBus = {
+    publish: vi.fn(),
+    subscribe: vi.fn().mockReturnValue(() => undefined),
+    listFor: vi.fn().mockResolvedValue([]),
+  };
+
   return new StreamAgentEventsUseCase(
     listFeaturesStub,
     agentRunRepo,
@@ -128,7 +135,8 @@ function buildUseCase(listMock: () => Promise<Application[]>): StreamAgentEvents
     cloudEventBus,
     applicationRepo,
     operationLogEventBus,
-    logger
+    logger,
+    agentMessageBus
   );
 }
 
