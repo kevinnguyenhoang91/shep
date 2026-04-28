@@ -35,6 +35,7 @@ import { setLifecycleContext } from './lifecycle-context.js';
 import { setLogPrefix, getLogPrefix } from './log-context.js';
 import { FeatureAgentLifecyclePublisher } from './feature-agent-lifecycle-publisher.js';
 import { FeatureAgentGateQuestionPublisher } from './feature-agent-gate-question-publisher.js';
+import { FeatureAgentSupervisorGateEvaluator } from './feature-agent-supervisor-gate-evaluator.js';
 import type { IPhaseTimingRepository } from '@/application/ports/output/agents/phase-timing-repository.interface.js';
 import { UpdateFeatureLifecycleUseCase } from '@/application/use-cases/features/update/update-feature-lifecycle.use-case.js';
 import { CleanupFeatureWorktreeUseCase } from '@/application/use-cases/features/cleanup-feature-worktree.use-case.js';
@@ -334,6 +335,12 @@ export async function runWorker(args: WorkerArgs): Promise<void> {
   // inbox covers background-mode gates (spec 093, task 20). Same flag
   // gating — no-op when collaboration is off.
   const gateQuestionPublisher = container.resolve(FeatureAgentGateQuestionPublisher);
+  // Supervisor gate evaluator: on every waiting_approval transition
+  // ask the configured supervisor (if any) to evaluate the gate
+  // (spec 093, task 29). In autonomous mode the supervisor may
+  // resolve the gate directly; in advisory / co-sign modes the
+  // decision is recorded for the user but the gate stays open.
+  const supervisorGateEvaluator = container.resolve(FeatureAgentSupervisorGateEvaluator);
   const lifecycleScope = {
     runId: args.runId,
     featureId: args.featureId,
@@ -479,6 +486,23 @@ export async function runWorker(args: WorkerArgs): Promise<void> {
         ...lifecycleScope,
         interruptNode,
       });
+      // Consult the supervisor (no-op when none configured / flag off).
+      // In autonomous mode the supervisor may close the gate directly;
+      // in advisory / co-sign modes the decision is recorded but the
+      // gate stays in waiting_approval for the user.
+      const supervisorOutcome = await supervisorGateEvaluator.evaluateForGate({
+        ...lifecycleScope,
+        interruptNode,
+      });
+      if (supervisorOutcome.autoResolved) {
+        log(
+          `Supervisor auto-resolved gate (verdict=${supervisorOutcome.verdict}, autonomy=${supervisorOutcome.effectiveAutonomy})`
+        );
+      } else if (supervisorOutcome.evaluated) {
+        log(
+          `Supervisor advised on gate (verdict=${supervisorOutcome.verdict}, autonomy=${supervisorOutcome.effectiveAutonomy}); user action still required`
+        );
+      }
       log('Run paused — waiting for human approval');
       return;
     }

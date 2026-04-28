@@ -31,6 +31,7 @@ import { AgentSessionRepositoryRegistry } from '../../services/agents/agent-sess
 import { AgentType } from '../../../domain/generated/output.js';
 import { FeatureAgentLifecyclePublisher } from '../../services/agents/feature-agent/feature-agent-lifecycle-publisher.js';
 import { FeatureAgentGateQuestionPublisher } from '../../services/agents/feature-agent/feature-agent-gate-question-publisher.js';
+import { FeatureAgentSupervisorGateEvaluator } from '../../services/agents/feature-agent/feature-agent-supervisor-gate-evaluator.js';
 
 /**
  * Register agent-execution infrastructure: executor factory/provider, runner,
@@ -139,4 +140,11 @@ export function registerAgents(container: DependencyContainer): void {
   // on every waiting_approval transition so the unified inbox covers
   // background-mode gates (spec 093, task 20).
   container.registerSingleton(FeatureAgentGateQuestionPublisher);
+
+  // Feature-agent worker consults the configured supervisor on every
+  // waiting_approval transition (spec 093, task 29). In autonomous
+  // mode the supervisor may close the gate via Approve/Reject; in
+  // advisory / co-sign modes the decision is recorded but the gate
+  // stays in waiting_approval for the user.
+  container.registerSingleton(FeatureAgentSupervisorGateEvaluator);
 }
