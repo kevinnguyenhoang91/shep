@@ -207,6 +207,111 @@ describe('ClaudeCodeInteractiveExecutor', () => {
     });
   });
 
+  describe('agentQuestionBridge routing (spec 093, task 19)', () => {
+    it('should route AskUserQuestion through agentQuestionBridge when present', async () => {
+      const bridge = {
+        ask: vi.fn().mockResolvedValue({ 'What is your name?': 'Ariel' }),
+      };
+      await executor.createSession({
+        cwd: process.cwd(),
+        model: 'claude-sonnet-4-6',
+        agentQuestionBridge: bridge,
+      });
+
+      const canUseTool = capturedOptions.canUseTool as (
+        name: string,
+        input: Record<string, unknown>,
+        opts: { toolUseID: string }
+      ) => Promise<{ behavior: string; updatedInput?: Record<string, unknown> }>;
+
+      const questions = [
+        { question: 'What is your name?', header: 'Name', options: [], multiSelect: false },
+      ];
+      const result = await canUseTool('AskUserQuestion', { questions }, { toolUseID: 'tu_bridge' });
+
+      expect(result.behavior).toBe('allow');
+      expect(result.updatedInput).toEqual({
+        questions,
+        answers: { 'What is your name?': 'Ariel' },
+      });
+      expect(bridge.ask).toHaveBeenCalledWith({
+        toolCallId: 'tu_bridge',
+        questions,
+      });
+    });
+
+    it('falls through to onUserQuestion when bridge returns null (flag-off path)', async () => {
+      const bridge = { ask: vi.fn().mockResolvedValue(null) };
+      const onUserQuestion = vi.fn().mockResolvedValue({ q1: 'legacy-answer' });
+
+      await executor.createSession({
+        cwd: process.cwd(),
+        model: 'claude-sonnet-4-6',
+        agentQuestionBridge: bridge,
+        onUserQuestion,
+      });
+
+      const canUseTool = capturedOptions.canUseTool as (
+        name: string,
+        input: Record<string, unknown>,
+        opts: { toolUseID: string }
+      ) => Promise<{ behavior: string; updatedInput?: Record<string, unknown> }>;
+
+      const questions = [{ question: 'q1', header: 'Q1', options: [], multiSelect: false }];
+      const result = await canUseTool('AskUserQuestion', { questions }, { toolUseID: 'tu_legacy' });
+
+      expect(bridge.ask).toHaveBeenCalledTimes(1);
+      expect(onUserQuestion).toHaveBeenCalledTimes(1);
+      expect(result.updatedInput).toEqual({
+        questions,
+        answers: { q1: 'legacy-answer' },
+      });
+    });
+
+    it('canUseTool callback resolves only when bridge.ask resolves (Deferred round-trip)', async () => {
+      let resolveAsk: ((answers: Record<string, string>) => void) | undefined;
+      const askPromise = new Promise<Record<string, string>>((r) => {
+        resolveAsk = r;
+      });
+      const bridge = { ask: vi.fn().mockReturnValue(askPromise) };
+
+      await executor.createSession({
+        cwd: process.cwd(),
+        model: 'claude-sonnet-4-6',
+        agentQuestionBridge: bridge,
+      });
+
+      const canUseTool = capturedOptions.canUseTool as (
+        name: string,
+        input: Record<string, unknown>,
+        opts: { toolUseID: string }
+      ) => Promise<{ behavior: string; updatedInput?: Record<string, unknown> }>;
+
+      const questions = [{ question: 'go?', header: 'Go', options: [], multiSelect: false }];
+      const callbackPromise = canUseTool(
+        'AskUserQuestion',
+        { questions },
+        { toolUseID: 'tu_round' }
+      );
+
+      // Verify the callback is still pending while the bridge awaits.
+      let resolved = false;
+      void callbackPromise.then(() => {
+        resolved = true;
+      });
+      await Promise.resolve();
+      expect(resolved).toBe(false);
+
+      resolveAsk!({ 'go?': 'yes' });
+      const result = await callbackPromise;
+
+      expect(result.updatedInput).toEqual({
+        questions,
+        answers: { 'go?': 'yes' },
+      });
+    });
+  });
+
   describe('resumeSession', () => {
     it('should pass session ID and options to SDK resume', async () => {
       await executor.resumeSession('existing-session-id', {

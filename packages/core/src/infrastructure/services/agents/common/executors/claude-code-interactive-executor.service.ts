@@ -153,20 +153,36 @@ export class ClaudeCodeInteractiveExecutor implements IInteractiveAgentExecutor 
 
     // Build the canUseTool callback that intercepts AskUserQuestion.
     // When the agent calls AskUserQuestion, this callback:
-    // 1. Delegates to onUserQuestion (which notifies the UI and waits for user response)
-    // 2. Returns { behavior: 'allow', updatedInput } with the user's answers injected
-    // 3. The SDK passes the updated input to AskUserQuestion, which sees pre-filled answers
+    // 1. Routes through the unified agent-question pipeline when the
+    //    collaboration feature flag is on (spec 093, task 19).
+    // 2. Otherwise delegates to onUserQuestion (legacy direct-prompt path).
+    // 3. Returns { behavior: 'allow', updatedInput } with the user's
+    //    answers injected so the SDK treats AskUserQuestion as answered.
     //
     // For ALL other tools: auto-allow (same effect as bypassPermissions).
-    const canUseTool = options.onUserQuestion
+    const hasInterception = Boolean(options.onUserQuestion ?? options.agentQuestionBridge);
+    const canUseTool = hasInterception
       ? async (toolName: string, input: Record<string, unknown>, opts: { toolUseID: string }) => {
           if (toolName === 'AskUserQuestion') {
             const questions = (input.questions as UserQuestion[]) ?? [];
-            const answers = await options.onUserQuestion!({
-              toolCallId: opts.toolUseID,
-              questions,
-            });
-            // Inject answers into the tool input so the SDK treats it as already answered
+            let answers: Record<string, string> | null = null;
+            if (options.agentQuestionBridge) {
+              answers = await options.agentQuestionBridge.ask({
+                toolCallId: opts.toolUseID,
+                questions,
+              });
+            }
+            if (answers === null) {
+              if (options.onUserQuestion) {
+                answers = await options.onUserQuestion({
+                  toolCallId: opts.toolUseID,
+                  questions,
+                });
+              } else {
+                // No legacy fallback — auto-allow with no synthesized answers.
+                return { behavior: 'allow' as const };
+              }
+            }
             return {
               behavior: 'allow' as const,
               updatedInput: { ...input, answers },

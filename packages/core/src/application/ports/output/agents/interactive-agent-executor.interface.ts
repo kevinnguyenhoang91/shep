@@ -19,6 +19,28 @@ export type OnUserQuestionCallback = (
   interaction: UserInteractionData
 ) => Promise<Record<string, string>>;
 
+/**
+ * Bridge between the SDK V2 `canUseTool` callback for `AskUserQuestion`
+ * and the unified agent-question pipeline (spec 093, task 19). When the
+ * collaboration feature flag is on, the executor calls
+ * {@link AgentQuestionBridge.ask} which writes an `AgentQuestion` row of
+ * kind `blocking` and awaits its answer (resolved by
+ * `AnswerAgentQuestionUseCase` from any process). When the flag is off,
+ * the bridge returns `null` and the executor falls through to the legacy
+ * `onUserQuestion` callback so behavior remains byte-identical (NFR-14).
+ */
+export interface AgentQuestionBridge {
+  /**
+   * Persist the AskUserQuestion invocation as an AgentQuestion row and
+   * await an answer. Returns `null` when the collaboration feature flag
+   * is off — caller MUST fall back to the legacy direct-prompt path.
+   */
+  ask(args: {
+    toolCallId: string;
+    questions: UserQuestion[];
+  }): Promise<Record<string, string> | null>;
+}
+
 /** Options for creating/resuming an interactive agent session. */
 export interface InteractiveAgentOptions {
   /** Absolute worktree path (CWD for agent) */
@@ -32,6 +54,13 @@ export interface InteractiveAgentOptions {
    * The SDK stream pauses until this resolves — the agent cannot continue without answers.
    */
   onUserQuestion?: OnUserQuestionCallback;
+  /**
+   * Optional bridge to the unified agent-question pipeline (spec 093).
+   * When provided AND the collaboration feature flag is on, the executor
+   * routes every AskUserQuestion through this bridge. Falls back to
+   * {@link onUserQuestion} otherwise.
+   */
+  agentQuestionBridge?: AgentQuestionBridge;
 }
 
 /** A single question within an AskUserQuestion tool call. */
