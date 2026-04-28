@@ -683,6 +683,10 @@ export type FeatureFlags = {
    * Enable AI-powered code review for pull requests
    */
   codeReview: boolean;
+  /**
+   * Enable agent collaboration, supervisor agent, and unified question pipeline (spec 093)
+   */
+  collaboration: boolean;
 };
 
 /**
@@ -701,6 +705,33 @@ export type InteractiveAgentConfig = {
    * Maximum number of concurrent active interactive sessions (default: 3)
    */
   maxConcurrentSessions: number;
+};
+export enum SupervisorAutonomy {
+  advisory = 'advisory',
+  cosign = 'cosign',
+  autonomous = 'autonomous',
+}
+
+/**
+ * Supervisor agent default configuration (spec 093)
+ */
+export type SupervisorConfig = {
+  /**
+   * Whether a supervisor is enabled by default for newly created apps
+   */
+  enabled: boolean;
+  /**
+   * Default autonomy level (advisory by default)
+   */
+  autonomyLevel: SupervisorAutonomy;
+  /**
+   * Default LLM model identifier (resolved through IAgentExecutorProvider)
+   */
+  modelId?: string;
+  /**
+   * Default evaluator prompt version marker
+   */
+  promptVersion?: string;
 };
 
 /**
@@ -761,6 +792,52 @@ export type Settings = BaseEntity & {
    * FAB layout configuration (optional, defaults applied at runtime)
    */
   fabLayout?: FabLayoutConfig;
+  /**
+   * Supervisor agent default configuration (optional, defaults applied at runtime)
+   */
+  supervisor?: SupervisorConfig;
+};
+
+/**
+ * Per-app supervisor policy with optional per-feature override
+ */
+export type SupervisorPolicy = BaseEntity & {
+  /**
+   * App scope identifier (required)
+   */
+  appId: string;
+  /**
+   * Feature scope identifier (optional override)
+   */
+  featureId?: string;
+  /**
+   * Master enable toggle
+   */
+  enabled: boolean;
+  /**
+   * Default autonomy level (advisory by default)
+   */
+  autonomyLevel: SupervisorAutonomy;
+  /**
+   * JSON map: per-gate autonomy override (e.g. { prd: 'advisory', merge: 'autonomous' })
+   */
+  gateAuthorityJson?: string;
+  /**
+   * LLM model identifier resolved through IAgentExecutorProvider
+   */
+  modelId?: string;
+  /**
+   * Evaluator prompt version marker for audit reproducibility
+   */
+  promptVersion?: string;
+  /**
+   * JSON array of structured policy rules
+   */
+  policyRulesJson?: string;
+  /**
+   * JSON object overriding the user's notification preferences for supervisor events
+   */
+  notificationOverridesJson?: string;
 };
 export enum TaskState {
   Todo = 'Todo',
@@ -3618,6 +3695,189 @@ export type WorkflowStep = BaseEntity & {
    * JSON blob with summary, details, error — populated when done/failed
    */
   metadata?: string;
+};
+export enum AgentMessageKind {
+  status = 'status',
+  request = 'request',
+  reply = 'reply',
+  blocked = 'blocked',
+  info = 'info',
+}
+
+/**
+ * Inter-agent / agent↔user / agent↔supervisor message persisted on the bus
+ */
+export type AgentMessage = BaseEntity & {
+  /**
+   * App scope identifier (NFR-7 isolation; never cross-app)
+   */
+  appId: string;
+  /**
+   * Optional feature scope identifier
+   */
+  featureId?: string;
+  /**
+   * Sending agent run id (omitted when sender is user or supervisor)
+   */
+  fromAgentRunId?: string;
+  /**
+   * Sender actor namespace: e.g. 'agent:<runId>', 'user:<id>', 'supervisor:<id>'
+   */
+  fromActor: string;
+  /**
+   * Target identifier — agent run id, 'broadcast', 'supervisor', or 'user'
+   */
+  toTarget: string;
+  /**
+   * Target kind: 'agent' | 'broadcast' | 'supervisor' | 'user'
+   */
+  toKind: string;
+  /**
+   * Discriminator for the meaning of the payload
+   */
+  messageKind: AgentMessageKind;
+  /**
+   * JSON-encoded payload (untrusted content, validated at boundaries)
+   */
+  payload: string;
+  /**
+   * Pairs a request with its reply (optional)
+   */
+  correlationId?: string;
+  /**
+   * Timestamp when the bus marked this message delivered to subscribers
+   */
+  deliveredAt?: any;
+};
+export enum AgentQuestionKind {
+  info = 'info',
+  question = 'question',
+  blocking = 'blocking',
+}
+export enum AgentQuestionAnswerer {
+  user = 'user',
+  supervisor = 'supervisor',
+  either = 'either',
+}
+export enum AgentQuestionStatus {
+  pending = 'pending',
+  answered = 'answered',
+  expired = 'expired',
+  cancelled = 'cancelled',
+}
+
+/**
+ * A question raised by an agent toward the user, supervisor, or either
+ */
+export type AgentQuestion = BaseEntity & {
+  /**
+   * App scope identifier (NFR-7 isolation)
+   */
+  appId: string;
+  /**
+   * Optional feature scope identifier
+   */
+  featureId?: string;
+  /**
+   * Agent run that raised this question
+   */
+  agentRunId: string;
+  /**
+   * Three-tier urgency
+   */
+  kind: AgentQuestionKind;
+  /**
+   * Free-form question text shown to the answerer
+   */
+  prompt: string;
+  /**
+   * JSON-encoded array of multiple-choice options (optional)
+   */
+  optionsJson?: string;
+  /**
+   * Default answer used when expiresAt fires (non-blocking kinds only)
+   */
+  defaultAnswer?: string;
+  /**
+   * Who is permitted to answer this question
+   */
+  answerer: AgentQuestionAnswerer;
+  /**
+   * Current lifecycle state
+   */
+  status: AgentQuestionStatus;
+  /**
+   * Final answer text, set when status transitions to answered or expired
+   */
+  answer?: string;
+  /**
+   * Actor namespace of the answerer, e.g. 'user:<id>' or 'supervisor:<id>'
+   */
+  answeredBy?: string;
+  /**
+   * Timestamp when the answer was recorded
+   */
+  answeredAt?: any;
+  /**
+   * Auto-resolution deadline (optional, used with defaultAnswer)
+   */
+  expiresAt?: any;
+};
+export enum SupervisorVerdict {
+  approve = 'approve',
+  reject = 'reject',
+  escalate = 'escalate',
+  advise = 'advise',
+}
+
+/**
+ * Immutable audit record of a supervisor decision
+ */
+export type SupervisorDecision = BaseEntity & {
+  /**
+   * App scope identifier (NFR-7 isolation)
+   */
+  appId: string;
+  /**
+   * Optional feature scope identifier
+   */
+  featureId?: string;
+  /**
+   * Agent run id of the supervisor that produced this decision
+   */
+  supervisorRunId: string;
+  /**
+   * Kind of source event: 'gate' | 'question' | 'message' | 'lifecycle'
+   */
+  sourceEventKind: string;
+  /**
+   * Id of the source event row this decision was about
+   */
+  sourceEventId: string;
+  /**
+   * Decision outcome
+   */
+  verdict: SupervisorVerdict;
+  /**
+   * Free-form rationale string written by the evaluator
+   */
+  rationale: string;
+  /**
+   * LLM model used at decision time (snapshot for reproducibility)
+   */
+  modelId: string;
+  /**
+   * Evaluator prompt version snapshot
+   */
+  promptVersion: string;
+  /**
+   * Optional reference to the policy rule that fired
+   */
+  ruleRef?: string;
+  /**
+   * Optional 0..1 confidence reported by the evaluator
+   */
+  confidence?: float64;
 };
 
 /**

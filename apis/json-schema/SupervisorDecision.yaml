@@ -1,0 +1,49 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: SupervisorDecision.yaml
+type: object
+properties:
+  appId:
+    type: string
+    description: App scope identifier (NFR-7 isolation)
+  featureId:
+    type: string
+    description: Optional feature scope identifier
+  supervisorRunId:
+    type: string
+    description: Agent run id of the supervisor that produced this decision
+  sourceEventKind:
+    type: string
+    description: "Kind of source event: 'gate' | 'question' | 'message' | 'lifecycle'"
+  sourceEventId:
+    type: string
+    description: Id of the source event row this decision was about
+  verdict:
+    $ref: SupervisorVerdict.yaml
+    description: Decision outcome
+  rationale:
+    type: string
+    description: Free-form rationale string written by the evaluator
+  modelId:
+    type: string
+    description: LLM model used at decision time (snapshot for reproducibility)
+  promptVersion:
+    type: string
+    description: Evaluator prompt version snapshot
+  ruleRef:
+    type: string
+    description: Optional reference to the policy rule that fired
+  confidence:
+    type: number
+    description: Optional 0..1 confidence reported by the evaluator
+required:
+  - appId
+  - supervisorRunId
+  - sourceEventKind
+  - sourceEventId
+  - verdict
+  - rationale
+  - modelId
+  - promptVersion
+allOf:
+  - $ref: BaseEntity.yaml
+description: Immutable audit record of a supervisor decision

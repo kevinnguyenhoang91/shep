@@ -38,6 +38,7 @@ import "../../common/enums/editor.tsp";
 import "../../common/enums/language.tsp";
 import "../../common/enums/notification.tsp";
 import "../../common/enums/terminal.tsp";
+import "../../agents/supervisor-policy.tsp";
 
 /**
  * Model Configuration
@@ -606,6 +607,9 @@ model FeatureFlags {
 
   @doc("Enable AI-powered code review for pull requests")
   codeReview: boolean = false;
+
+  @doc("Enable agent collaboration, supervisor agent, and unified question pipeline (spec 093)")
+  collaboration: boolean = false;
 }
 
 /**
@@ -658,6 +662,32 @@ model InteractiveAgentConfig {
    */
   @doc("Maximum number of concurrent active interactive sessions (default: 3)")
   maxConcurrentSessions: int32 = 3;
+}
+
+/**
+ * Supervisor Configuration (Settings-level defaults, spec 093)
+ *
+ * Global default supervisor behavior. Per-app and per-feature overrides
+ * live on the SupervisorPolicy entity. This sub-block on Settings is the
+ * fallback when no policy row exists for a scope and the user wants
+ * default-on supervision for newly created apps.
+ *
+ * All fields are optional and default to disabled / advisory so existing
+ * installations behave identically until the user opts in.
+ */
+@doc("Supervisor agent default configuration (spec 093)")
+model SupervisorConfig {
+  @doc("Whether a supervisor is enabled by default for newly created apps")
+  enabled: boolean = false;
+
+  @doc("Default autonomy level (advisory by default)")
+  autonomyLevel: SupervisorAutonomy = SupervisorAutonomy.advisory;
+
+  @doc("Default LLM model identifier (resolved through IAgentExecutorProvider)")
+  modelId?: string;
+
+  @doc("Default evaluator prompt version marker")
+  promptVersion?: string;
 }
 
 /**
@@ -832,4 +862,12 @@ model Settings extends BaseEntity {
    */
   @doc("FAB layout configuration (optional, defaults applied at runtime)")
   fabLayout?: FabLayoutConfig;
+
+  /**
+   * Supervisor agent default configuration (spec 093).
+   * Per-app and per-feature overrides live on the SupervisorPolicy entity.
+   * Optional for backward compatibility — defaults applied at runtime.
+   */
+  @doc("Supervisor agent default configuration (optional, defaults applied at runtime)")
+  supervisor?: SupervisorConfig;
 }

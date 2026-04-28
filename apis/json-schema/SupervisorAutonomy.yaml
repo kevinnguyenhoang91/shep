@@ -1,0 +1,8 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: SupervisorAutonomy.yaml
+type: string
+enum:
+  - advisory
+  - cosign
+  - autonomous
+description: Authority delegated to the supervisor for the configured scope

@@ -44,6 +44,7 @@ export const AllSections: Story = {
         inventory: false,
         projects: false,
         codeReview: false,
+        collaboration: false,
       },
     },
     shepHome: '/opt/shep',

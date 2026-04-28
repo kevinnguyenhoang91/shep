@@ -101,6 +101,7 @@ function WithGitOpsTemplate({ data }: { data: RepositoryNodeData }) {
     inventory: false,
     projects: false,
     codeReview: false,
+    collaboration: false,
   };
 
   return (

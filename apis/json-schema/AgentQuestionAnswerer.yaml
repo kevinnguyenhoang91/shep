@@ -1,0 +1,8 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: AgentQuestionAnswerer.yaml
+type: string
+enum:
+  - user
+  - supervisor
+  - either
+description: Who is permitted to answer this question

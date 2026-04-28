@@ -30,6 +30,7 @@ const defaultFlags = {
   inventory: false,
   projects: false,
   codeReview: false,
+  collaboration: false,
 };
 
 /**

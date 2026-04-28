@@ -1,0 +1,22 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: SupervisorConfig.yaml
+type: object
+properties:
+  enabled:
+    type: boolean
+    default: false
+    description: Whether a supervisor is enabled by default for newly created apps
+  autonomyLevel:
+    $ref: SupervisorAutonomy.yaml
+    default: advisory
+    description: Default autonomy level (advisory by default)
+  modelId:
+    type: string
+    description: Default LLM model identifier (resolved through IAgentExecutorProvider)
+  promptVersion:
+    type: string
+    description: Default evaluator prompt version marker
+required:
+  - enabled
+  - autonomyLevel
+description: Supervisor agent default configuration (spec 093)

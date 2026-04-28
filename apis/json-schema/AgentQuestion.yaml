@@ -1,0 +1,55 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: AgentQuestion.yaml
+type: object
+properties:
+  appId:
+    type: string
+    description: App scope identifier (NFR-7 isolation)
+  featureId:
+    type: string
+    description: Optional feature scope identifier
+  agentRunId:
+    type: string
+    description: Agent run that raised this question
+  kind:
+    $ref: AgentQuestionKind.yaml
+    description: Three-tier urgency
+  prompt:
+    type: string
+    description: Free-form question text shown to the answerer
+  optionsJson:
+    type: string
+    description: JSON-encoded array of multiple-choice options (optional)
+  defaultAnswer:
+    type: string
+    description: Default answer used when expiresAt fires (non-blocking kinds only)
+  answerer:
+    $ref: AgentQuestionAnswerer.yaml
+    description: Who is permitted to answer this question
+  status:
+    $ref: AgentQuestionStatus.yaml
+    description: Current lifecycle state
+  answer:
+    type: string
+    description: Final answer text, set when status transitions to answered or expired
+  answeredBy:
+    type: string
+    description: Actor namespace of the answerer, e.g. 'user:<id>' or 'supervisor:<id>'
+  answeredAt:
+    type: string
+    format: date-time
+    description: Timestamp when the answer was recorded
+  expiresAt:
+    type: string
+    format: date-time
+    description: Auto-resolution deadline (optional, used with defaultAnswer)
+required:
+  - appId
+  - agentRunId
+  - kind
+  - prompt
+  - answerer
+  - status
+allOf:
+  - $ref: BaseEntity.yaml
+description: A question raised by an agent toward the user, supervisor, or either

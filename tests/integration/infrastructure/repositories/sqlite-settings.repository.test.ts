@@ -527,6 +527,7 @@ describe('SQLiteSettingsRepository', () => {
         inventory: false,
         projects: false,
         codeReview: false,
+        collaboration: false,
       };
 
       await repository.initialize(settings);
@@ -543,6 +544,7 @@ describe('SQLiteSettingsRepository', () => {
         inventory: false,
         projects: false,
         codeReview: false,
+        collaboration: false,
       });
     });
 
@@ -563,6 +565,7 @@ describe('SQLiteSettingsRepository', () => {
         inventory: false,
         projects: false,
         codeReview: false,
+        collaboration: false,
       });
     });
 
@@ -581,6 +584,7 @@ describe('SQLiteSettingsRepository', () => {
         inventory: false,
         projects: false,
         codeReview: false,
+        collaboration: false,
       };
       settings.updatedAt = new Date('2025-01-02T00:00:00Z');
       await repository.update(settings);
@@ -597,6 +601,7 @@ describe('SQLiteSettingsRepository', () => {
         inventory: false,
         projects: false,
         codeReview: false,
+        collaboration: false,
       });
     });
 
@@ -613,6 +618,7 @@ describe('SQLiteSettingsRepository', () => {
         inventory: false,
         projects: false,
         codeReview: false,
+        collaboration: false,
       };
 
       await repository.initialize(settings);

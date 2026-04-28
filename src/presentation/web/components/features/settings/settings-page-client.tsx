@@ -400,6 +400,7 @@ export function SettingsPageClient({
     projects: false,
     inventory: false,
     codeReview: false,
+    collaboration: false,
   };
 
   // Language state

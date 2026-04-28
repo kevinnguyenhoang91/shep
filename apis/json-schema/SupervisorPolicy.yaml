@@ -1,0 +1,38 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: SupervisorPolicy.yaml
+type: object
+properties:
+  appId:
+    type: string
+    description: App scope identifier (required)
+  featureId:
+    type: string
+    description: Feature scope identifier (optional override)
+  enabled:
+    type: boolean
+    description: Master enable toggle
+  autonomyLevel:
+    $ref: SupervisorAutonomy.yaml
+    description: Default autonomy level (advisory by default)
+  gateAuthorityJson:
+    type: string
+    description: "JSON map: per-gate autonomy override (e.g. { prd: 'advisory', merge: 'autonomous' })"
+  modelId:
+    type: string
+    description: LLM model identifier resolved through IAgentExecutorProvider
+  promptVersion:
+    type: string
+    description: Evaluator prompt version marker for audit reproducibility
+  policyRulesJson:
+    type: string
+    description: JSON array of structured policy rules
+  notificationOverridesJson:
+    type: string
+    description: JSON object overriding the user's notification preferences for supervisor events
+required:
+  - appId
+  - enabled
+  - autonomyLevel
+allOf:
+  - $ref: BaseEntity.yaml
+description: Per-app supervisor policy with optional per-feature override

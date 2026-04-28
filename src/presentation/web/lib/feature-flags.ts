@@ -23,6 +23,7 @@ export interface FeatureFlagsState {
   inventory: boolean;
   projects: boolean;
   codeReview: boolean;
+  collaboration: boolean;
 }
 
 export function getFeatureFlags(): FeatureFlagsState {
@@ -41,6 +42,7 @@ export function getFeatureFlags(): FeatureFlagsState {
           inventory: flags.inventory,
           projects: flags.projects,
           codeReview: flags.codeReview,
+          collaboration: flags.collaboration,
         };
       }
     }
@@ -62,6 +64,7 @@ export function getFeatureFlags(): FeatureFlagsState {
     inventory: false,
     projects: false,
     codeReview: false,
+    collaboration: isEnabled(process.env.NEXT_PUBLIC_FLAG_COLLABORATION),
   };
 }
 
@@ -99,5 +102,8 @@ export const featureFlags = {
   },
   get codeReview() {
     return getFeatureFlags().codeReview;
+  },
+  get collaboration() {
+    return getFeatureFlags().collaboration;
   },
 } as const;

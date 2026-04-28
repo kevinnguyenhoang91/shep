@@ -1,0 +1,9 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: SupervisorVerdict.yaml
+type: string
+enum:
+  - approve
+  - reject
+  - escalate
+  - advise
+description: Outcome of a single supervisor evaluation

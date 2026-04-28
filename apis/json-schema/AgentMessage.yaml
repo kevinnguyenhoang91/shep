@@ -1,0 +1,45 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: AgentMessage.yaml
+type: object
+properties:
+  appId:
+    type: string
+    description: App scope identifier (NFR-7 isolation; never cross-app)
+  featureId:
+    type: string
+    description: Optional feature scope identifier
+  fromAgentRunId:
+    type: string
+    description: Sending agent run id (omitted when sender is user or supervisor)
+  fromActor:
+    type: string
+    description: "Sender actor namespace: e.g. 'agent:<runId>', 'user:<id>', 'supervisor:<id>'"
+  toTarget:
+    type: string
+    description: Target identifier — agent run id, 'broadcast', 'supervisor', or 'user'
+  toKind:
+    type: string
+    description: "Target kind: 'agent' | 'broadcast' | 'supervisor' | 'user'"
+  messageKind:
+    $ref: AgentMessageKind.yaml
+    description: Discriminator for the meaning of the payload
+  payload:
+    type: string
+    description: JSON-encoded payload (untrusted content, validated at boundaries)
+  correlationId:
+    type: string
+    description: Pairs a request with its reply (optional)
+  deliveredAt:
+    type: string
+    format: date-time
+    description: Timestamp when the bus marked this message delivered to subscribers
+required:
+  - appId
+  - fromActor
+  - toTarget
+  - toKind
+  - messageKind
+  - payload
+allOf:
+  - $ref: BaseEntity.yaml
+description: Inter-agent / agent↔user / agent↔supervisor message persisted on the bus

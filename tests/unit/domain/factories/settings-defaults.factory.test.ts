@@ -322,6 +322,7 @@ describe('createDefaultSettings', () => {
         inventory: false,
         projects: false,
         codeReview: false,
+        collaboration: false,
       });
     });
   });

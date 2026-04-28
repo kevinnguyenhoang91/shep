@@ -224,6 +224,7 @@ export function createDefaultSettings(): Settings {
     inventory: false,
     projects: false,
     codeReview: false,
+    collaboration: false,
   };
 
   return {

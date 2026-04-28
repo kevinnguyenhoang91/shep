@@ -7,3 +7,12 @@ export {
   createMissingStatus,
   createErrorStatus,
 } from './tool-installation-status';
+export type { SupervisorActor, SupervisorActorNamespace } from './supervisor-actor';
+export {
+  InvalidSupervisorActorError,
+  SUPERVISOR_ACTOR_NAMESPACE_SUPERVISOR,
+  SUPERVISOR_ACTOR_NAMESPACE_USER,
+  parseSupervisorActor,
+  supervisorActor,
+  userActor,
+} from './supervisor-actor';

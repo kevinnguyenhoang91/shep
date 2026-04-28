@@ -58,6 +58,7 @@ vi.mock('@/hooks/feature-flags-context', () => ({
     inventory: false,
     projects: false,
     codeReview: false,
+    collaboration: false,
   })),
 }));
 
@@ -82,6 +83,7 @@ describe('AddRepositoryButton', () => {
       inventory: false,
       projects: false,
       codeReview: false,
+      collaboration: false,
     });
   });
 
@@ -181,6 +183,7 @@ describe('AddRepositoryButton', () => {
         inventory: false,
         projects: false,
         codeReview: false,
+        collaboration: false,
       });
     });
 
@@ -313,6 +316,7 @@ describe('AddRepositoryButton', () => {
         inventory: false,
         projects: false,
         codeReview: false,
+        collaboration: false,
       });
     });
 
@@ -387,6 +391,7 @@ describe('AddRepositoryButton', () => {
         inventory: false,
         projects: false,
         codeReview: false,
+        collaboration: false,
       });
       const user = userEvent.setup();
       render(<AddRepositoryButton />);

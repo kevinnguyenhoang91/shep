@@ -1,0 +1,10 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: AgentMessageKind.yaml
+type: string
+enum:
+  - status
+  - request
+  - reply
+  - blocked
+  - info
+description: Discriminator for the kind of an agent message
