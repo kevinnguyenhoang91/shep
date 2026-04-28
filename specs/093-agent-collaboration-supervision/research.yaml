@@ -1,0 +1,887 @@
+# Research Artifact (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: "agent-collaboration-supervision"
+summary: >
+  Technical research for feature 093 — agent collaboration, supervision, and a unified
+  question pipeline. Validates that all three capabilities can be built on existing
+  Shep primitives (TypeSpec models, SQLite migrations, the StreamAgentEventsUseCase
+  polling pattern, approval gates, LangGraph + IAgentExecutorProvider, INotificationService,
+  and the feature-flag registry) without introducing new infrastructure dependencies.
+  Recommends a SQLite-backed agent message bus, a LangGraph supervisor node resolved
+  via the agent-executor abstraction, and a first-class AgentQuestion entity that
+  bridges the SDK V2 canUseTool path and background-agent approval gates.
+
+# Relationships
+relatedFeatures:
+  - "014-ui-sidebar — team-execution protocol (EM hub, [TASK-READY]/[BLOCKED] vocabulary) reused as the message-kind seed"
+  - "057-feature-flags — the FeatureFlags singleton block in Settings is the gating mechanism"
+  - "Approval gates on AgentRun (allowPrd/allowPlan/allowMerge) — the supervisor's primary intervention surface"
+  - "Interactive sessions (canUseTool + AskUserQuestion) — the existing user-question primitive we unify with background gates"
+
+technologies:
+  - "TypeSpec — domain model source of truth for AgentMessage, AgentQuestion, SupervisorPolicy, SupervisorDecision"
+  - "SQLite + WAL + custom timestamped migrations — durable cross-process persistence"
+  - "tsyringe DI with string tokens (e.g. 'IAgentMessageBus', 'ISupervisorAgent')"
+  - "LangGraph + checkpointer — supervisor implemented as a graph node so it inherits state, resume, and SSE event emission"
+  - "Claude Code SDK V2 unstable_v2_createSession + canUseTool — interception point for AskUserQuestion"
+  - "Server-Sent Events (SSE) via StreamAgentEventsUseCase — extended with new event kinds (agent_message, agent_question, supervisor_decision)"
+  - "INotificationService + NotificationEventType + Settings.notifications.events — escalation routing"
+  - "Next.js + React + React Flow — web supervisor configuration page and unified questions inbox"
+  - "Commander — CLI surfaces (shep supervisor *, shep agent questions *)"
+  - "IAgentExecutorProvider — agent-agnostic LLM resolution (mandatory rule)"
+
+relatedLinks:
+  - title: "Agent system architecture (in-repo)"
+    url: "docs/architecture/agent-system.md"
+  - title: "AGENTS.md — agent resolution rules"
+    url: "AGENTS.md"
+  - title: "Spec 014 team-execution protocol"
+    url: "specs/014-ui-sidebar/team-execution.md"
+  - title: "Anthropic Claude Code SDK V2 — canUseTool / AskUserQuestion"
+    url: "https://docs.anthropic.com/en/docs/claude-code/sdk"
+  - title: "LangGraph multi-agent supervision patterns"
+    url: "https://langchain-ai.github.io/langgraph/concepts/multi_agent/"
+  - title: "Clean Architecture rules (in-repo)"
+    url: ".claude/rules/code-quality.md"
+
+# Structured technology decisions
+decisions:
+  - title: "Domain modeling — first-class entities in TypeSpec for messages, questions, supervisor policies, and decisions"
+    chosen: |
+      Define four new TypeSpec models in tsp/agents/:
+      AgentMessage, AgentQuestion, SupervisorPolicy, SupervisorDecision, plus enums
+      AgentMessageKind (status|request|reply|blocked|info), AgentQuestionKind
+      (info|question|blocking), AgentQuestionAnswerer (user|supervisor|either),
+      AgentQuestionStatus (pending|answered|expired|cancelled), SupervisorAutonomy
+      (advisory|cosign|autonomous), SupervisorVerdict (approve|reject|escalate|advise).
+      Each gets a dedicated SQLite table and migration. Add a SupervisorConfig sub-block
+      to Settings + per-app overrides on the App entity.
+    rejected:
+      - "Reusing InteractiveMessage and WorkflowStep with new tag fields — saves a table but forces every consumer (UI inbox, supervisor, notifications, audit) to query two surfaces and never converges."
+      - "JSON blob hung off AgentRun.metadata — fastest to ship but loses queryability, scoping, and indexing; cannot satisfy NFR-3 (5 concurrent agents) or the unified-inbox UX requirement."
+      - "Single polymorphic agent_event table with discriminator column — superficially elegant but conflates entities with very different lifecycles (a question stays pending; a message is fire-and-forget; a decision is immutable)."
+    rationale: >
+      Shep's existing pattern is uniformly "TypeSpec model → migration → repository → use cases."
+      Every domain concept (AgentRun, ApprovalGates, InteractiveMessage, WorkflowStep,
+      PhaseTimings) follows it. Defying the pattern for this feature would create the
+      first divergent model and break tooling expectations (codegen, repository scaffolds,
+      web type generation). Each entity has clear independent invariants — messages are
+      append-only, questions have a state machine (pending → answered/expired/cancelled),
+      decisions are immutable audit records, policies are mutable config — so giving them
+      separate tables matches the data shape and indexes naturally. The schema cost is
+      ~6 columns per table; the queryability and audit clarity gain is large.
+
+  - title: "Agent message bus — SQLite-backed agent_messages table with SSE-compatible polling"
+    chosen: |
+      Implement IAgentMessageBus as a SQLite adapter writing to a new agent_messages
+      table (id, app_id, feature_id, from_agent_run_id, from_actor, to_target,
+      to_kind, message_kind, payload_json, correlation_id, created_at, delivered_at).
+      Subscribers use the same poll-the-DB pattern as StreamAgentEventsUseCase
+      (configurable interval, default 2s, override 500ms for high-frequency
+      collaboration). New SSE event kind 'agent_message' is added by extending the
+      stream-agent-events generator (new compute helper computeMessageDeltas alongside
+      computeFeatureDeltas/computePrDeltas/computeStatusDeltas). Indexes on
+      (app_id, feature_id, created_at) and (correlation_id).
+    rejected:
+      - "Node EventEmitter / in-process bus — fails immediately for parallel feature agents living in separate worktree processes (the user's exact scenario). Single-process fan-out is unusable here."
+      - "Redis pub/sub — low latency and battle-tested but introduces an external dependency to a single-binary, local-first product, breaks offline workflows, and forces operators to manage another service. Disqualified by Shep's product positioning."
+      - "File-based watcher (chokidar over a shared dir) — cross-process but unordered, racy, hard to audit, and inferior to SQLite on every property that matters (durability, query, scope filtering, atomic correlation)."
+    rationale: >
+      Cross-process delivery is mandatory because parallel feature agents run in separate
+      worktree processes. SQLite already crosses that boundary trivially (the DB file is
+      shared) and Shep already runs in WAL mode, so concurrent readers/writers are safe.
+      The exact polling-DB-and-fan-out pattern is the proven backbone of every existing
+      real-time surface (StreamAgentEventsUseCase + Service Worker fan-out). Reusing it
+      means: no new infrastructure, free durability, free audit, free per-app/feature
+      scoping (NFR-7 security), and the same NFR-1 latency budget the SSE pipeline
+      already meets. The cost is an extra table and a poll loop. The benefit is that
+      every existing UI client gets agent messages "for free" by extending the SSE event
+      union, and the supervisor (also a graph node consuming SSE) reads from the same
+      source as users.
+
+  - title: "Hub-and-spoke topology — supervisor (or logical hub when none configured) mediates all inter-agent traffic"
+    chosen: |
+      The IAgentMessageBus rejects to_target='peer' addressing for v1. All inter-agent
+      messages target one of: 'broadcast' (per app/feature), 'supervisor', or 'user'.
+      When a SupervisorPolicy exists for the app/feature scope, the supervisor evaluates
+      every routed message. When none is configured, a logical NullSupervisor still
+      records the message in activity_log but performs no policy evaluation. Direct
+      to-agentRunId addressing is permitted for replies (correlationId matches an open
+      request) so request/reply round-trips work without supervisor intervention.
+    rejected:
+      - "Peer-to-peer mesh from day one — maximum flexibility but introduces emergent chatter, conflicting decisions, and zero central audit point. Reverses the trust-by-default invariant: now every consumer needs its own filtering."
+      - "Broadcast-only topic bus — simplest infrastructure but provides no targeted handoff or request/reply primitive, which is required by the spec-014 vocabulary (e.g., tester→developer [RED-DONE] handoff)."
+    rationale: >
+      Spec 014's draft team-execution protocol already designates an EM (engineering
+      manager) hub. Promoting that hub to a real supervisor agent matches the existing
+      mental model and gives one place to enforce policy, audit, and scope isolation
+      (NFR-7). The cost (one extra hop) is negligible compared to LLM turn time;
+      reply round-trips remain direct via correlationId so we don't bottleneck high-
+      frequency exchanges. We can relax to peer-to-peer in a future spec once we know
+      what real workloads actually demand.
+
+  - title: "Supervisor implementation — LangGraph workflow node resolved via IAgentExecutorProvider"
+    chosen: |
+      Build the supervisor as a LangGraph workflow rooted in
+      packages/core/src/infrastructure/services/agents/supervisor-agent/. It runs as
+      its own background worker when triggered, identical to feature-agent-worker.ts
+      (own threadId for checkpointing, own AgentRun row of agent_type='supervisor').
+      The graph has nodes: ingest-event → load-policy → evaluate (LLM call via
+      IAgentExecutorProvider) → emit-decision → optionally publish-message. Triggers
+      are events read off the same SSE stream (gate reached, question raised, blocking
+      milestone). The evaluator prompt + model version are stored on every
+      SupervisorDecision for reproducibility.
+    rejected:
+      - "Lightweight deterministic rule engine (e.g., 'auto-approve if test coverage > 80%') — predictable but inflexible; doesn't satisfy the user's mental model of an 'agent supervisor' and can't handle open-ended questions."
+      - "One-shot LLM call from a use case (EvaluateSupervisorDecisionUseCase) — simpler but loses cross-decision memory, breaks the 'agent has a session' invariant used everywhere else, and can't checkpoint mid-evaluation if a tool call is needed."
+      - "Hardcoded Anthropic-only client — violates the mandatory agent-agnostic rule (AGENTS.md) and would block any future LLM provider."
+    rationale: >
+      Resolving via IAgentExecutorProvider is non-negotiable per AGENTS.md and
+      .claude/rules/code-quality.md (no hardcoded providers outside infrastructure
+      adapters). LangGraph specifically (vs a one-shot call) gives us: free
+      checkpointing for long evaluations, the ability to compose with tools (e.g.,
+      "look at recent CI runs before deciding"), reuse of all heartbeat / phase-timing
+      / SSE plumbing, and the same observability surface every other agent has.
+      Future rule-engine policies can be expressed as deterministic graph nodes
+      executed before the LLM call, giving us cheap fast-path approvals while keeping
+      the same architecture.
+
+  - title: "Approval gate integration — interception, not replacement"
+    chosen: |
+      When a feature agent's LangGraph reaches a gate and transitions AgentRun.status
+      to 'waiting_approval', the supervisor (if configured for that app/feature) is
+      consulted BEFORE the WaitingApproval notification fires for the user. The
+      supervisor adapter publishes a SupervisorDecision; depending on autonomy:
+      - advisory: notification still fires; user sees decision attached to gate.
+      - co-sign: notification fires; user-approve also requires supervisor.approve.
+      - autonomous: ApproveAgentRunUseCase or RejectAgentRunUseCase is invoked
+        directly with actor_id='supervisor:<id>'; notification suppresses; user can
+        still override via existing reject/stop primitives.
+      Implementation point: the existing ApproveAgentRunUseCase already accepts a
+      payload to update spec.yaml selections; we extend the actor model to allow
+      'supervisor:<id>' actors. No new pause primitive is invented.
+    rejected:
+      - "New supervisor-only pause status (e.g., 'awaiting_supervisor') — duplicates approval-gate state machine and forces every consumer (CLI, web, TUI) to handle a new state; clean reuse of waiting_approval is enough."
+      - "Gate evaluation runs entirely outside the existing flow (parallel decision pipeline) — risks divergence between supervisor and human decisions, and complicates the 'user always wins' invariant."
+    rationale: >
+      The mandatory invariant is "user always wins" (resolved open question 6). The
+      cleanest way to enforce it is to keep the existing approval-gate state machine
+      as the single source of truth and let the supervisor act AS an actor inside it,
+      not alongside it. ApproveAgentRunUseCase already allows arbitrary actors; we
+      only need an actor namespace ('supervisor:<id>') and a guard that user actions
+      always overwrite supervisor actions for the same gate. This produces a clean
+      audit trail (both decisions stored in activity_log with their actor_id) and
+      means the supervisor can never silently bypass a gate.
+
+  - title: "Unified question pipeline — single AgentQuestion entity bridging interactive and background modes"
+    chosen: |
+      Introduce AgentQuestion + agent_questions table. Two write paths converge here:
+      (1) The Claude SDK V2 canUseTool callback in claude-code-interactive-executor.service.ts
+          is extended: when the intercepted tool is AskUserQuestion, it calls
+          AskAgentQuestionUseCase which writes an AgentQuestion of kind 'blocking'
+          and pauses the SDK callback until AnswerAgentQuestionUseCase resolves it
+          (signalled via an in-process Deferred keyed by question id).
+      (2) Background feature-agent gates emit a corresponding AgentQuestion of kind
+          'blocking' alongside the existing approval-gate transition, so the unified
+          inbox shows both modes uniformly.
+      AnswerAgentQuestionUseCase is the single answer surface for both modes; in
+      interactive mode it resolves the Deferred so canUseTool returns to the SDK; in
+      background mode it forwards to ApproveAgentRunUseCase / RejectAgentRunUseCase.
+      Web exposes /agent-questions; CLI exposes shep agent questions list|answer|cancel.
+    rejected:
+      - "Keep two parallel surfaces (InteractiveMessage interaction field + ApprovalGate) and union them at the UI layer — every consumer would need to merge two queries, and the supervisor would need two distinct evaluation paths."
+      - "Convert ApprovalGate to inherit from AgentQuestion — appealing convergence but a backwards-incompatible refactor of a stable, heavily-used surface; not warranted."
+    rationale: >
+      The user's third question ("what happens when agents want to ask questions?")
+      is fundamentally about a single inbox. Today, asking in interactive mode and
+      asking from a background agent take different paths and have different UI
+      surfaces; users see this as a product seam. AgentQuestion is the convergence
+      point. The interactive-mode integration uses the SDK's canUseTool callback
+      (already wired in claude-code-interactive-executor.service.ts; AskUserQuestion
+      is intentionally excluded from auto-allowed tools so it always hits the
+      callback) and a Deferred to bridge the async gap. Background-mode integration
+      is purely additive — emit a parallel AgentQuestion record alongside the
+      existing waiting_approval transition; existing approve/reject continues
+      working. Net effect: one inbox, one CLI verb set, one supervisor evaluation
+      path.
+
+  - title: "Configuration model — SupervisorPolicy on App with optional per-feature override"
+    chosen: |
+      SupervisorPolicy table keyed by (app_id, feature_id NULLABLE). Lookup uses a
+      two-step resolution: feature-scoped policy first; fall back to app-scoped.
+      Fields: id, app_id, feature_id?, enabled, autonomy_level, gate_authority_json
+      (per-gate override map: prd|plan|merge → autonomy), model, prompt_version,
+      policy_rules_json (array of {ruleId, condition, action}), notification_overrides_json,
+      created_at, updated_at. SupervisorConfig.enabled also exposed as a top-level
+      Settings flag for global default. Web exposes the editor at /apps/[id]/supervisor
+      with a per-feature drill-down.
+    rejected:
+      - "Global single supervisor — one policy for all apps. Too coarse: a side project and a production app have very different risk profiles."
+      - "Per-feature only — maximum control but maximum friction; users won't configure 50 features by hand."
+      - "Per-agent-type as a separate scope — orthogonal to app/feature; folded into gate_authority_json instead so we don't multiply the scope hierarchy."
+    rationale: >
+      Every existing scoping decision in Shep (Settings, ApprovalGates, AgentDefinition)
+      cascades from app to feature. Repeating the pattern keeps the mental model
+      consistent and lets us reuse existing settings UI patterns. JSON columns for
+      gate_authority and policy_rules is acceptable here because (a) they're rarely
+      queried by content, (b) they evolve independently of the rest of the row, and
+      (c) the alternative (normalized rules table) introduces FK churn for marginal
+      gain.
+
+  - title: "Audit and explainability — full rationale on every decision, append to activity_log"
+    chosen: |
+      Persist SupervisorDecision rows: id, supervisor_run_id, source_event_kind,
+      source_event_id, verdict, rationale_text, model, prompt_version, rule_ref?,
+      confidence?, created_at. Mirror each decision into activity_log with
+      actor_id='supervisor:<id>', field_name describing the gate/question, and
+      old_value/new_value capturing the state change. Web exposes a "Why?" drawer on
+      every gate and question that opens the matching SupervisorDecision row.
+      activity_log is intentionally append-only (per migrations/064 design) so audit
+      cannot be silently rewritten.
+    rejected:
+      - "Decision-only (verdict, no rationale) — cheap but defeats trust; user delegating authority must inspect why."
+      - "Lazy rationale generation on first 'explain' click — fails when the model/prompt rotates between decision time and inspection time, breaking reproducibility."
+    rationale: >
+      Cost of writing one extra rationale string per decision is negligible compared
+      to the LLM call that produced it. activity_log already exists and is the
+      canonical audit surface (migration 064). Storing model + prompt version is
+      mandatory for reproducibility — Shep upgrades models periodically, and an
+      "approved by supervisor" record without that context is unauditable a year
+      later. The "Why?" drawer is a small UI addition over rows we'd write anyway.
+
+  - title: "Notification routing — extend existing INotificationService with new event kinds"
+    chosen: |
+      Add NotificationEventType values: AgentQuestionPending, AgentQuestionBlocking,
+      AgentMessageBlocked, SupervisorEscalated, SupervisorFailed. Extend
+      NotificationEventConfig in tsp/domain/entities/settings.tsp with corresponding
+      booleans (default: blocking events ON, info events OFF). NotificationService
+      checks per-event preferences and emits via the existing in-memory bus → SSE
+      pipeline. No new delivery channel.
+    rejected:
+      - "Build a parallel high-priority escalation channel (e.g., dedicated SSE topic, push notifications) — duplicates infrastructure that already supports event preferences and priorities; users already manage notifications in one place."
+      - "In-app only (no notification at all) — defeats delegated supervision: when the user is away, blocking questions need to reach them through whatever channel they configured."
+    rationale: >
+      INotificationService already supports per-event preferences across in-app /
+      browser / desktop channels (Settings.notifications.events). Adding event kinds
+      is mechanical and inherits the entire delivery pipeline. Building a parallel
+      channel violates the no-duplication rule in code-quality.md and forces users
+      to manage notifications in two places. The blocking-vs-non-blocking distinction
+      is preserved through three urgency levels on AgentQuestion (info → activity
+      feed only; question → notification at user-controlled urgency; blocking →
+      always notify within NFR-10's 2s budget).
+
+  - title: "SSE event extension — three new kinds, same generator pattern"
+    chosen: |
+      Extend StreamAgentEventsUseCase output union with three new kinds:
+      'agent_message', 'agent_question', 'supervisor_decision'. Add three matching
+      compute helpers (computeMessageDeltas, computeQuestionDeltas, computeDecisionDeltas)
+      alongside the existing computeFeatureDeltas / computePrDeltas / computeStatusDeltas
+      / computePhaseCompletionDeltas / computeApplicationDeltas / computeSessionDeltas
+      under stream-agent-events/. Web's useAgentEvents hook receives them via the
+      existing Service Worker multiplex. Polling cadence stays at the default 2s
+      (NFR-1 budget allows 750ms p95; SSE poll is the dominant component).
+    rejected:
+      - "Push events directly via WebSockets / a new SSE channel — adds a parallel transport when the existing one already fans out to every client tab via Service Worker."
+      - "Emit only on a single 'agent_event' kind with internal type discriminator — sacrifices type narrowing on the client and complicates the existing kind-based routing."
+    rationale: >
+      The proven pattern is one helper per logical entity, one kind per discriminated
+      union arm. Adding three kinds is the same shape and complexity as the recent
+      addition of session-deltas. The 2s default poll keeps NFR-1 (≤ 750ms p95
+      publish-to-subscriber) achievable for blocking events because we'll trigger
+      an immediate flush by writing to the agent_messages / agent_questions table
+      (the next poll within 2s catches it; for blocking-priority events we can opt
+      into the 500ms variant on a per-subscription basis).
+
+  - title: "Feature flag gating — single 'collaboration' flag in FeatureFlags singleton"
+    chosen: |
+      Add featureFlagCollaboration to settings table (migration: ALTER TABLE settings
+      ADD COLUMN feature_flag_collaboration INTEGER NOT NULL DEFAULT 0) and a matching
+      collaboration: boolean field on FeatureFlags in
+      tsp/domain/entities/settings.tsp. Mirror env override
+      NEXT_PUBLIC_FEATURE_COLLABORATION via the existing resolution order in
+      src/presentation/web/lib/feature-flags.ts. With the flag off, all new use cases
+      short-circuit at the entry point and all UI surfaces hide; the supervisor
+      adapter is registered but its evaluator is bypassed. With the flag on,
+      behavior diverges only as required.
+    rejected:
+      - "Multiple sub-flags (collaboration.bus, collaboration.supervisor, collaboration.questions) — premature granularity; users will toggle the whole thing once the supervisor has earned trust. Sub-flags add testing surface for marginal value."
+      - "Skip the flag and ship behind a hidden route — Shep's existing precedent (every recent capability flagged) and the spec's Success Criteria explicitly require a flag."
+    rationale: >
+      Aligns with the existing feature-flag registry (PR #557) and gives ops a single
+      kill switch. NFR-14 mandates byte-identical behavior with the flag off; a single
+      flag is the simplest way to satisfy it and to validate end-to-end via tests
+      (one off / one on suite). Sub-flags are additive later if a real rollout
+      requires them.
+
+  - title: "Cross-worktree coordination — rely on shared SQLite, not new IPC"
+    chosen: |
+      No new cross-process IPC primitive in v1. Worktrees already share the same
+      SQLite database (~/.shep/<repo-hash>/shep.db). All inter-agent coordination
+      uses agent_messages reads/writes against that DB. The supervisor is the
+      conceptual hub regardless of which worktree process is running each agent.
+      Heartbeat columns on agent_runs already cover liveness; we do NOT add a
+      separate worker registry.
+    rejected:
+      - "Direct cross-worktree pub/sub via Unix sockets / named pipes — solves a problem we don't have (SQLite already crosses processes), introduces OS-specific code paths and ordering concerns, fights with the worktree lifecycle."
+      - "Per-worktree leader election — overkill for a tool that runs ≤ 5 concurrent agents per feature (NFR-3). The supervisor (singleton per app/feature) already serves as the deterministic decision point."
+    rationale: >
+      The SQLite bus is structurally cross-process — there is nothing left to
+      implement for cross-worktree messaging once messages live in agent_messages.
+      Avoiding new IPC keeps the binary single-file, the install zero-dependency,
+      and the operational story trivial. v1 scope demands this restraint.
+
+  - title: "DI wiring — string tokens for ports, dedicated registration module"
+    chosen: |
+      Register all new ports with string tokens consistent with existing convention:
+      'IAgentMessageBus', 'IAgentQuestionService', 'ISupervisorAgent', 'IAgentInbox',
+      'IAgentMessageRepository', 'IAgentQuestionRepository',
+      'ISupervisorPolicyRepository', 'ISupervisorDecisionRepository'. Group all
+      registrations into a new packages/core/src/infrastructure/di/registrations/
+      register-collaboration.ts module called from initializeContainer alongside
+      register-services.ts. Use cases receive ports via @inject('IPortName').
+    rejected:
+      - "Class-token DI for new services (e.g. @inject(SupervisorAgentService)) — works but inconsistent with every existing port (IAgentExecutorProvider, IAgentRunRepository, INotificationService all use string tokens), creating a stylistic split."
+      - "Add registrations to register-services.ts — would push that module past the 300-line boundary; topic-grouping into a dedicated file is the established refactor."
+    rationale: >
+      Matches existing patterns exactly (container.ts shows topic-grouped registration
+      modules called from initializeContainer). Keeps each registration file focused
+      and small. String tokens are the codified convention in code-quality.md and the
+      existing container.
+
+  - title: "Migration strategy — one migration per table, idempotent ALTER for settings"
+    chosen: |
+      Five new migrations following Shep's NNN-kebab-name pattern:
+      (1) NNN-create-agent-messages.ts (agent_messages + indexes on app_id, feature_id,
+          correlation_id, created_at);
+      (2) NNN-create-agent-questions.ts (agent_questions + indexes on agent_run_id,
+          feature_id, status, expires_at);
+      (3) NNN-create-supervisor-policies.ts (supervisor_policies + unique index on
+          app_id+feature_id);
+      (4) NNN-create-supervisor-decisions.ts (supervisor_decisions + indexes on
+          source_event_id, supervisor_run_id, created_at);
+      (5) NNN-add-feature-flag-collaboration.ts (idempotent ALTER on settings).
+      Every migration uses pragma table_info / sqlite_master existence checks
+      (matching migrations/040, 064, 078). Both up() and down() implemented; down()
+      tested.
+    rejected:
+      - "Single mega-migration creating all four tables — works but defies Shep's per-concept-per-migration convention and complicates rollback testing."
+      - "Defer migrations and store everything in a single new agent_collaboration JSON blob — violates queryability, indexing, and FR-29 explicitly."
+    rationale: >
+      Shep's migration discipline is one-concept-per-file with idempotent existence
+      checks. Splitting the changes makes rollback testing per-table feasible and
+      lets us land them incrementally during plan execution without coupling
+      unrelated table creates.
+
+  - title: "Presentation surfaces — thin CLI/Web wrappers over a shared use-case API"
+    chosen: |
+      Web routes:
+      - /apps/[id]/supervisor — read/write SupervisorPolicy.
+      - /agent-questions — unified inbox, filters by app/urgency/agent.
+      - existing /apps/[id]/features/[id] — add 'Agent Activity' section consuming
+        agent_messages and an inline 'Why?' drawer for supervisor decisions.
+      CLI commands:
+      - shep supervisor configure|status|enable|disable|approve|reject
+      - shep agent questions list|answer|cancel
+      - shep agent message send (debug aid; gated to dev mode)
+      Both surfaces consume the same use cases (ConfigureSupervisor,
+      EvaluateSupervisorDecision, AskAgentQuestion, AnswerAgentQuestion,
+      SendAgentMessage, etc.). No business logic in CLI/Web.
+    rejected:
+      - "Web-only initial release — leaves CLI users (a primary persona) with no way to operate the feature; conflicts with the presentation-agnostic core API rule."
+      - "TUI-first release — the TUI today does not have an inbox surface; building one now expands scope."
+    rationale: >
+      .claude/rules/code-quality.md mandates that every feature is implementable in
+      every presentation layer using the same use-case API. CLI + Web in v1 covers
+      both major personas; TUI gets read-only views in v1 (existing patterns suffice)
+      and a full editor later. All logic stays in use cases (FR-27, NFR-11).
+
+  - title: "Testing strategy — TDD with in-memory adapters for every port"
+    chosen: |
+      Per the mandatory TDD rule: every use case starts with a failing test. Every
+      new port (IAgentMessageBus, ISupervisorAgent, IAgentQuestionService, IAgentInbox,
+      and four repositories) ships with an InMemory* adapter under
+      packages/core/src/infrastructure/adapters/in-memory/ (matches existing
+      InMemoryAgentRunRepository pattern) used by unit tests. Supervisor tests use
+      a deterministic StubSupervisorAgentExecutor that returns canned verdicts so
+      we don't make LLM calls in CI. Integration tests exercise the SQLite adapters
+      end-to-end with a temp DB. One e2e test covers the supervisor configuration
+      flow and one blocking-question round-trip.
+    rejected:
+      - "Mock supervisor LLM calls with vi.mock at the use-case level — fragile and couples tests to import paths; in-memory port adapters are the established pattern."
+      - "Skip in-memory adapters and only test against SQLite — acceptable for integration tests but slow, breaks unit-level isolation, and obscures port contracts."
+    rationale: >
+      .claude/rules/code-quality.md and CLAUDE.md mandate TDD with port-based DI for
+      testability. Existing in-memory adapters are the proven shape (one class per
+      port, fast, parallel-safe). A deterministic StubSupervisorAgentExecutor lets
+      us verify decision logic, conflict resolution, and audit writes without LLM
+      cost or flakiness. e2e coverage is intentionally narrow (one flow, one round-
+      trip) to keep CI under control while still exercising the SSE → UI pipeline.
+
+# Open questions (should be resolved by end of research)
+openQuestions:
+  - question: "Where should the supervisor-evaluator process actually run?"
+    resolved: true
+    options:
+      - option: "Dedicated background worker per (app_id, feature_id?) scope"
+        description: "A long-lived process keyed by policy scope, started lazily when the first event for that scope arrives. Reuses feature-agent-worker.ts shape: AgentRun row of agent_type='supervisor', heartbeat, checkpointing. Same lifecycle and observability story as feature agents."
+        selected: true
+      - option: "Inline inside each feature-agent-worker.ts process"
+        description: "Run supervisor evaluation inside the same process that hit the gate. Fast and cheap but couples supervisor lifetime to feature-agent lifetime, breaks isolation (NFR-5 reliability), and makes cross-worktree supervision impossible."
+        selected: false
+      - option: "Single global supervisor process per Shep installation"
+        description: "One process for everything, simpler operationally but a single point of failure across all apps; cross-app contention; harder to scope policies and credentials per app (NFR-8)."
+        selected: false
+    selectionRationale: >
+      Per-scope worker matches the existing worker model exactly (feature-agent-worker.ts,
+      heartbeat, checkpointing, AgentRun row) so we inherit all observability and
+      crash-isolation guarantees with no new code paths. NFR-5 explicitly requires that
+      a supervisor crash MUST NOT crash the feature agent; per-process isolation gives
+      that guarantee for free. NFR-7 requires app-scoped isolation; per-scope workers
+      respect it natively. The lazy-start model avoids paying for idle supervisors.
+
+  - question: "How do we handle a Deferred-style block in interactive mode without leaking promises?"
+    resolved: true
+    options:
+      - option: "In-process Deferred map keyed by question id with timeout + cancellation"
+        description: "AskAgentQuestionUseCase creates a Deferred (Promise + resolve/reject) registered in a request-scoped map; AnswerAgentQuestionUseCase resolves it. SDK callback awaits the Deferred. Timeout (configurable, default 30 min for blocking questions) auto-rejects with a structured error so the SDK can fail-soft. Cancellation handle published via the message bus so other workers can abort."
+        selected: true
+      - option: "Polling the agent_questions table from the canUseTool callback"
+        description: "Callback polls the DB until status changes. Works without in-process state but wastes CPU during long waits and complicates timeout semantics."
+        selected: false
+      - option: "Block the SDK callback indefinitely until status changes via DB trigger or in-process EventEmitter"
+        description: "EventEmitter is fine for single-process but the answer might come from a different process (CLI answer command). DB trigger to local emitter is doable but redundant when we already have the SSE pipeline."
+        selected: false
+    selectionRationale: >
+      The canUseTool callback runs in the SAME process that owns the interactive
+      session, so an in-process Deferred is sufficient and simple. Cross-process
+      answers (CLI in another shell, web UI in browser) hit AnswerAgentQuestionUseCase
+      via HTTP/CLI which writes the answer to DB; the session process subscribes to
+      the SSE stream (kind 'agent_question'), and on status='answered' the local
+      Deferred-resolution helper is invoked. Timeout + cancellation are critical to
+      avoid leaked Promises if the user never answers.
+
+  - question: "What is the right indexing strategy for the agent_messages table to keep p95 ≤ 750ms?"
+    resolved: true
+    options:
+      - option: "Composite indexes on (app_id, feature_id, created_at) and on correlation_id; partial index on undelivered messages"
+        description: "Two main composite indexes plus a partial index WHERE delivered_at IS NULL for fast subscriber polls. Covers the dominant query (subscriber filtering by scope and recency) and request/reply correlation lookups, while keeping write amplification small (3 indexes)."
+        selected: true
+      - option: "Single index on created_at with full table scan for filtering"
+        description: "Simplest schema but degrades non-linearly as agent_messages grows; bad for NFR-3 (5 concurrent agents)."
+        selected: false
+      - option: "Per-column indexes on every field"
+        description: "SQLite query planner will pick one anyway; adds write amplification and disk usage for marginal read benefit."
+        selected: false
+    selectionRationale: >
+      Subscribers always filter by scope (app_id, feature_id) and recency
+      (created_at > since); the composite covers that exactly. Request/reply
+      round-trips need an O(1) lookup by correlation_id. The partial index on
+      undelivered messages is the standard SQLite idiom for queue tables and keeps
+      polling cost flat as history grows. Three indexes is the same write
+      amplification as agent_runs and within budget for NFR-3.
+
+content: |
+  ## Status
+
+  - **Phase:** Research
+  - **Updated:** 2026-04-28
+
+  ## Technology Decisions
+
+  ### 1. Domain modeling — first-class TypeSpec entities
+
+  **Chosen:** Four new TypeSpec models — `AgentMessage`, `AgentQuestion`,
+  `SupervisorPolicy`, `SupervisorDecision` — plus enums for kinds, urgency,
+  answerer, status, autonomy, and verdict. Each gets its own SQLite table and
+  migration. Add a `SupervisorConfig` sub-block on `Settings` and a per-app
+  override on `App`.
+
+  **Rejected:**
+  - Reusing `InteractiveMessage` + `WorkflowStep` with new tag fields — saves a
+    table but forces every consumer to query two surfaces. Never converges.
+  - JSON blob hung off `AgentRun.metadata` — fastest but loses queryability,
+    indexing, and scoping; cannot satisfy NFR-3 or the unified-inbox UX.
+  - Polymorphic `agent_event` table with a discriminator column — conflates
+    entities with very different lifecycles.
+
+  **Rationale:** Every existing domain concept in Shep follows the
+  TypeSpec → migration → repository → use-case pipeline. Diverging would create
+  the first off-pattern model and break codegen + scaffold expectations. Each
+  new entity has clear independent invariants (messages append-only; questions
+  state-machine; decisions immutable; policies mutable), so independent tables
+  match the data shape.
+
+  ### 2. Agent message bus — SQLite + polling
+
+  **Chosen:** Implement `IAgentMessageBus` as a SQLite adapter writing to a new
+  `agent_messages` table. Subscribers reuse the proven
+  `StreamAgentEventsUseCase` poll-the-DB pattern (default 2s; opt-in 500ms for
+  high-frequency collaboration). Add SSE event kind `agent_message` via
+  `computeMessageDeltas` alongside the existing compute helpers.
+
+  **Rejected:**
+  - Node `EventEmitter` — fails for parallel feature agents in separate worktree
+    processes.
+  - Redis pub/sub — breaks the single-binary, local-first product positioning.
+  - File-based watcher — unordered, racy, inferior to SQLite on every property.
+
+  **Rationale:** SQLite already crosses worktree process boundaries (shared DB
+  in WAL mode). Reusing the SSE polling pipeline gives free durability, audit,
+  scope filtering (NFR-7), and lets every existing UI client receive agent
+  messages by extending the SSE union — no new transport.
+
+  ### 3. Hub-and-spoke topology
+
+  **Chosen:** Bus rejects peer addressing in v1; messages target `broadcast`,
+  `supervisor`, or `user`. When a `SupervisorPolicy` exists, the supervisor
+  evaluates routed messages; when none, a `NullSupervisor` records into
+  `activity_log` without policy evaluation. Reply correlation by `correlationId`
+  permits direct round-trips without supervisor involvement.
+
+  **Rejected:**
+  - Peer-to-peer mesh — emergent chatter, no central audit point.
+  - Broadcast-only — no targeted handoff or request/reply primitive.
+
+  **Rationale:** Spec 014 already designates an EM hub. Promoting it to a real
+  supervisor centralizes policy and audit while reply correlation keeps high-
+  frequency exchanges fast.
+
+  ### 4. Supervisor implementation — LangGraph node + `IAgentExecutorProvider`
+
+  **Chosen:** A LangGraph workflow under
+  `infrastructure/services/agents/supervisor-agent/` running as its own worker
+  (`agent_type='supervisor'`, own `threadId`, heartbeat, checkpointing). Graph
+  nodes: ingest-event → load-policy → evaluate (LLM via
+  `IAgentExecutorProvider`) → emit-decision → optionally publish-message.
+
+  **Rejected:**
+  - Lightweight rule engine — inflexible; doesn't satisfy "agent supervisor"
+    mental model.
+  - One-shot LLM call — loses cross-decision memory and breaks the agent-has-a-
+    session invariant.
+  - Hardcoded provider — violates `AGENTS.md` agent-agnostic rule.
+
+  **Rationale:** `IAgentExecutorProvider` is mandatory. LangGraph reuses every
+  feature-agent guarantee (heartbeat, checkpointing, SSE, phase timing) and lets
+  the supervisor accumulate context across decisions. Future deterministic
+  policies become graph nodes executed before the LLM call.
+
+  ### 5. Approval-gate integration — interception, not replacement
+
+  **Chosen:** When `AgentRun.status='waiting_approval'`, the supervisor (if any)
+  evaluates BEFORE the `WaitingApproval` notification fires. Per autonomy:
+  advisory attaches a recommendation; co-sign requires both supervisor and user
+  approve; autonomous calls `ApproveAgentRunUseCase`/`RejectAgentRunUseCase`
+  with `actor_id='supervisor:<id>'`. User actions always overwrite supervisor
+  actions on the same gate.
+
+  **Rejected:**
+  - New `awaiting_supervisor` status — duplicates the state machine.
+  - Parallel decision pipeline outside the existing flow — divergence risk.
+
+  **Rationale:** "User always wins" is the invariant. Keeping the existing gate
+  state machine as the single source of truth and letting the supervisor act
+  AS an actor inside it produces the cleanest audit trail and prevents silent
+  bypass.
+
+  ### 6. Unified question pipeline — `AgentQuestion` bridges both modes
+
+  **Chosen:** New `AgentQuestion` + `agent_questions` table. Two write paths
+  converge: (1) the SDK V2 `canUseTool` callback in
+  `claude-code-interactive-executor.service.ts` calls `AskAgentQuestionUseCase`
+  and awaits a Deferred until `AnswerAgentQuestionUseCase` resolves it;
+  (2) background gates emit a parallel `AgentQuestion` of kind `blocking`
+  alongside the existing `waiting_approval` transition.
+
+  **Rejected:**
+  - Two parallel surfaces unioned at UI — every consumer merges queries.
+  - Convert `ApprovalGate` to inherit from `AgentQuestion` — backwards-
+    incompatible refactor of a stable surface.
+
+  **Rationale:** Single inbox is the user's actual ask. SDK's `canUseTool`
+  already excludes `AskUserQuestion` from auto-allowed tools, so it always hits
+  the callback — the integration point already exists.
+
+  ### 7. Configuration scope — per-app + per-feature override
+
+  **Chosen:** `supervisor_policies` keyed by `(app_id, feature_id NULLABLE)`,
+  resolved feature-first then app-fallback. Stores autonomy level, per-gate
+  authority map, model, prompt version, policy rules, notification overrides.
+  Web editor at `/apps/[id]/supervisor` with per-feature drill-down.
+
+  **Rejected:**
+  - Global single supervisor — too coarse.
+  - Per-feature only — too much friction.
+  - Per-agent-type as a separate scope — folded into `gate_authority_json`.
+
+  **Rationale:** Matches every existing scoping decision (Settings,
+  ApprovalGates, AgentDefinition cascade app → feature). Keeps mental model
+  consistent and reuses settings UI patterns.
+
+  ### 8. Audit & explainability — full rationale, append to `activity_log`
+
+  **Chosen:** Persist `SupervisorDecision` rows with verdict, rationale, model,
+  prompt version, rule reference, optional confidence. Mirror each into
+  `activity_log` with `actor_id='supervisor:<id>'`. Web exposes a "Why?" drawer
+  on every gate and question.
+
+  **Rejected:**
+  - Decision-only — defeats trust.
+  - Lazy rationale generation — breaks reproducibility on model rotation.
+
+  **Rationale:** Explainability is the price of delegated authority.
+  `activity_log` is already the canonical audit surface; storing model + prompt
+  version is mandatory for reproducibility across upgrades.
+
+  ### 9. Notification routing — extend `INotificationService`
+
+  **Chosen:** New `NotificationEventType` values
+  (`AgentQuestionPending`, `AgentQuestionBlocking`, `AgentMessageBlocked`,
+  `SupervisorEscalated`, `SupervisorFailed`) and matching booleans in
+  `NotificationEventConfig`. Reuses the existing in-memory bus → SSE pipeline.
+
+  **Rejected:**
+  - Parallel high-priority channel — duplicates infrastructure.
+  - In-app only — defeats delegated supervision when user is away.
+
+  **Rationale:** `INotificationService` already supports per-event preferences
+  across in-app / browser / desktop. Adding kinds inherits the entire delivery
+  pipeline.
+
+  ### 10. SSE event extension
+
+  **Chosen:** Three new SSE event kinds — `agent_message`, `agent_question`,
+  `supervisor_decision` — implemented as compute helpers under
+  `stream-agent-events/`, mirroring `computeFeatureDeltas` etc.
+
+  **Rejected:**
+  - WebSockets / new SSE channel — parallel transport.
+  - Single `agent_event` kind with internal discriminator — sacrifices client
+    type narrowing.
+
+  **Rationale:** Same shape and complexity as adding session deltas. Default 2s
+  poll fits NFR-1; we can opt blocking-priority subscriptions into 500ms.
+
+  ### 11. Feature flag — one `collaboration` flag
+
+  **Chosen:** `featureFlagCollaboration` column on `settings` (idempotent
+  `ALTER TABLE`) and matching field on `FeatureFlags` in TypeSpec. Env override
+  `NEXT_PUBLIC_FEATURE_COLLABORATION` via existing resolution order. With flag
+  off: all new use cases short-circuit, all UI surfaces hide, supervisor
+  evaluator bypassed.
+
+  **Rejected:**
+  - Multiple sub-flags — premature granularity.
+  - No flag — violates Success Criteria and Shep precedent.
+
+  **Rationale:** One kill switch. NFR-14 mandates byte-identical behavior with
+  the flag off; one flag is the simplest way to validate end-to-end.
+
+  ### 12. Cross-worktree coordination — shared SQLite, no new IPC
+
+  **Chosen:** Worktrees share `~/.shep/<repo-hash>/shep.db`. All inter-agent
+  coordination is `agent_messages` reads/writes. Heartbeat columns on
+  `agent_runs` cover liveness; no new worker registry.
+
+  **Rejected:**
+  - Unix sockets / named pipes — solves a problem we don't have.
+  - Per-worktree leader election — overkill for ≤ 5 concurrent agents per
+    feature.
+
+  **Rationale:** SQLite is already cross-process; nothing more is needed.
+
+  ### 13. DI wiring — string tokens, dedicated registration module
+
+  **Chosen:** String tokens consistent with existing convention
+  (`'IAgentMessageBus'`, `'ISupervisorAgent'`, etc.). New module
+  `infrastructure/di/registrations/register-collaboration.ts` called from
+  `initializeContainer` alongside `register-services.ts`.
+
+  **Rejected:**
+  - Class-token DI — inconsistent with every existing port.
+  - Pile registrations into `register-services.ts` — pushes that file past the
+    300-line limit.
+
+  **Rationale:** Matches existing patterns exactly.
+
+  ### 14. Migration strategy
+
+  **Chosen:** Five migrations following the `NNN-kebab-name.ts` convention with
+  idempotent existence checks (matching migrations 040, 064, 078). Both `up()`
+  and `down()` implemented; `down()` covered by tests.
+
+  **Rejected:**
+  - Single mega-migration — defies per-concept-per-file convention.
+  - JSON blob deferral — violates queryability and FR-29.
+
+  **Rationale:** Per-concept-per-migration enables clean rollback testing.
+
+  ### 15. Presentation surfaces
+
+  **Chosen:** Web (`/apps/[id]/supervisor`, `/agent-questions`, "Agent Activity"
+  panel on feature detail) and CLI (`shep supervisor *`,
+  `shep agent questions *`) ship in v1, both consuming the same use cases. No
+  business logic in presentation. TUI gets read-only views in v1.
+
+  **Rejected:**
+  - Web-only release — leaves CLI users without parity.
+  - TUI-first — current TUI lacks the inbox surface.
+
+  **Rationale:** `code-quality.md` mandates presentation parity; both major
+  personas get the feature in v1.
+
+  ### 16. Testing strategy — TDD with in-memory adapters
+
+  **Chosen:** Every use case starts with a failing test. Every new port has an
+  `InMemory*` adapter under `infrastructure/adapters/in-memory/`. Supervisor
+  tests use a `StubSupervisorAgentExecutor` returning canned verdicts.
+  Integration tests use a temp SQLite DB. One e2e test for supervisor config +
+  one blocking-question round-trip.
+
+  **Rejected:**
+  - `vi.mock` at use-case level — fragile, couples to import paths.
+  - SQLite-only tests — slow, breaks unit isolation.
+
+  **Rationale:** Mandatory TDD + port-based DI; in-memory adapters are the
+  established pattern.
+
+  ## Library Analysis
+
+  | Library | Purpose | Decision | Reasoning |
+  | ------- | ------- | -------- | --------- |
+  | `better-sqlite3` (existing) | Persistence for new tables | **Use** | Already the durable store; WAL mode handles concurrent worktree readers/writers. |
+  | `@langchain/langgraph` (existing) | Supervisor as a stateful agent graph | **Use** | Already the foundation for feature agents; reuse checkpointing, resume, observability. |
+  | `tsyringe` (existing) | DI for new ports/services | **Use** | Mandated by every existing module. |
+  | `commander` (existing) | New CLI commands | **Use** | Standard for all `shep ...` commands. |
+  | `react-flow` / `@xyflow/react` (existing) | Future "agent room" / collaboration graph view | **Use later** | Not v1; v1 ships the supervisor config + questions inbox. |
+  | `redis` / `ioredis` | External pub/sub for the bus | **Reject** | Breaks single-binary, local-first product positioning. |
+  | `chokidar` | File-watcher message bus | **Reject** | Inferior to SQLite on every property. |
+  | `zeromq` / nanomsg | Cross-process IPC | **Reject** | Solves a problem already solved by shared SQLite. |
+  | `uuid` (existing) | IDs for messages, questions, decisions, policies | **Use** | Already used everywhere. |
+  | `zod` (existing) | Validate `policy_rules_json` and `gate_authority_json` at boundaries | **Use** | Already the validation library at use-case boundaries. |
+  | New external auth/secret system | Supervisor credentials | **Reject** | Existing per-app API-key isolation (NFR-8) covers it. |
+
+  ## Security Considerations
+
+  - **App / feature scope isolation (NFR-7):** Every read of `agent_messages`,
+    `agent_questions`, `supervisor_*` tables MUST filter by `app_id`
+    (and `feature_id` where applicable). Repositories enforce this at the SQL
+    layer; no use case may bypass scope.
+  - **Credential isolation (NFR-8):** The supervisor's LLM calls go through
+    `IAgentExecutorProvider`, which already resolves per-app API keys. No new
+    credential storage is introduced.
+  - **Authority escalation:** The "user always wins" invariant is enforced by
+    `ApproveAgentRunUseCase` / `RejectAgentRunUseCase` recognising the
+    `supervisor:<id>` actor namespace and treating any subsequent `user:<id>`
+    action on the same gate as an override that wins. Both decisions are
+    audited.
+  - **Audit immutability:** `activity_log` is intentionally append-only
+    (migration 064) — no `deleted_at`, no UPDATE paths. Supervisor decisions
+    inherit this property by mirroring there.
+  - **Prompt injection across agents:** Inter-agent message payloads are
+    untrusted by default. The supervisor's evaluator prompt MUST treat
+    `payload_json` as user-supplied content (existing prompt-hardening pattern
+    in feature-agent prompts applies). New surface area to review under the
+    existing `/security-review` skill.
+  - **Feature-flag default (NFR-14):** With `featureFlagCollaboration=false`,
+    every new code path short-circuits at the entry point, no new tables are
+    written, and no new SSE events are emitted — preserving byte-identical
+    behavior.
+  - **Notification fan-out:** New event kinds inherit the existing per-channel
+    user controls; users can mute the new kinds individually.
+
+  ## Performance Implications
+
+  - **Bus latency (NFR-1, ≤ 750ms p95):** SQLite write is sub-ms in WAL mode;
+    the dominant component is the SSE poll cadence (default 2s, opt-in 500ms).
+    For blocking-priority events, subscribers can opt into the 500ms variant —
+    same mechanism `StreamAgentEventsUseCase` already supports
+    (`pollIntervalMs` option).
+  - **Concurrent agents (NFR-3, 5 concurrent without > 2x degradation):**
+    Composite index on `(app_id, feature_id, created_at)` plus partial index
+    on undelivered messages keeps subscriber polls O(log N). Five concurrent
+    agents emitting at human pace produce a few writes/second per feature —
+    well below SQLite WAL saturation.
+  - **Supervisor evaluation budget (NFR-2, ≤ 30s p95):** Implementation runs
+    the LLM call in the LangGraph evaluator node with a hard 25s timeout
+    (5s buffer for I/O). On timeout, the graph publishes a
+    `SupervisorDecision { verdict: 'escalate' }` so the human path proceeds
+    immediately (FR-22 fail-safe).
+  - **Worker startup cost:** Lazy per-scope worker means the first event for a
+    new app/feature scope incurs a ~1–2s startup cost. Subsequent events
+    reuse the warm worker; idle workers are reaped after a configurable TTL
+    (default 10 minutes) to bound resource use.
+  - **Index write amplification:** Three indexes on `agent_messages` is
+    consistent with `agent_runs` and `interactive_messages`. No expected
+    impact on commit throughput at v1 scale.
+  - **UI render budget:** New `/agent-questions` page paginates server-side
+    (existing pattern). React Flow is NOT introduced in v1; the "Agent
+    Activity" feed is a vanilla list. No client-side regressions expected.
+  - **SSE event volume:** Three new event kinds proportional to gate /
+    question / message activity — well within the established envelope of
+    `StreamAgentEventsUseCase`.
+
+  ## Architecture Notes
+
+  ### Layer mapping
+
+  | Layer | New artifacts |
+  | ----- | ------------- |
+  | `tsp/` | `tsp/agents/agent-message.tsp`, `agent-question.tsp`, `supervisor-policy.tsp`, `supervisor-decision.tsp`; new enums (`AgentMessageKind`, `AgentQuestionKind`, `AgentQuestionAnswerer`, `AgentQuestionStatus`, `SupervisorAutonomy`, `SupervisorVerdict`); `SupervisorConfig` block on `Settings` and `FeatureFlags.collaboration`. |
+  | `domain/` | Generated types (`output.ts`); a new value-object module for `SupervisorDecision` rationale formatting helpers; `SupervisorActor` value object encapsulating the `supervisor:<id>` actor namespace. |
+  | `application/ports/output/agents/` | `IAgentMessageBus`, `IAgentQuestionService`, `ISupervisorAgent`, `IAgentInbox`. |
+  | `application/ports/output/repositories/` | `IAgentMessageRepository`, `IAgentQuestionRepository`, `ISupervisorPolicyRepository`, `ISupervisorDecisionRepository`. |
+  | `application/use-cases/agents/` | `SendAgentMessage`, `AskAgentQuestion`, `AnswerAgentQuestion`, `CancelAgentQuestion`, `EscalateToUser`, `EvaluateSupervisorDecision`, `ConfigureSupervisor`, `EnableSupervisor`, `DisableSupervisor`, `ListAgentQuestions`. |
+  | `infrastructure/adapters/in-memory/` | `InMemoryAgentMessageBus`, `InMemoryAgentQuestionService`, `InMemorySupervisorAgent` (deterministic stub). |
+  | `infrastructure/services/agents/supervisor-agent/` | LangGraph workflow (`supervisor-graph.ts`), worker entry point (`supervisor-agent-worker.ts`), evaluator prompt registry. |
+  | `infrastructure/persistence/sqlite/` | New repositories implementing the four new repository ports; five new migrations under `migrations/`. |
+  | `infrastructure/di/registrations/` | `register-collaboration.ts`. |
+  | `presentation/web/` | `app/apps/[id]/supervisor/page.tsx`, `app/agent-questions/page.tsx`, "Agent Activity" panel on feature detail; supervisor "Why?" drawer component (with `.stories.tsx`); new SSE event-kind handlers. |
+  | `presentation/cli/commands/` | `supervisor.ts`, `agent-questions.ts`, `agent-message.ts` (dev). |
+
+  ### Reuse map
+
+  - `StreamAgentEventsUseCase` extended with `agent_message`, `agent_question`,
+    `supervisor_decision` event kinds — same compute-helper pattern as
+    existing kinds.
+  - `ApproveAgentRunUseCase` / `RejectAgentRunUseCase` extended to recognise
+    the `supervisor:<id>` actor and to enforce "user always wins".
+  - `claude-code-interactive-executor.service.ts` `canUseTool` interception
+    extended to route `AskUserQuestion` invocations through
+    `AskAgentQuestionUseCase`.
+  - `INotificationService` extended with new `NotificationEventType` values;
+    `Settings.notifications.events` extended with matching booleans.
+  - `feature-agent-worker.ts` extended to publish lifecycle messages on the
+    bus and to emit a parallel `AgentQuestion` whenever an approval gate
+    transitions to `waiting_approval`.
+  - `FeatureFlags` registry extended with `collaboration: boolean` plus
+    matching `featureFlagCollaboration` settings column.
+
+  ### Phasing inside the single feature flag
+
+  Although release strategy is a single big-bang flip of the `collaboration`
+  flag, internal delivery proceeds in slices to keep PRs small (CLAUDE.md
+  cadence): (1) tsp + migrations + repositories; (2) `IAgentMessageBus` +
+  `SendAgentMessage` + SSE event; (3) `AgentQuestion` pipeline + `canUseTool`
+  integration + unified inbox; (4) `SupervisorPolicy` CRUD + UI;
+  (5) `ISupervisorAgent` LangGraph evaluator; (6) audit "Why?" surface and
+  notification kinds; (7) e2e tests + docs. Each slice ships independently to
+  `main` behind the still-off flag. The flag flips on once slice 7 lands and
+  validation passes.
+
+  ### Mandatory rule check
+
+  - **Agent-agnostic resolution:** All LLM calls go through
+    `IAgentExecutorProvider`. ✅
+  - **TypeSpec-first:** Four new entities defined in `tsp/`. ✅
+  - **TDD:** Every use case ships a failing test first. ✅
+  - **Storybook stories:** Every new web component ships a colocated
+    `.stories.tsx`. ✅
+  - **Spec-driven:** This research belongs to spec 093. ✅
+  - **No singletons / module globals outside infra bootstrap:** All new
+    services injected via tsyringe string tokens. ✅
+  - **No magic literals:** All event kinds, autonomy levels, verdicts come
+    from TypeSpec enums. ✅
+  - **File length:** Use cases land in their own files; supervisor graph
+    split into per-node modules. ✅
