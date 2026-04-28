@@ -244,6 +244,88 @@ describe('useAgentEvents', () => {
       expect(navigator.serviceWorker.removeEventListener).toHaveBeenCalled();
     });
 
+    it('receives agent_message events from SW with narrowed kind', async () => {
+      const { result } = renderHook(() => useAgentEvents());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      const data = {
+        kind: 'agent_message' as const,
+        messageId: 'msg-1',
+        appId: 'app-1',
+        featureId: 'feat-1',
+        fromActor: 'agent:run-1',
+        toTarget: 'broadcast',
+        toKind: 'broadcast',
+        messageKind: 'status',
+        payload: '{"phase":"started"}',
+        createdAt: '2026-04-28T10:00:00Z',
+      };
+      act(() => {
+        simulateSWMessage({ type: 'agent_message', data });
+      });
+
+      expect(result.current.agentMessages).toHaveLength(1);
+      expect(result.current.lastAgentMessage?.kind).toBe('agent_message');
+      expect(result.current.lastAgentMessage?.messageId).toBe('msg-1');
+    });
+
+    it('receives agent_question events from SW with narrowed kind', async () => {
+      const { result } = renderHook(() => useAgentEvents());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      const data = {
+        kind: 'agent_question' as const,
+        questionId: 'q-1',
+        appId: 'app-1',
+        agentRunId: 'run-1',
+        questionKind: 'blocking',
+        answerer: 'user',
+        status: 'pending',
+        prompt: 'Approve?',
+        transition: 'new' as const,
+        createdAt: '2026-04-28T10:00:00Z',
+      };
+      act(() => {
+        simulateSWMessage({ type: 'agent_question', data });
+      });
+
+      expect(result.current.agentQuestions).toHaveLength(1);
+      expect(result.current.lastAgentQuestion?.kind).toBe('agent_question');
+      expect(result.current.lastAgentQuestion?.questionId).toBe('q-1');
+    });
+
+    it('receives supervisor_decision events from SW with narrowed kind', async () => {
+      const { result } = renderHook(() => useAgentEvents());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      const data = {
+        kind: 'supervisor_decision' as const,
+        decisionId: 'dec-1',
+        appId: 'app-1',
+        supervisorRunId: 'sup-1',
+        sourceEventKind: 'gate',
+        sourceEventId: 'run-1',
+        verdict: 'advise',
+        rationale: 'looks good',
+        modelId: 'claude-sonnet',
+        promptVersion: 'v1',
+        createdAt: '2026-04-28T10:00:00Z',
+      };
+      act(() => {
+        simulateSWMessage({ type: 'supervisor_decision', data });
+      });
+
+      expect(result.current.supervisorDecisions).toHaveLength(1);
+      expect(result.current.lastSupervisorDecision?.kind).toBe('supervisor_decision');
+      expect(result.current.lastSupervisorDecision?.verdict).toBe('advise');
+    });
+
     it('ignores messages with invalid shape', async () => {
       const { result } = renderHook(() => useAgentEvents());
       await act(async () => {

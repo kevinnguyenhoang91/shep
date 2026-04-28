@@ -75,6 +75,12 @@ function Harness({
   const value: UseAgentEventsResult = {
     events: lastEvent ? [lastEvent] : [],
     lastEvent,
+    agentMessages: [],
+    lastAgentMessage: null,
+    agentQuestions: [],
+    lastAgentQuestion: null,
+    supervisorDecisions: [],
+    lastSupervisorDecision: null,
     connectionStatus: 'connected',
   };
   return React.createElement(

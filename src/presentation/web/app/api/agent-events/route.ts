@@ -79,6 +79,16 @@ export function GET(request: Request): Response {
             // channel so the web client can render the agent activity feed
             // without overloading the notification channel.
             enqueue(`event: agent_message\ndata: ${JSON.stringify(event)}\n\n`);
+          } else if (event.kind === 'agent_question') {
+            // Unified agent-question pipeline event (spec 093) — drives the
+            // /agent-questions inbox. Carries both `new` and `status`
+            // transitions; consumers narrow on the `transition` field.
+            enqueue(`event: agent_question\ndata: ${JSON.stringify(event)}\n\n`);
+          } else if (event.kind === 'supervisor_decision') {
+            // Supervisor decision event (spec 093) — drives the inline "Why?"
+            // drawer rendered next to gates and questions. Decisions are
+            // immutable, so only `new` events flow.
+            enqueue(`event: supervisor_decision\ndata: ${JSON.stringify(event)}\n\n`);
           }
         };
 

@@ -10,6 +10,9 @@
  *
  * Messages TO clients:
  *   { type: 'notification', data: NotificationEvent }
+ *   { type: 'agent_message', data: AgentMessageStreamEvent }       (spec 093)
+ *   { type: 'agent_question', data: AgentQuestionStreamEvent }     (spec 093)
+ *   { type: 'supervisor_decision', data: SupervisorDecisionStreamEvent } (spec 093)
  *   { type: 'status', status: 'connected' | 'connecting' | 'disconnected' }
  */
 
@@ -126,6 +129,22 @@ function connect() {
     }
     broadcast({ type: 'notification', data });
   });
+
+  // Spec 093 — collaboration & supervision event channels. Clients receiving
+  // these messages can rely on `data` being the matching StreamedAgentEvent
+  // envelope (kind already set on the server side).
+  for (const channel of ['agent_message', 'agent_question', 'supervisor_decision']) {
+    eventSource.addEventListener(channel, (event) => {
+      /** @type {unknown} */
+      let data;
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      broadcast({ type: channel, data });
+    });
+  }
 }
 
 function disconnect() {
