@@ -85,6 +85,10 @@ import { AskAgentQuestionUseCase } from '../../../application/use-cases/agents/a
 import { AnswerAgentQuestionUseCase } from '../../../application/use-cases/agents/answer-agent-question.use-case.js';
 import { CancelAgentQuestionUseCase } from '../../../application/use-cases/agents/cancel-agent-question.use-case.js';
 import { ListAgentQuestionsUseCase } from '../../../application/use-cases/agents/list-agent-questions.use-case.js';
+import { ConfigureSupervisorUseCase } from '../../../application/use-cases/agents/configure-supervisor.use-case.js';
+import { EnableSupervisorUseCase } from '../../../application/use-cases/agents/enable-supervisor.use-case.js';
+import { DisableSupervisorUseCase } from '../../../application/use-cases/agents/disable-supervisor.use-case.js';
+import { GetSupervisorPolicyUseCase } from '../../../application/use-cases/agents/get-supervisor-policy.use-case.js';
 
 /**
  * Register the main body of application use cases (settings, agents, features,
@@ -183,6 +187,10 @@ export function registerUseCases(container: DependencyContainer): void {
   container.registerSingleton(AnswerAgentQuestionUseCase);
   container.registerSingleton(CancelAgentQuestionUseCase);
   container.registerSingleton(ListAgentQuestionsUseCase);
+  container.registerSingleton(ConfigureSupervisorUseCase);
+  container.registerSingleton(EnableSupervisorUseCase);
+  container.registerSingleton(DisableSupervisorUseCase);
+  container.registerSingleton(GetSupervisorPolicyUseCase);
 
   // ─── String-token aliases for web routes ─────────────────────────────────
   // Turbopack can't resolve .js→.ts imports inside @shepai/core, so routes use
