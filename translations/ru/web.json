@@ -208,6 +208,8 @@
       "projectsDescription": "Включить навигацию Проектов и страницы управления проектами в веб-интерфейсе",
       "codeReview": "AI Code Review",
       "codeReviewDescription": "Enable AI-powered code review that analyzes PR diffs and posts inline comments to GitHub",
+      "collaboration": "Agent Collaboration & Supervision",
+      "collaborationDescription": "Enable agent-to-agent messaging, supervisor delegation, and the unified agent questions inbox",
       "hint": "Экспериментальные функции, которые ещё находятся в разработке. Включайте на свой страх и риск — они могут измениться или быть удалены в будущих версиях. Режим отладки добавляет подробное логирование, полезное для устранения неполадок."
     },
     "interactiveAgent": {
@@ -252,7 +254,8 @@
     "sessions": "Сессии",
     "tools": "Инструменты",
     "skills": "Навыки",
-    "applications": "Applications"
+    "applications": "Applications",
+    "agentQuestions": "Agent Questions"
   },
   "sidebar": {
     "features": "Функции",

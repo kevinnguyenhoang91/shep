@@ -38,9 +38,37 @@ Feature flags are persisted in the Settings singleton and toggled via the Settin
 
 **Verify before claiming done:** run `pnpm typecheck`, then open the Settings page in the browser and confirm the new toggle actually renders. If it doesn't, you forgot translation keys (see step 9) or the DB row still has the default value.
 
+**Real failure (spec 093 — collaboration flag):** Steps 8 and 9 were skipped during implementation. The flag existed in `feature-flags.ts` and the DB layer but had no `<SwitchRow>` in the settings page and no translation keys. Users had no way to toggle it from the UI — they had to set `NEXT_PUBLIC_FLAG_COLLABORATION=true` manually. The checklist was in LESSONS.md the whole time. No excuse for skipping it.
+
 **Failure mode if you skip a step:** the UI toggle saves, the mapper writes the column, but the repo SQL omits it → the value is silently dropped on INSERT/UPDATE. Same pattern as the per-feature flag bug below — mapper and repo SQL are separate sources of truth and must stay in sync.
 
 **Do NOT** hide a flag only via `NEXT_PUBLIC_FLAG_*` env vars when the rest of the flag system is DB-backed. Users expect to toggle flags from the Settings page, not by editing `.env`.
+
+## New Feature Pages Must Be Reachable — Nav + Entry Points Are Mandatory
+
+When a new feature flag gates pages (e.g. `/agent-questions`, `/application/[id]/supervisor`), implementation is NOT done until:
+
+1. **Sidebar nav item** added (gated on the flag) so the page is discoverable — add `badge` support when there's a live count (e.g. pending questions)
+2. **Entry point from related surfaces** — e.g. supervisor config linked from the app overflow menu, not just a raw URL
+3. **First-run onboarding callout** — when the flag first turns on and the user has never tried it, show a dismissable callout (use `localStorage` for dismissed state) with links to the new surfaces
+4. **Translation keys** for any new nav label (all 9 locales)
+
+**What went wrong (spec 093):** All four were missing. The pages existed and SSE events were wired, but users had no way to reach them from the UI. `agentQuestions` and `supervisorDecisions` events were being received by the hook but nothing consumed them visually.
+
+**Rule:** After building any feature-flagged page, immediately ask: "Can a user who just turned on the flag actually find and use this?" If the answer requires knowing the URL, it's not done.
+
+## Onboarding Callouts Must Not Drop Users in a Dead End
+
+Linking to a page (e.g. `/applications`) from an onboarding callout is NOT guidance — it is abandonment. The callout must know enough context to continue the flow from where the user is.
+
+**What went wrong:** The collaboration onboarding linked to `/applications` when no `firstAppId` was available. The user landed there and had no idea what to do next.
+
+**Rule:** Any onboarding CTA that depends on a user-specific resource (e.g. "configure supervisor for app X") must handle all states:
+- **Resource exists, single** — link directly (e.g. `/application/[id]/supervisor`)
+- **Resource exists, multiple** — show an inline picker in the callout itself so the user never leaves context
+- **Resource missing** — show what to create first, with a CTA to do it (e.g. `shep:open-create-application` event or create link), NOT a link to a listing page
+
+The inline picker keeps the user on the surface they already understand (control center) and threads context through each step without navigation dead-ends.
 
 ## Auth-Detection Checks Must Match the Tool's Real Storage + Real CLI
 

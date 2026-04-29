@@ -13,7 +13,7 @@
  *    └── identity ──────┘     └── context ┘            └─── primary ───┘    └ local ┘    └── view ─┘   └ overflow ┘
  */
 
-import { LayoutGrid } from 'lucide-react';
+import { LayoutGrid, ShieldCheck } from 'lucide-react';
 import type { Application } from '@shepai/core/domain/generated/output';
 import { DeploymentState } from '@shepai/core/domain/generated/output';
 import type { ChatState } from '@shepai/core/application/ports/output/services/interactive-session-service.interface';
@@ -24,6 +24,9 @@ import { SmartDeployCluster } from '@/components/features/application-page/smart
 import type { CloudDeployActionApi } from '@/hooks/use-cloud-deploy-action';
 import type { DeployActionState } from '@/hooks/use-deploy-action';
 
+import Link from 'next/link';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { useFeatureFlags } from '@/hooks/feature-flags-context';
 import { AppOverflowMenu } from './app-overflow-menu';
 import { AppViewTabs, type AppView } from './app-view-tabs';
 import { CopyPromptButton } from './copy-prompt-button';
@@ -63,6 +66,8 @@ export function AppTopBar({
   deploy,
   cloudDeploy,
 }: AppTopBarProps) {
+  const { collaboration } = useFeatureFlags();
+
   return (
     <header
       className={cn(
@@ -132,6 +137,17 @@ export function AppTopBar({
         <div className="px-2 pb-2">
           <CopyPromptButton applicationId={application.id} />
         </div>
+        {collaboration ? (
+          <DropdownMenuItem asChild>
+            <Link
+              href={`/application/${application.id}/supervisor`}
+              className="flex cursor-pointer items-center gap-2"
+            >
+              <ShieldCheck className="size-4" />
+              Configure supervisor
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
         <DeleteApplicationMenuItem
           applicationId={application.id}
           applicationName={application.name}

@@ -1816,6 +1816,18 @@ export function SettingsPageClient({
                 save({ featureFlags: newFlags });
               }}
             />
+            <SwitchRow
+              label={t('settings.featureFlags.collaboration')}
+              description={t('settings.featureFlags.collaborationDescription')}
+              id="flag-collaboration"
+              testId="switch-flag-collaboration"
+              checked={flags.collaboration}
+              onChange={(v) => {
+                const newFlags = { ...flags, collaboration: v };
+                setFlags(newFlags);
+                save({ featureFlags: newFlags });
+              }}
+            />
           </SettingsSection>
           <SectionHint>{t('settings.featureFlags.hint')}</SectionHint>
         </div>

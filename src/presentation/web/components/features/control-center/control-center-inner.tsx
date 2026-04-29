@@ -46,6 +46,7 @@ import { useSidebar } from '@/components/ui/sidebar';
 import { useFabLayout } from '@/hooks/fab-layout-context';
 import { ControlCenterEmptyState } from './control-center-empty-state';
 import { ControlCenterOnboarding } from './control-center-onboarding';
+import { CollaborationOnboarding } from './collaboration-onboarding';
 import { NewProjectDialog } from './new-project-dialog';
 import { useControlCenterState } from './use-control-center-state';
 import { useCanvasEventListeners } from './use-canvas-event-listeners';
@@ -522,6 +523,14 @@ export function ControlCenterInner({ initialNodes, initialEdges }: ControlCenter
 
   const featureFlags = useFeatureFlags();
 
+  const collaborationApps = useMemo(
+    () =>
+      initialNodes
+        .filter((n) => n.type === 'applicationNode')
+        .map((n) => ({ id: n.data.id as string, name: n.data.name as string })),
+    [initialNodes]
+  );
+
   // (+) FAB actions — only visible on control center. Action list lives in
   // its own hook so this component stays focused on graph state + rendering.
   const fabActions = useFabActions({
@@ -574,6 +583,15 @@ export function ControlCenterInner({ initialNodes, initialEdges }: ControlCenter
         showToolbarOnEmpty={workspaceFilteredEmpty}
         emptyState={emptyStateNode}
       />
+      {/* Collaboration onboarding — top-right overlay, shown once per browser profile */}
+      {featureFlags.collaboration ? (
+        <div className="pointer-events-none absolute inset-x-0 top-14 z-10 flex justify-end px-4">
+          <CollaborationOnboarding
+            apps={collaborationApps}
+            className="pointer-events-auto w-full max-w-md"
+          />
+        </div>
+      ) : null}
       {/* (+) FAB — bottom-left, moves with sidebar */}
       {showCanvas ? <CreateFab actions={fabActions} /> : null}
       <NewProjectDialog

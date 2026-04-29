@@ -208,6 +208,8 @@
       "projectsDescription": "Увімкнути навігацію Проєктів та сторінки управління проєктами у вебінтерфейсі",
       "codeReview": "AI Code Review",
       "codeReviewDescription": "Enable AI-powered code review that analyzes PR diffs and posts inline comments to GitHub",
+      "collaboration": "Agent Collaboration & Supervision",
+      "collaborationDescription": "Enable agent-to-agent messaging, supervisor delegation, and the unified agent questions inbox",
       "hint": "Експериментальні функції, що ще перебувають у розробці. Вмикайте на власний ризик — вони можуть змінитися або бути видалені в майбутніх версіях. Режим відлагодження додає докладне журналювання, корисне для усунення неполадок."
     },
     "interactiveAgent": {
@@ -252,7 +254,8 @@
     "sessions": "Сесії",
     "tools": "Інструменти",
     "skills": "Навички",
-    "applications": "Applications"
+    "applications": "Applications",
+    "agentQuestions": "Agent Questions"
   },
   "sidebar": {
     "features": "Функції",

@@ -208,6 +208,8 @@
       "projectsDescription": "Activer la navigation Projets et les pages de gestion de projets dans l'interface web",
       "codeReview": "AI Code Review",
       "codeReviewDescription": "Enable AI-powered code review that analyzes PR diffs and posts inline comments to GitHub",
+      "collaboration": "Agent Collaboration & Supervision",
+      "collaborationDescription": "Enable agent-to-agent messaging, supervisor delegation, and the unified agent questions inbox",
       "hint": "Fonctionnalités expérimentales encore en cours de développement. Activez à vos risques et périls — elles peuvent changer ou être supprimées dans les versions futures. Le mode débogage ajoute une journalisation détaillée utile pour le dépannage."
     },
     "interactiveAgent": {
@@ -252,7 +254,8 @@
     "sessions": "Sessions",
     "tools": "Outils",
     "skills": "Compétences",
-    "applications": "Applications"
+    "applications": "Applications",
+    "agentQuestions": "Agent Questions"
   },
   "sidebar": {
     "features": "Fonctionnalités",
