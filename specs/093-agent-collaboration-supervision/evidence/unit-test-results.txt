@@ -22,10 +22,8 @@ Shep Web UI
 ✓ Daemon spawned at http://localhost:4050
 
 
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/upgrade/upgrade-cli.use-case.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 776[2mms[22m[39m
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/upgrade/upgrade-cli.use-case.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 778[2mms[22m[39m
  [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/stream-agent-events.use-case.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 756[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/feature-agent/nodes/node-helpers.test.ts [2m([22m[2m49 tests[22m[2m)[22m[33m 843[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/executors/gemini-cli-executor.test.ts [2m([22m[2m43 tests[22m[2m)[22m[33m 306[2mms[22m[39m
 [90mstdout[2m | tests/unit/commands/daemon/start-daemon.test.ts[2m > [22m[2mstartDaemon()[2m > [22m[2mfresh-start path (no existing daemon)[2m > [22m[2mcalls findAvailablePort with the provided port override
 [22m[39m
 Shep Web UI
@@ -33,72 +31,11 @@ Shep Web UI
 ✓ Daemon spawned at http://localhost:8080
 
 
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/executors/codex-cli-executor.test.ts [2m([22m[2m49 tests[22m[2m)[22m[33m 309[2mms[22m[39m
-[2026-04-28T23:38:29.360Z] Spawning: cursor-agent --yolo -p Implement feature --output-format stream-json
-[2026-04-28T23:38:29.361Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:29.361Z] Subprocess PID: 12345
-[90mstdout[2m | tests/unit/infrastructure/di/container-session-registrations.test.ts[2m > [22m[2msession DI registrations[2m > [22m[2mresolves ListAgentSessionsUseCase after initialization
-[22m[39m[DeploymentService] No dev servers to recover from database
-
-[90mstdout[2m | tests/unit/infrastructure/di/container-reject-token.test.ts[2m > [22m[2mRejectAgentRunUseCase string-token alias[2m > [22m[2mresolves RejectAgentRunUseCase via string token after initialization
-[22m[39m[DeploymentService] No dev servers to recover from database
-
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/di/container-reject-token.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1477[2mms[22m[39m
-     [33m[2m✓[22m[39m resolves RejectAgentRunUseCase via string token after initialization [33m 1476[2mms[22m[39m
-[90mstdout[2m | tests/unit/infrastructure/di/container-session-registrations.test.ts[2m > [22m[2msession DI registrations[2m > [22m[2mresolves GetAgentSessionUseCase after initialization
-[22m[39m[DeploymentService] No dev servers to recover from database
-
-[90mstdout[2m | tests/unit/infrastructure/di/container-idempotency.test.ts[2m > [22m[2mcontainer idempotency[2m > [22m[2misContainerInitialized() returns true after init
-[22m[39m[DeploymentService] No dev servers to recover from database
-
-[2026-04-28T23:38:29.394Z] Spawning: cursor-agent --yolo -p Bad prompt --output-format stream-json
-[2026-04-28T23:38:29.394Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:29.394Z] Subprocess PID: 12345
-[2026-04-28T23:38:29.409Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
-[2026-04-28T23:38:29.410Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:29.410Z] Subprocess PID: 12345
-[90mstdout[2m | tests/unit/infrastructure/di/container-idempotency.test.ts[2m > [22m[2mcontainer idempotency[2m > [22m[2minitializeContainer() returns the same container on second call
-[22m[39m[DeploymentService] No dev servers to recover from database
-
-[90mstdout[2m | tests/unit/infrastructure/di/container-session-registrations.test.ts[2m > [22m[2msession DI registrations[2m > [22m[2mresolves IAgentSessionRepository:claude-code as ClaudeCodeSessionRepository
-[22m[39m[DeploymentService] No dev servers to recover from database
-
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/di/container-idempotency.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1515[2mms[22m[39m
-     [33m[2m✓[22m[39m isContainerInitialized() returns false before init [33m 1470[2mms[22m[39m
-[2026-04-28T23:38:29.434Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
-[2026-04-28T23:38:29.434Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:29.434Z] Subprocess PID: 12345
-[90mstdout[2m | tests/unit/infrastructure/di/container-session-registrations.test.ts[2m > [22m[2msession DI registrations[2m > [22m[2mresolves IAgentSessionRepository:cursor as StubSessionRepository
-[22m[39m[DeploymentService] No dev servers to recover from database
-
-[90mstdout[2m | tests/unit/infrastructure/di/container-session-registrations.test.ts[2m > [22m[2msession DI registrations[2m > [22m[2mresolves IAgentSessionRepository:gemini-cli as StubSessionRepository
-[22m[39m[DeploymentService] No dev servers to recover from database
-
-[2026-04-28T23:38:29.457Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
-[2026-04-28T23:38:29.457Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:29.457Z] Subprocess PID: 12345
-[90mstdout[2m | tests/unit/infrastructure/di/container-session-registrations.test.ts[2m > [22m[2msession DI registrations[2m > [22m[2mresolves IAgentSessionRepository:codex-cli as CodexCliSessionRepository
-[22m[39m[DeploymentService] No dev servers to recover from database
-
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/di/container-session-registrations.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 1580[2mms[22m[39m
-     [33m[2m✓[22m[39m resolves ListAgentSessionsUseCase after initialization [33m 1478[2mms[22m[39m
-[2026-04-28T23:38:29.480Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
-[2026-04-28T23:38:29.480Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:29.480Z] Subprocess PID: 12345
-[2026-04-28T23:38:29.502Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
-[2026-04-28T23:38:29.502Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:29.502Z] Subprocess PID: 12345
-[2026-04-28T23:38:29.525Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
-[2026-04-28T23:38:29.525Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:29.525Z] Subprocess PID: 12345
-[2026-04-28T23:38:29.537Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
-[2026-04-28T23:38:29.537Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:29.537Z] Subprocess PID: 12345
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/executors/cursor-executor.test.ts [2m([22m[2m39 tests[22m[2m)[22m[32m 211[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/stream-agent-events-application.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 304[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/repositories/sqlite-operation-log-repository-publish.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 330[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/tool-installer/tool-installer.service.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 181[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/executors/copilot-cli-executor.test.ts [2m([22m[2m51 tests[22m[2m)[22m[32m 182[2mms[22m[39m
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/executors/codex-cli-executor.test.ts [2m([22m[2m49 tests[22m[2m)[22m[33m 334[2mms[22m[39m
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/feature-agent/nodes/node-helpers.test.ts [2m([22m[2m49 tests[22m[2m)[22m[33m 1366[2mms[22m[39m
+     [33m[2m✓[22m[39m should not modify commits when commitSpecs=true [33m 356[2mms[22m[39m
+     [33m[2m✓[22m[39m should not modify commits for non-spec phases [33m 313[2mms[22m[39m
+     [33m[2m✓[22m[39m should be a no-op when agent did not commit spec files [33m 404[2mms[22m[39m
 [90mstdout[2m | tests/unit/commands/daemon/start-daemon.test.ts[2m > [22m[2mstartDaemon()[2m > [22m[2mfresh-start path (no existing daemon)[2m > [22m[2mspawns the daemon process using process.execPath and _serve args
 [22m[39m
 Shep Web UI
@@ -106,7 +43,56 @@ Shep Web UI
 ✓ Daemon spawned at http://localhost:4050
 
 
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/filesystem/node-application-file-system.service.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 161[2mms[22m[39m
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/executors/gemini-cli-executor.test.ts [2m([22m[2m43 tests[22m[2m)[22m[33m 421[2mms[22m[39m
+[2026-04-28T23:52:41.974Z] Spawning: cursor-agent --yolo -p Implement feature --output-format stream-json
+[2026-04-28T23:52:41.978Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:41.978Z] Subprocess PID: 12345
+[2026-04-28T23:52:42.010Z] Spawning: cursor-agent --yolo -p Bad prompt --output-format stream-json
+[2026-04-28T23:52:42.010Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:42.010Z] Subprocess PID: 12345
+[2026-04-28T23:52:42.021Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
+[2026-04-28T23:52:42.021Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:42.021Z] Subprocess PID: 12345
+[2026-04-28T23:52:42.043Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
+[2026-04-28T23:52:42.043Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:42.043Z] Subprocess PID: 12345
+[2026-04-28T23:52:42.063Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
+[2026-04-28T23:52:42.063Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:42.063Z] Subprocess PID: 12345
+[2026-04-28T23:52:42.084Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
+[2026-04-28T23:52:42.084Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:42.084Z] Subprocess PID: 12345
+[2026-04-28T23:52:42.107Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
+[2026-04-28T23:52:42.107Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:42.107Z] Subprocess PID: 12345
+[90mstdout[2m | tests/unit/commands/daemon/start-daemon.test.ts[2m > [22m[2mstartDaemon()[2m > [22m[2mfresh-start path (no existing daemon)[2m > [22m[2mpropagates process.execArgv to the child
+[22m[39m
+Shep Web UI
+
+✓ Daemon spawned at http://localhost:4050
+
+
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/presentation/cli/commands/upgrade.command.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 2275[2mms[22m[39m
+[2026-04-28T23:52:42.129Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
+[2026-04-28T23:52:42.129Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:42.129Z] Subprocess PID: 12345
+[2026-04-28T23:52:42.141Z] Spawning: cursor-agent --yolo -p Test --output-format stream-json
+[2026-04-28T23:52:42.141Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:42.141Z] Subprocess PID: 12345
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/executors/cursor-executor.test.ts [2m([22m[2m39 tests[22m[2m)[22m[32m 234[2mms[22m[39m
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/stream-agent-events-application.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 305[2mms[22m[39m
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/repositories/sqlite-operation-log-repository-publish.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1438[2mms[22m[39m
+     [33m[2m✓[22m[39m calls bus.publish exactly once with { entry } after a successful append [33m 1146[2mms[22m[39m
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/agent-registry.service.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 232[2mms[22m[39m
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/executors/copilot-cli-executor.test.ts [2m([22m[2m51 tests[22m[2m)[22m[32m 203[2mms[22m[39m
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/tool-installer/tool-installer.service.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 191[2mms[22m[39m
+[90mstdout[2m | tests/unit/commands/daemon/start-daemon.test.ts[2m > [22m[2mstartDaemon()[2m > [22m[2mfresh-start path (no existing daemon)[2m > [22m[2mspawns with detached: true
+[22m[39m
+Shep Web UI
+
+✓ Daemon spawned at http://localhost:4050
+
+
 [90mstdout[2m | tests/unit/infrastructure/services/pr-sync/pr-sync-watcher.service.test.ts[2m > [22m[2mPrSyncWatcherService[2m > [22m[2mstart/stop lifecycle[2m > [22m[2mshould set isRunning to true when started
 [22m[39m[PrSyncWatcher] Starting (poll every 30000ms)
 
@@ -147,7 +133,6 @@ Shep Web UI
 [90mstdout[2m | tests/unit/infrastructure/services/pr-sync/pr-sync-watcher.service.test.ts[2m > [22m[2mPrSyncWatcherService[2m > [22m[2mPR status polling and transition detection[2m > [22m[2mshould detect Open→Merged transition and update feature and agent run
 [22m[39m[PrSyncWatcher] PR #1 status changed: Open -> Merged for "My Feature"
 
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/spec-yaml-backward-compatibility.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 132[2mms[22m[39m
 [90mstdout[2m | tests/unit/infrastructure/services/pr-sync/pr-sync-watcher.service.test.ts[2m > [22m[2mPrSyncWatcherService[2m > [22m[2mPR status polling and transition detection[2m > [22m[2mshould detect Open→Merged transition and update feature and agent run
 [22m[39m[PrSyncWatcher] CI status changed: none -> Pending for "My Feature"
 
@@ -262,7 +247,6 @@ Shep Web UI
 [90mstdout[2m | tests/unit/infrastructure/services/pr-sync/pr-sync-watcher.service.test.ts[2m > [22m[2mPrSyncWatcherService[2m > [22m[2mPR status polling and transition detection[2m > [22m[2mshould not update feature when no matching PR found by branch
 [22m[39m[PrSyncWatcher] Starting (poll every 30000ms)
 
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/interactive/interactive-session.service.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 55[2mms[22m[39m
 [90mstdout[2m | tests/unit/infrastructure/services/pr-sync/pr-sync-watcher.service.test.ts[2m > [22m[2mPrSyncWatcherService[2m > [22m[2mPR status polling and transition detection[2m > [22m[2mshould not update feature when no matching PR found by branch
 [22m[39m[PrSyncWatcher] Stopped
 
@@ -428,73 +412,89 @@ Shep Web UI
 [90mstdout[2m | tests/unit/infrastructure/services/pr-sync/pr-sync-watcher.service.test.ts[2m > [22m[2mPrSyncWatcherService[2m > [22m[2mSQLite poll lock[2m > [22m[2mshould proceed without lock when no DB is provided
 [22m[39m[PrSyncWatcher] Stopped
 
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/agent-registry.service.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 184[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/pr-sync/pr-sync-watcher.service.test.ts [2m([22m[2m55 tests[22m[2m)[22m[32m 77[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/list-agent-runs.use-case.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/skill-injector.service.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 10[2mms[22m[39m
-[2026-04-28T23:38:29.998Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
-[2026-04-28T23:38:29.999Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:29.999Z] Subprocess PID: 12345
-[2026-04-28T23:38:29.999Z] Prompt length: 21 chars (piped via stdin)
-[2026-04-28T23:38:29.999Z] [result] 33 chars, session=sess-abc-123
-[2026-04-28T23:38:29.999Z] Process closed with code 0, result=33 chars
-[2026-04-28T23:38:30.001Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
-[2026-04-28T23:38:30.001Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:30.001Z] Subprocess PID: 12345
-[2026-04-28T23:38:30.001Z] Prompt length: 12 chars (piped via stdin)
-[2026-04-28T23:38:30.001Z] [result] 4 chars, session=session-xyz-789
-[2026-04-28T23:38:30.001Z] Process closed with code 0, result=4 chars
-[2026-04-28T23:38:30.002Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
-[2026-04-28T23:38:30.002Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:30.002Z] Subprocess PID: 12345
-[2026-04-28T23:38:30.002Z] Prompt length: 11 chars (piped via stdin)
-[2026-04-28T23:38:30.002Z] [result] 4 chars, session=sess-1
-[2026-04-28T23:38:30.002Z] [tokens] 1500 in / 800 out
-[2026-04-28T23:38:30.002Z] Process closed with code 0, result=4 chars
-[2026-04-28T23:38:30.002Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
-[2026-04-28T23:38:30.002Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:30.002Z] Subprocess PID: 12345
-[2026-04-28T23:38:30.002Z] Prompt length: 4 chars (piped via stdin)
-[2026-04-28T23:38:30.002Z] [result] 4 chars, session=none
-[2026-04-28T23:38:30.002Z] [tokens] 500 in / 200 out
-[2026-04-28T23:38:30.002Z] Process closed with code 0, result=4 chars
-[2026-04-28T23:38:30.002Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
-[2026-04-28T23:38:30.002Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:30.002Z] Subprocess PID: 12345
-[2026-04-28T23:38:30.002Z] Prompt length: 4 chars (piped via stdin)
-[2026-04-28T23:38:30.002Z] [result] 4 chars, session=none
-[2026-04-28T23:38:30.002Z] [tokens] 100 in / 50 out, $0.1857
-[2026-04-28T23:38:30.002Z] Process closed with code 0, result=4 chars
-[2026-04-28T23:38:30.003Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
-[2026-04-28T23:38:30.003Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:30.003Z] Subprocess PID: 12345
-[2026-04-28T23:38:30.003Z] Prompt length: 4 chars (piped via stdin)
-[2026-04-28T23:38:30.003Z] [result] 4 chars, session=none
-[2026-04-28T23:38:30.003Z] Process closed with code 0, result=4 chars
-[2026-04-28T23:38:30.004Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
-[2026-04-28T23:38:30.004Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:30.004Z] Subprocess PID: 12345
-[2026-04-28T23:38:30.004Z] Prompt length: 10 chars (piped via stdin)
-[2026-04-28T23:38:30.005Z] stderr: Error: Authentication failed
-[2026-04-28T23:38:30.005Z] Process closed with code 1, result=0 chars
-[2026-04-28T23:38:30.006Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
-[2026-04-28T23:38:30.006Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:30.006Z] Subprocess PID: 12345
-[2026-04-28T23:38:30.006Z] Prompt length: 4 chars (piped via stdin)
-[2026-04-28T23:38:30.006Z] Process error event: spawn claude ENOENT
-[2026-04-28T23:38:30.007Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --resume prev-session-id --verbose --include-partial-messages --no-chrome
-[2026-04-28T23:38:30.007Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:30.007Z] Subprocess PID: 12345
-[2026-04-28T23:38:30.007Z] Prompt length: 13 chars (piped via stdin)
-[2026-04-28T23:38:30.007Z] [result] 7 chars, session=sess-resume
-[2026-04-28T23:38:30.007Z] Process closed with code 0, result=7 chars
-[2026-04-28T23:38:30.007Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --model claude-sonnet-4-5-20250929 --verbose --include-partial-messages --no-chrome
-[2026-04-28T23:38:30.007Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:30.007Z] Subprocess PID: 12345
-[2026-04-28T23:38:30.007Z] Prompt length: 4 chars (piped via stdin)
-[2026-04-28T23:38:30.007Z] [result] 4 chars, session=none
-[2026-04-28T23:38:30.007Z] Process closed with code 0, result=4 chars
-[2026-04-28T23:38:30.007Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --append-system-prompt You are a code reviewer --verbose --include-partial-messages --no-chrome
-[2026-04-28T23:38:30.007Z] Spawn cwd: (inherited)
-[2026-04-28T23:38:30.007Z] Subprocess PID: 12345
-[2026-04-28T23:38:30.007Z] Prompt length: 4 chars (piped via stdin)
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/pr-sync/pr-sync-watcher.service.test.ts [2m([22m[2m55 tests[22m[2m)[22m[32m 85[2mms[22m[39m
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/filesystem/node-application-file-system.service.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 254[2mms[22m[39m
+[90mstdout[2m | tests/unit/infrastructure/di/container-reject-token.test.ts[2m > [22m[2mRejectAgentRunUseCase string-token alias[2m > [22m[2mresolves RejectAgentRunUseCase via string token after initialization
+[22m[39m[DeploymentService] No dev servers to recover from database
+
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/di/container-reject-token.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 3316[2mms[22m[39m
+     [33m[2m✓[22m[39m resolves RejectAgentRunUseCase via string token after initialization [33m 3315[2mms[22m[39m
+[90mstdout[2m | tests/unit/infrastructure/di/container-session-registrations.test.ts[2m > [22m[2msession DI registrations[2m > [22m[2mresolves ListAgentSessionsUseCase after initialization
+[22m[39m[DeploymentService] No dev servers to recover from database
+
+[90mstdout[2m | tests/unit/commands/daemon/start-daemon.test.ts[2m > [22m[2mstartDaemon()[2m > [22m[2mfresh-start path (no existing daemon)[2m > [22m[2mspawns with windowsHide: true to suppress console window on Windows
+[22m[39m
+Shep Web UI
+
+✓ Daemon spawned at http://localhost:4050
+
+
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/spec-yaml-backward-compatibility.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 186[2mms[22m[39m
+[90mstdout[2m | tests/unit/infrastructure/di/container-idempotency.test.ts[2m > [22m[2mcontainer idempotency[2m > [22m[2misContainerInitialized() returns true after init
+[22m[39m[DeploymentService] No dev servers to recover from database
+
+[90mstdout[2m | tests/unit/infrastructure/di/container-session-registrations.test.ts[2m > [22m[2msession DI registrations[2m > [22m[2mresolves GetAgentSessionUseCase after initialization
+[22m[39m[DeploymentService] No dev servers to recover from database
+
+[90mstdout[2m | tests/unit/infrastructure/di/container-idempotency.test.ts[2m > [22m[2mcontainer idempotency[2m > [22m[2minitializeContainer() returns the same container on second call
+[22m[39m[DeploymentService] No dev servers to recover from database
+
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/di/container-idempotency.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 3402[2mms[22m[39m
+     [33m[2m✓[22m[39m isContainerInitialized() returns false before init [33m 3310[2mms[22m[39m
+[90mstdout[2m | tests/unit/infrastructure/di/container-session-registrations.test.ts[2m > [22m[2msession DI registrations[2m > [22m[2mresolves IAgentSessionRepository:claude-code as ClaudeCodeSessionRepository
+[22m[39m[DeploymentService] No dev servers to recover from database
+
+[90mstdout[2m | tests/unit/infrastructure/di/container-session-registrations.test.ts[2m > [22m[2msession DI registrations[2m > [22m[2mresolves IAgentSessionRepository:cursor as StubSessionRepository
+[22m[39m[DeploymentService] No dev servers to recover from database
+
+[90mstdout[2m | tests/unit/infrastructure/di/container-session-registrations.test.ts[2m > [22m[2msession DI registrations[2m > [22m[2mresolves IAgentSessionRepository:gemini-cli as StubSessionRepository
+[22m[39m[DeploymentService] No dev servers to recover from database
+
+[90mstdout[2m | tests/unit/infrastructure/di/container-session-registrations.test.ts[2m > [22m[2msession DI registrations[2m > [22m[2mresolves IAgentSessionRepository:codex-cli as CodexCliSessionRepository
+[22m[39m[DeploymentService] No dev servers to recover from database
+
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/di/container-session-registrations.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 3596[2mms[22m[39m
+     [33m[2m✓[22m[39m resolves ListAgentSessionsUseCase after initialization [33m 3320[2mms[22m[39m
+ [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/spec/spec-initializer.service.test.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 177[2mms[22m[39m
+[2026-04-28T23:52:43.437Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
+[2026-04-28T23:52:43.447Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:43.447Z] Subprocess PID: 12345
+[2026-04-28T23:52:43.447Z] Prompt length: 21 chars (piped via stdin)
+[2026-04-28T23:52:43.448Z] [result] 33 chars, session=sess-abc-123
+[2026-04-28T23:52:43.448Z] Process closed with code 0, result=33 chars
+[2026-04-28T23:52:43.452Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
+[2026-04-28T23:52:43.452Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:43.453Z] Subprocess PID: 12345
+[2026-04-28T23:52:43.453Z] Prompt length: 12 chars (piped via stdin)
+[2026-04-28T23:52:43.453Z] [result] 4 chars, session=session-xyz-789
+[2026-04-28T23:52:43.453Z] Process closed with code 0, result=4 chars
+[2026-04-28T23:52:43.454Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
+[2026-04-28T23:52:43.454Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:43.454Z] Subprocess PID: 12345
+[2026-04-28T23:52:43.454Z] Prompt length: 11 chars (piped via stdin)
+[2026-04-28T23:52:43.454Z] [result] 4 chars, session=sess-1
+[2026-04-28T23:52:43.454Z] [tokens] 1500 in / 800 out
+[2026-04-28T23:52:43.455Z] Process closed with code 0, result=4 chars
+[2026-04-28T23:52:43.456Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
+[2026-04-28T23:52:43.456Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:43.456Z] Subprocess PID: 12345
+[2026-04-28T23:52:43.456Z] Prompt length: 4 chars (piped via stdin)
+[2026-04-28T23:52:43.456Z] [result] 4 chars, session=none
+[2026-04-28T23:52:43.456Z] [tokens] 500 in / 200 out
+[2026-04-28T23:52:43.456Z] Process closed with code 0, result=4 chars
+[2026-04-28T23:52:43.456Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
+[2026-04-28T23:52:43.456Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:43.456Z] Subprocess PID: 12345
+[2026-04-28T23:52:43.456Z] Prompt length: 4 chars (piped via stdin)
+[2026-04-28T23:52:43.458Z] [result] 4 chars, session=none
+[2026-04-28T23:52:43.458Z] [tokens] 100 in / 50 out, $0.1857
+[2026-04-28T23:52:43.458Z] Process closed with code 0, result=4 chars
+[2026-04-28T23:52:43.459Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
+[2026-04-28T23:52:43.459Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:43.459Z] Subprocess PID: 12345
+[2026-04-28T23:52:43.459Z] Prompt length: 4 chars (piped via stdin)
+[2026-04-28T23:52:43.459Z] [result] 4 chars, session=none
+[2026-04-28T23:52:43.459Z] Process closed with code 0, result=4 chars
+[2026-04-28T23:52:43.460Z] Spawning: claude -p --output-format stream-json --dangerously-skip-permissions --verbose --include-partial-messages --no-chrome
+[2026-04-28T23:52:43.460Z] Spawn cwd: (inherited)
+[2026-04-28T23:52:43.460Z] Subprocess PID: 12345
