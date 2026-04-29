@@ -132,11 +132,12 @@ test.describe('Agent question round-trip — answer a blocking question (spec 09
     await page.goto(`/agent-questions?app=${TEST_APP_ID}&status=pending`);
 
     // Skip cleanly if the flag didn't take effect on a stale dev server.
-    const status = await page.evaluate(() =>
-      document.title.toLowerCase().includes('not found') ? 'notfound' : 'ok'
-    );
+    const isNotFound = await page
+      .getByRole('heading', { name: 'Not Found' })
+      .isVisible()
+      .catch(() => false);
     test.skip(
-      status === 'notfound',
+      isNotFound,
       'Collaboration flag is OFF in the running dev server. Restart `pnpm dev:web` to pick up the globalSetup flip.'
     );
 
@@ -154,6 +155,11 @@ test.describe('Agent question round-trip — answer a blocking question (spec 09
     await answerInput.fill('proceed');
 
     await page.getByTestId(`question-submit-${TEST_QUESTION_ID}`).click();
+
+    // The status filter is "pending" — once answered the question is filtered
+    // out. Switch to "All" so the answered row remains visible.
+    await page.getByTestId('status-filter').click();
+    await page.getByRole('option', { name: 'All' }).click();
 
     // The row reflects the answered state inline.
     await expect(page.getByTestId(`question-answer-${TEST_QUESTION_ID}`)).toBeVisible({

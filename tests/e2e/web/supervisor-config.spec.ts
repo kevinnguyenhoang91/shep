@@ -67,16 +67,17 @@ test.describe('Supervisor configuration round-trip (spec 093)', () => {
     // If the flag is still off (e.g. local dev with a stale dev server), the
     // page returns notFound. Skip with a helpful pointer rather than failing
     // ambiguously.
-    const status = await page.evaluate(() =>
-      document.title.toLowerCase().includes('not found') ? 'notfound' : 'ok'
-    );
+    const isNotFound = await page
+      .getByRole('heading', { name: 'Not Found' })
+      .isVisible()
+      .catch(() => false);
     test.skip(
-      status === 'notfound',
+      isNotFound,
       'Collaboration flag is OFF in the running dev server. Restart `pnpm dev:web` to pick up the globalSetup flip.'
     );
 
     // Form renders with the page header + the supervisor config form.
-    await expect(page.getByRole('heading', { name: 'Supervisor' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Supervisor', exact: true })).toBeVisible();
     await expect(page.getByTestId('supervisor-config-form')).toBeVisible();
 
     // Fill the form: switch autonomy → autonomous, set model + prompt version.

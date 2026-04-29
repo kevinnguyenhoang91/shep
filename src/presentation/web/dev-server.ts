@@ -121,6 +121,11 @@ async function main() {
 
     const initSettingsUseCase = container.resolve(InitializeSettingsUseCase);
     const settings = await initSettingsUseCase.execute();
+
+    if (process.env.SHEP_COLLABORATION_FLAG === '1' && settings.featureFlags) {
+      settings.featureFlags.collaboration = true;
+    }
+
     initializeSettings(settings);
 
     // Start notification watcher for real-time SSE events (same as shep ui)
