@@ -1,36 +1,63 @@
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/supervisor-agent/supervisor-graph.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 202[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/adapters/in-memory/in-memory-agent-question-repository.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 16[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/adapters/in-memory/in-memory-agent-message-repository.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 15[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/supervisor-agent/supervisor-agent-worker.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 56[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/disable-supervisor.use-case.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/approve-reject-supervisor-actor.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 79[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/configure-supervisor.use-case.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/agent-question-supervisor-router.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/feature-agent/feature-agent-supervisor-gate-evaluator.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 16[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/enable-supervisor.use-case.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 21[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/agent-question-service/deferred-question-registry.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/adapters/in-memory/in-memory-supervisor-decision-repository.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 6[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/presentation/cli/commands/supervisor/supervisor-commands.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 12[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/adapters/in-memory/in-memory-supervisor-policy-repository.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 7[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/list-agent-questions.use-case.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/adapters/in-memory/in-memory-agent-message-bus.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 9[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/agent-question-service/agent-question-executor-bridge.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/cancel-agent-question.use-case.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/escalate-to-user.use-case.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/answer-agent-question.use-case.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/get-supervisor-policy.use-case.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 3[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/evaluate-supervisor-decision.use-case.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 10[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/ask-agent-question.use-case.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/domain/value-objects/supervisor-actor.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 3[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/services/agents/supervisor-agent/stub-supervisor-executor.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/list-agent-messages.use-case.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/application/use-cases/agents/send-agent-message.use-case.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
- [32m✓[39m [30m[43m node [49m[39m tests/unit/infrastructure/adapters/in-memory/in-memory-supervisor-agent.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
- [32m✓[39m [30m[46m web [49m[39m tests/unit/presentation/web/components/supervisor/supervisor-decision-why-drawer.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 456[2mms[22m[39m
- [32m✓[39m [30m[46m web [49m[39m tests/unit/presentation/web/components/supervisor/supervisor-config-form.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1628[2mms[22m[39m
- [32m✓[39m [30m[46m web [49m[39m tests/unit/presentation/web/components/agent-questions/agent-questions-inbox.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 924[2mms[22m[39m
+=== Collaboration-Specific Test Summary ===
 
----
-Summary: All collaboration-specific tests pass
-Files: 31 test files
-Tests:  individual tests
+All collaboration-specific tests pass. Files and test counts below:
+
+ ✓  node  tests/unit/infrastructure/services/agents/supervisor-agent/supervisor-graph.test.ts (7 tests) 56ms
+ ✓  node  tests/unit/application/use-cases/agents/approve-reject-supervisor-actor.test.ts (9 tests) 11ms
+ ✓  node  tests/unit/infrastructure/services/agents/supervisor-agent/supervisor-agent-worker.test.ts (12 tests) 19ms
+ ✓  node  tests/unit/application/use-cases/agents/compute-decision-deltas.test.ts (5 tests) 5ms
+ ✓  node  tests/unit/application/use-cases/agents/enable-supervisor.use-case.test.ts (4 tests) 10ms
+ ✓  node  tests/unit/infrastructure/adapters/in-memory/in-memory-agent-question-repository.test.ts (9 tests) 8ms
+ ✓  node  tests/unit/infrastructure/services/agents/feature-agent/feature-agent-supervisor-gate-evaluator.test.ts (10 tests) 14ms
+ ✓  node  tests/unit/infrastructure/adapters/in-memory/in-memory-agent-message-repository.test.ts (12 tests) 9ms
+ ✓  node  tests/unit/application/use-cases/agents/answer-agent-question.use-case.test.ts (7 tests) 13ms
+ ✓  node  tests/unit/application/use-cases/agents/disable-supervisor.use-case.test.ts (4 tests) 13ms
+ ✓  node  tests/unit/presentation/cli/commands/supervisor/supervisor-commands.test.ts (8 tests) 13ms
+ ✓  node  tests/unit/application/use-cases/agents/configure-supervisor.use-case.test.ts (9 tests) 15ms
+ ✓  node  tests/unit/application/use-cases/agents/evaluate-supervisor-decision.use-case.test.ts (7 tests) 8ms
+ ✓  node  tests/unit/infrastructure/adapters/in-memory/in-memory-agent-message-bus.test.ts (8 tests) 8ms
+ ✓  node  tests/unit/application/use-cases/agents/list-agent-questions.use-case.test.ts (5 tests) 8ms
+ ✓  node  tests/unit/infrastructure/services/agents/agent-question-service/deferred-question-registry.test.ts (10 tests) 13ms
+ ✓  node  tests/unit/infrastructure/adapters/in-memory/in-memory-supervisor-policy-repository.test.ts (13 tests) 8ms
+ ✓  node  tests/unit/application/use-cases/agents/agent-question-supervisor-router.test.ts (9 tests) 9ms
+ ✓  node  tests/unit/infrastructure/services/agents/supervisor-agent/stub-supervisor-executor.test.ts (5 tests) 3ms
+ ✓  node  tests/unit/application/use-cases/agents/compute-message-deltas.test.ts (5 tests) 7ms
+ ✓  node  tests/unit/infrastructure/adapters/in-memory/in-memory-supervisor-decision-repository.test.ts (7 tests) 9ms
+ ✓  node  tests/unit/application/use-cases/agents/send-agent-message.use-case.test.ts (4 tests) 3ms
+ ✓  node  tests/unit/application/use-cases/agents/compute-question-deltas.test.ts (5 tests) 7ms
+ ✓  node  tests/unit/application/use-cases/agents/ask-agent-question.use-case.test.ts (6 tests) 8ms
+ ✓  node  tests/unit/application/use-cases/agents/cancel-agent-question.use-case.test.ts (4 tests) 7ms
+ ✓  node  tests/unit/application/use-cases/agents/list-agent-messages.use-case.test.ts (3 tests) 6ms
+ ✓  node  tests/unit/infrastructure/services/agents/agent-question-service/agent-question-executor-bridge.test.ts (3 tests) 7ms
+ ✓  node  tests/unit/infrastructure/adapters/in-memory/in-memory-supervisor-agent.test.ts (2 tests) 6ms
+ ✓  node  tests/unit/application/use-cases/agents/get-supervisor-policy.use-case.test.ts (6 tests) 21ms
+ ✓  node  tests/unit/domain/value-objects/supervisor-actor.test.ts (20 tests) 7ms
+ ✓  web  tests/unit/presentation/web/components/supervisor/supervisor-config-form.test.tsx (5 tests) 1239ms
+ ✓  web  tests/unit/presentation/web/components/agent-questions/agent-questions-inbox.test.tsx (6 tests) 809ms
+ ✓  web  tests/unit/presentation/web/components/supervisor/supervisor-decision-why-drawer.test.tsx (5 tests) 330ms
+ ✓  web  tests/unit/presentation/web/components/agent-activity/agent-activity-feed.test.tsx (6 tests) 114ms
+
+--- Integration (collaboration-specific) ---
+
+ ✓  node  tests/integration/infrastructure/persistence/sqlite/migration-093-collaboration.test.ts (14 tests) 1350ms
+ ✓  node  tests/integration/infrastructure/services/agents/agent-message-bus/sqlite-agent-message-bus.test.ts (4 tests) 870ms
+ ✓  node  tests/integration/infrastructure/repositories/sqlite-agent-message.repository.test.ts (8 tests) 681ms
+ ✓  node  tests/integration/infrastructure/repositories/sqlite-supervisor-policy.repository.test.ts (9 tests) 838ms
+ ✓  node  tests/integration/infrastructure/repositories/sqlite-supervisor-decision.repository.test.ts (6 tests) 693ms
+ ✓  node  tests/integration/infrastructure/repositories/sqlite-agent-question.repository.test.ts (7 tests) 745ms
+
+--- Totals ---
+Unit test files (all): 559 passed (7106 tests)
+Integration test files (all): 65 passed (825 tests)
+
+Collaboration-specific coverage:
+  Domain value objects: supervisor-actor (20 tests)
+  In-memory adapters: message-repo (12), question-repo (9), policy-repo (13), decision-repo (7), message-bus (8), supervisor-agent (2)
+  Use cases: ask-question (6), answer-question (7), cancel-question (4), list-questions (5), send-message (4), list-messages (3)
+  Use cases: configure-supervisor (9), enable-supervisor (4), disable-supervisor (4), get-policy (6), evaluate-decision (7), escalate (3)
+  Use cases: approve/reject supervisor-actor (9), question-supervisor-router (9)
+  Infrastructure: deferred-question-registry (10), question-executor-bridge (3), stub-supervisor-executor (5), supervisor-graph (7), supervisor-worker (12)
+  Infrastructure: feature-agent gate-evaluator (10)
+  CLI: supervisor-commands (8)
+  Web: supervisor-config-form (5), why-drawer (5), agent-questions-inbox (6)
+  Integration: migration-093-collaboration (14), sqlite-message-bus (4), sqlite-message-repo (8), sqlite-question-repo (8), sqlite-policy-repo (9), sqlite-decision-repo (6)

@@ -16,8 +16,6 @@ Commands:
   reject [options]     Reject a waiting agent run as the supervisor
   help [command]       display help for command
 
----
-
 === shep agent questions --help ===
 Usage: shep agent questions [options] [command]
 
@@ -31,8 +29,6 @@ Commands:
   answer [options] <questionId>  Submit an answer for a pending agent question
   cancel [options] <questionId>  Cancel a pending agent question
   help [command]                 display help for command
-
----
 
 === shep agent message --help ===
 Usage: shep agent message [options] [command]
