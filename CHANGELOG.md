@@ -1,3 +1,46 @@
+## [1.195.1](https://github.com/shep-ai/shep/compare/v1.195.0...v1.195.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **web:** make server bind address configurable via env var ([#589](https://github.com/shep-ai/shep/issues/589)) ([abfdd76](https://github.com/shep-ai/shep/commit/abfdd7639c09a46dcc75266182754851698b2038))
+* resolve github issues [#583](https://github.com/shep-ai/shep/issues/583), [#582](https://github.com/shep-ai/shep/issues/582), [#580](https://github.com/shep-ai/shep/issues/580) ([#585](https://github.com/shep-ai/shep/issues/585)) ([9e8fcfa](https://github.com/shep-ai/shep/commit/9e8fcfaf1c1d40e6084c4253a4793249e9798fd8)), closes [#584](https://github.com/shep-ai/shep/issues/584)
+
+# [1.195.0](https://github.com/shep-ai/shep/compare/v1.194.4...v1.195.0) (2026-04-29)
+
+
+### Features
+
+* **web:** always-on skills inventory adopt-branch rebase-sync github-import ([#588](https://github.com/shep-ai/shep/issues/588)) ([95d87c2](https://github.com/shep-ai/shep/commit/95d87c2be2f6df0b77dbc1587f965bd7ccc78065))
+
+## [1.194.4](https://github.com/shep-ai/shep/compare/v1.194.3...v1.194.4) (2026-04-28)
+
+
+### Bug Fixes
+
+* **web:** flip model picker dropdown upward when near bottom of viewport ([#586](https://github.com/shep-ai/shep/issues/586)) ([88b9b56](https://github.com/shep-ai/shep/commit/88b9b56022b6638279f6e074a4f9e513c2fbca33))
+
+## [1.194.3](https://github.com/shep-ai/shep/compare/v1.194.2...v1.194.3) (2026-04-28)
+
+
+### Bug Fixes
+
+* **agents:** kill claude subprocess if it hangs after result event ([#584](https://github.com/shep-ai/shep/issues/584)) ([4895503](https://github.com/shep-ai/shep/commit/4895503c9ce03200383b702ad8148a95092c0f67))
+
+## [1.194.2](https://github.com/shep-ai/shep/compare/v1.194.1...v1.194.2) (2026-04-28)
+
+
+### Bug Fixes
+
+* **core:** explicit subpath exports for cloud bundlers ([c2ef7a9](https://github.com/shep-ai/shep/commit/c2ef7a9e3d8bb8eef2bbdebf83669e36df41cbbe))
+
+## [1.194.1](https://github.com/shep-ai/shep/compare/v1.194.0...v1.194.1) (2026-04-28)
+
+
+### Performance Improvements
+
+* **domain:** web ui performance pass — kill n+1, tune sqlite, lazy-load heavy ui chunks ([#581](https://github.com/shep-ai/shep/issues/581)) ([f18d0cb](https://github.com/shep-ai/shep/commit/f18d0cb98f98512e338666a51f7b9e1a36fccde4))
+
 # [1.194.0](https://github.com/shep-ai/shep/compare/v1.193.0...v1.194.0) (2026-04-26)
 
 

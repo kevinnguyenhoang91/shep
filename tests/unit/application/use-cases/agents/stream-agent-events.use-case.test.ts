@@ -86,6 +86,7 @@ function createUseCase(args: {
     create: vi.fn(),
     findById: vi.fn().mockResolvedValue(args.run),
     findByThreadId: vi.fn(),
+    findByIds: vi.fn().mockResolvedValue(args.run ? [args.run] : []),
     updateStatus: vi.fn(),
     updatePinnedConfig: vi.fn(),
     findRunningByPid: vi.fn(),
@@ -98,6 +99,7 @@ function createUseCase(args: {
     update: vi.fn(),
     updateApprovalWait: vi.fn(),
     findByRunId: vi.fn().mockResolvedValue([]),
+    findByRunIds: vi.fn().mockResolvedValue([]),
     findByFeatureId: vi.fn().mockResolvedValue([]),
   };
 
@@ -233,6 +235,7 @@ describe('StreamAgentEventsUseCase', () => {
       create: vi.fn(),
       findById: vi.fn().mockResolvedValueOnce(runRunning).mockResolvedValue(runCompleted),
       findByThreadId: vi.fn(),
+      findByIds: vi.fn().mockResolvedValueOnce([runRunning]).mockResolvedValue([runCompleted]),
       updateStatus: vi.fn(),
       updatePinnedConfig: vi.fn(),
       findRunningByPid: vi.fn(),
@@ -245,6 +248,7 @@ describe('StreamAgentEventsUseCase', () => {
       update: vi.fn(),
       updateApprovalWait: vi.fn(),
       findByRunId: vi.fn().mockResolvedValue([]),
+      findByRunIds: vi.fn().mockResolvedValue([]),
       findByFeatureId: vi.fn().mockResolvedValue([]),
     };
 
@@ -346,6 +350,7 @@ describe('StreamAgentEventsUseCase', () => {
       create: vi.fn(),
       findById: vi.fn().mockResolvedValue(run),
       findByThreadId: vi.fn(),
+      findByIds: vi.fn().mockResolvedValue([run]),
       updateStatus: vi.fn(),
       updatePinnedConfig: vi.fn(),
       findRunningByPid: vi.fn(),
@@ -357,6 +362,7 @@ describe('StreamAgentEventsUseCase', () => {
       update: vi.fn(),
       updateApprovalWait: vi.fn(),
       findByRunId: vi.fn().mockResolvedValue([]),
+      findByRunIds: vi.fn().mockResolvedValue([]),
       findByFeatureId: vi.fn().mockResolvedValue([]),
     };
     const sessionRepo: IInteractiveSessionRepository = {

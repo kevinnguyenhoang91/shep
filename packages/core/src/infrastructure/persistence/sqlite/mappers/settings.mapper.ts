@@ -23,6 +23,7 @@ import {
   type EditorType,
   type Language,
   type TerminalType,
+  type DefaultHomePage,
 } from '../../../../domain/generated/output.js';
 
 /**
@@ -116,14 +117,9 @@ export interface SettingsRow {
   default_fast_mode: number;
 
   // FeatureFlags (featureFlags.*)
-  feature_flag_skills: number;
   feature_flag_env_deploy: number;
   feature_flag_debug: number;
-  feature_flag_github_import: number;
-  feature_flag_adopt_branch: number;
-  feature_flag_git_rebase_sync: number;
   feature_flag_react_file_manager: number;
-  feature_flag_inventory: number;
   feature_flag_projects: number;
   feature_flag_code_review: number;
   feature_flag_collaboration: number;
@@ -141,6 +137,9 @@ export interface SettingsRow {
   // Skill injection config (added in migration 051)
   skill_injection_enabled: number;
   skill_injection_skills: string | null;
+
+  // Default home page (added in migration 095)
+  default_home_page: string;
 }
 
 /**
@@ -242,14 +241,9 @@ export function toDatabase(settings: Settings): SettingsRow {
       : 0,
 
     // FeatureFlags (boolean → 0/1, defaults to 0 when featureFlags undefined)
-    feature_flag_skills: settings.featureFlags?.skills ? 1 : 0,
     feature_flag_env_deploy: settings.featureFlags?.envDeploy ? 1 : 0,
     feature_flag_debug: settings.featureFlags?.debug ? 1 : 0,
-    feature_flag_github_import: settings.featureFlags?.githubImport ? 1 : 0,
-    feature_flag_adopt_branch: settings.featureFlags?.adoptBranch ? 1 : 0,
-    feature_flag_git_rebase_sync: settings.featureFlags?.gitRebaseSync ? 1 : 0,
     feature_flag_react_file_manager: settings.featureFlags?.reactFileManager ? 1 : 0,
-    feature_flag_inventory: settings.featureFlags?.inventory ? 1 : 0,
     feature_flag_projects: settings.featureFlags?.projects ? 1 : 0,
     feature_flag_code_review: settings.featureFlags?.codeReview ? 1 : 0,
     feature_flag_collaboration: settings.featureFlags?.collaboration ? 1 : 0,
@@ -271,6 +265,9 @@ export function toDatabase(settings: Settings): SettingsRow {
     skill_injection_skills: settings.workflow.skillInjection?.skills?.length
       ? JSON.stringify(settings.workflow.skillInjection.skills)
       : null,
+
+    // Default home page (default: control-center)
+    default_home_page: settings.defaultHomePage ?? 'control-center',
   };
 }
 
@@ -429,14 +426,9 @@ export function fromDatabase(row: SettingsRow): Settings {
 
     // FeatureFlags (INTEGER 0/1 → boolean)
     featureFlags: {
-      skills: row.feature_flag_skills === 1,
       envDeploy: row.feature_flag_env_deploy === 1,
       debug: row.feature_flag_debug === 1,
-      githubImport: row.feature_flag_github_import === 1,
-      adoptBranch: row.feature_flag_adopt_branch === 1,
-      gitRebaseSync: row.feature_flag_git_rebase_sync === 1,
       reactFileManager: row.feature_flag_react_file_manager === 1,
-      inventory: row.feature_flag_inventory === 1,
       projects: row.feature_flag_projects === 1,
       codeReview: row.feature_flag_code_review === 1,
       collaboration: row.feature_flag_collaboration === 1,
@@ -453,6 +445,9 @@ export function fromDatabase(row: SettingsRow): Settings {
     fabLayout: {
       swapPosition: (row.fab_position_swapped ?? 0) !== 0,
     },
+
+    // Default home page
+    defaultHomePage: (row.default_home_page ?? 'control-center') as DefaultHomePage,
 
     // Onboarding (INTEGER → boolean)
     onboardingComplete: row.onboarding_complete === 1,

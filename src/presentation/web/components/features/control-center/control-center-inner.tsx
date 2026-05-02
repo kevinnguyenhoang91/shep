@@ -35,7 +35,6 @@ import {
   mapNodeStateToSidebarStatus,
 } from '@/hooks/sidebar-features-context';
 import { useTranslation } from 'react-i18next';
-import { useFeatureFlags } from '@/hooks/feature-flags-context';
 
 import { useSelectedFeatureId } from '@/hooks/use-selected-feature-id';
 import { useSelectedRepository } from '@/hooks/use-selected-repository';
@@ -44,6 +43,7 @@ import { useDrawerCloseGuard } from '@/hooks/drawer-close-guard';
 import { useViewportPersistence } from '@/hooks/use-viewport-persistence';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useFabLayout } from '@/hooks/fab-layout-context';
+import { useFeatureFlags } from '@/hooks/feature-flags-context';
 import { ControlCenterEmptyState } from './control-center-empty-state';
 import { ControlCenterOnboarding } from './control-center-onboarding';
 import { CollaborationOnboarding } from './collaboration-onboarding';
@@ -540,7 +540,6 @@ export function ControlCenterInner({ initialNodes, initialEdges }: ControlCenter
     handlePickFolder,
     onNewProject: () => setWorkspaceNewProjectOpen(true),
     onNewApplication: () => setShowCreatePrompt(true),
-    featureFlags,
   });
 
   const canvasToolbar = (

@@ -13,14 +13,9 @@ function isEnabled(envVar: string | undefined): boolean {
 }
 
 export interface FeatureFlagsState {
-  skills: boolean;
   envDeploy: boolean;
   debug: boolean;
-  githubImport: boolean;
-  adoptBranch: boolean;
-  gitRebaseSync: boolean;
   reactFileManager: boolean;
-  inventory: boolean;
   projects: boolean;
   codeReview: boolean;
   collaboration: boolean;
@@ -32,14 +27,9 @@ export function getFeatureFlags(): FeatureFlagsState {
       const flags = getSettings().featureFlags;
       if (flags) {
         return {
-          skills: flags.skills,
           envDeploy: flags.envDeploy,
           debug: flags.debug,
-          githubImport: flags.githubImport,
-          adoptBranch: flags.adoptBranch,
-          gitRebaseSync: flags.gitRebaseSync,
           reactFileManager: flags.reactFileManager,
-          inventory: flags.inventory,
           projects: flags.projects,
           codeReview: flags.codeReview,
           collaboration: flags.collaboration,
@@ -51,17 +41,12 @@ export function getFeatureFlags(): FeatureFlagsState {
   }
 
   return {
-    skills: isEnabled(process.env.NEXT_PUBLIC_FLAG_SKILLS),
     envDeploy:
       process.env.NEXT_PUBLIC_FLAG_ENV_DEPLOY !== undefined
         ? isEnabled(process.env.NEXT_PUBLIC_FLAG_ENV_DEPLOY)
         : true,
     debug: false,
-    githubImport: true,
-    adoptBranch: false,
-    gitRebaseSync: false,
     reactFileManager: isEnabled(process.env.NEXT_PUBLIC_FLAG_REACT_FILE_MANAGER),
-    inventory: false,
     projects: false,
     codeReview: false,
     collaboration: isEnabled(process.env.NEXT_PUBLIC_FLAG_COLLABORATION),
@@ -73,29 +58,14 @@ export function getFeatureFlags(): FeatureFlagsState {
  * Kept for backward compatibility during migration.
  */
 export const featureFlags = {
-  get skills() {
-    return getFeatureFlags().skills;
-  },
   get envDeploy() {
     return getFeatureFlags().envDeploy;
   },
   get debug() {
     return getFeatureFlags().debug;
   },
-  get githubImport() {
-    return getFeatureFlags().githubImport;
-  },
-  get adoptBranch() {
-    return getFeatureFlags().adoptBranch;
-  },
-  get gitRebaseSync() {
-    return getFeatureFlags().gitRebaseSync;
-  },
   get reactFileManager() {
     return getFeatureFlags().reactFileManager;
-  },
-  get inventory() {
-    return getFeatureFlags().inventory;
   },
   get projects() {
     return getFeatureFlags().projects;

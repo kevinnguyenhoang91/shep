@@ -63,20 +63,15 @@ describe('updateSettings', () => {
     // Arrange
     const initial = createDefaultSettings();
     initializeSettings(initial);
-    expect(getSettings().featureFlags?.skills).toBe(false);
+    expect(getSettings().featureFlags?.debug).toBe(false);
 
     // Act
     const updated = {
       ...initial,
       featureFlags: {
-        skills: true,
         envDeploy: false,
         debug: true,
-        githubImport: false,
-        adoptBranch: false,
-        gitRebaseSync: false,
         reactFileManager: false,
-        inventory: false,
         projects: false,
         codeReview: false,
         collaboration: false,
@@ -85,7 +80,6 @@ describe('updateSettings', () => {
     updateSettings(updated);
 
     // Assert
-    expect(getSettings().featureFlags?.skills).toBe(true);
     expect(getSettings().featureFlags?.debug).toBe(true);
   });
 });

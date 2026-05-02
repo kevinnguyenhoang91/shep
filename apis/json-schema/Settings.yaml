@@ -39,6 +39,9 @@ properties:
   supervisor:
     $ref: SupervisorConfig.yaml
     description: Supervisor agent default configuration (optional, defaults applied at runtime)
+  defaultHomePage:
+    $ref: DefaultHomePage.yaml
+    description: "Default landing page when opening the web UI (default: control-center)"
 required:
   - models
   - user

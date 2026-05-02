@@ -151,47 +151,48 @@ export class ClaudeCodeInteractiveExecutor implements IInteractiveAgentExecutor 
     // Strip CLAUDECODE env var to prevent nested-session detection errors.
     const { CLAUDECODE: _, ...cleanEnv } = process.env;
 
-    // Build the canUseTool callback that intercepts AskUserQuestion.
-    // When the agent calls AskUserQuestion, this callback:
-    // 1. Routes through the unified agent-question pipeline when the
-    //    collaboration feature flag is on (spec 093, task 19).
-    // 2. Otherwise delegates to onUserQuestion (legacy direct-prompt path).
-    // 3. Returns { behavior: 'allow', updatedInput } with the user's
-    //    answers injected so the SDK treats AskUserQuestion as answered.
+    // Build the canUseTool callback. This callback acts as both:
+    //   1. The interception point for AskUserQuestion — routes through the
+    //      unified agent-question pipeline (spec 093) when enabled, or
+    //      delegates to onUserQuestion (legacy direct-prompt path).
+    //   2. The fallback approver for any tool NOT in `allowedTools` — most
+    //      importantly, MCP tools (named `mcp__<server>__<tool>`).
     //
-    // For ALL other tools: auto-allow (same effect as bypassPermissions).
-    const hasInterception = Boolean(options.onUserQuestion ?? options.agentQuestionBridge);
-    const canUseTool = hasInterception
-      ? async (toolName: string, input: Record<string, unknown>, opts: { toolUseID: string }) => {
-          if (toolName === 'AskUserQuestion') {
-            const questions = (input.questions as UserQuestion[]) ?? [];
-            let answers: Record<string, string> | null = null;
-            if (options.agentQuestionBridge) {
-              answers = await options.agentQuestionBridge.ask({
-                toolCallId: opts.toolUseID,
-                questions,
-              });
-            }
-            if (answers === null) {
-              if (options.onUserQuestion) {
-                answers = await options.onUserQuestion({
-                  toolCallId: opts.toolUseID,
-                  questions,
-                });
-              } else {
-                // No legacy fallback — auto-allow with no synthesized answers.
-                return { behavior: 'allow' as const };
-              }
-            }
-            return {
-              behavior: 'allow' as const,
-              updatedInput: { ...input, answers },
-            };
-          }
-          // Auto-allow all other tools
-          return { behavior: 'allow' as const };
+    // Issue #582: Always installing canUseTool ensures unknown / dynamic MCP
+    // tools fall through to "allow" instead of being rejected by the SDK's
+    // default permission gate.
+    const canUseTool = async (
+      toolName: string,
+      input: Record<string, unknown>,
+      opts: { toolUseID: string }
+    ) => {
+      if (toolName === 'AskUserQuestion') {
+        const questions = (input.questions as UserQuestion[]) ?? [];
+        let answers: Record<string, string> | null = null;
+        if (options.agentQuestionBridge) {
+          answers = await options.agentQuestionBridge.ask({
+            toolCallId: opts.toolUseID,
+            questions,
+          });
         }
-      : undefined;
+        if (answers === null) {
+          if (options.onUserQuestion) {
+            answers = await options.onUserQuestion({
+              toolCallId: opts.toolUseID,
+              questions,
+            });
+          } else {
+            return { behavior: 'allow' as const };
+          }
+        }
+        return {
+          behavior: 'allow' as const,
+          updatedInput: { ...input, answers },
+        };
+      }
+      // Auto-allow all other tools (including dynamically-discovered MCP tools)
+      return { behavior: 'allow' as const };
+    };
 
     // NOTE: The V2 Agent SDK `SDKSessionOptions` type does NOT include
     // a `systemPrompt` field — anything we pass there is silently
@@ -214,9 +215,10 @@ export class ClaudeCodeInteractiveExecutor implements IInteractiveAgentExecutor 
       // bypassPermissions approach — V2 hardcodes allowDangerouslySkipPermissions
       // to false, so bypassPermissions silently falls back to default mode.
       allowedTools: AUTO_ALLOWED_TOOLS,
-      // When onUserQuestion is provided, use canUseTool to intercept
-      // AskUserQuestion while auto-allowing any unlisted tools as a fallback.
-      ...(canUseTool ? { canUseTool } : {}),
+      // canUseTool is ALWAYS installed (issue #582) so MCP tools and any
+      // other tool not in AUTO_ALLOWED_TOOLS fall through to "allow" rather
+      // than being rejected by the SDK's default permission gate.
+      canUseTool,
       env: cleanEnv,
     };
   }
