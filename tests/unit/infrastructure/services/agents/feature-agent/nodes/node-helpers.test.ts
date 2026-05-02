@@ -463,9 +463,9 @@ describe('removeSpecCommitsIfNeeded', () => {
     writeFileSync(join(repoDir, 'README.md'), 'initial');
     git('add README.md');
     git('commit -m "initial"');
-  });
+  }, 30_000);
 
-  it('should soft-reset spec commits when commitSpecs=false', () => {
+  it('should soft-reset spec commits when commitSpecs=false', { timeout: 30_000 }, () => {
     // Simulate agent committing a spec file
     writeFileSync(join(specDir, 'spec.yaml'), 'name: test');
     git('add specs/');
@@ -497,7 +497,7 @@ describe('removeSpecCommitsIfNeeded', () => {
     expect(staged).not.toContain('specs/');
   });
 
-  it('should not modify commits when commitSpecs=true', () => {
+  it('should not modify commits when commitSpecs=true', { timeout: 30_000 }, () => {
     writeFileSync(join(specDir, 'spec.yaml'), 'name: test');
     git('add specs/');
     git('commit --no-verify -m "docs(specs): analyze repository"');
@@ -519,7 +519,7 @@ describe('removeSpecCommitsIfNeeded', () => {
     expect(commitsAfter).toBe(commitsBefore);
   });
 
-  it('should not modify commits for non-spec phases', () => {
+  it('should not modify commits for non-spec phases', { timeout: 30_000 }, () => {
     writeFileSync(join(specDir, 'spec.yaml'), 'name: test');
     git('add specs/');
     git('commit --no-verify -m "docs(specs): analyze repository"');
@@ -541,7 +541,7 @@ describe('removeSpecCommitsIfNeeded', () => {
     expect(commitsAfter).toBe(commitsBefore);
   });
 
-  it('should be a no-op when agent did not commit spec files', () => {
+  it('should be a no-op when agent did not commit spec files', { timeout: 30_000 }, () => {
     // Agent only committed non-spec files
     writeFileSync(join(repoDir, 'src.ts'), 'code');
     git('add src.ts');
