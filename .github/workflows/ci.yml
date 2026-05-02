@@ -199,6 +199,7 @@ jobs:
 
       - name: Upload Electron artifact
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_pattern }}
@@ -252,6 +253,7 @@ jobs:
 
       - name: Upload Apps-Only Electron artifact
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_pattern }}
