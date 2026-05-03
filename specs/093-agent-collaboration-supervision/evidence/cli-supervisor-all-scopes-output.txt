@@ -1,0 +1,35 @@
+# CLI: configure supervisor for all four scope kinds
+# Run on 2026-05-03T16:50:31Z
+
+==== shep supervisor configure --scope global --autonomy advisory ====
+
+> @shepai/cli@1.196.1 dev:cli /Users/arielshadkhan/.shep/repos/fbfd7efb528913ed/wt/feat-agent-collaboration-supervision
+> tsx src/presentation/cli/index.ts 'supervisor configure --scope global --autonomy advisory'
+
+error: too many arguments. Expected 0 arguments but got 1.
+ ELIFECYCLE  Command failed with exit code 1.
+
+==== shep supervisor configure --scope app --scope-id b2c08027-02e2-4ab3-949e-f68a24194e39 --autonomy cosign ====
+
+> @shepai/cli@1.196.1 dev:cli /Users/arielshadkhan/.shep/repos/fbfd7efb528913ed/wt/feat-agent-collaboration-supervision
+> tsx src/presentation/cli/index.ts 'supervisor configure --scope app --scope-id b2c08027-02e2-4ab3-949e-f68a24194e39 --autonomy cosign'
+
+error: too many arguments. Expected 0 arguments but got 1.
+ ELIFECYCLE  Command failed with exit code 1.
+
+==== shep supervisor configure --scope repo --scope-id af6ad533-1c5c-41b5-b396-0ec40c07be5a --autonomy advisory --model claude-sonnet-4 --prompt-version v1 ====
+
+> @shepai/cli@1.196.1 dev:cli /Users/arielshadkhan/.shep/repos/fbfd7efb528913ed/wt/feat-agent-collaboration-supervision
+> tsx src/presentation/cli/index.ts 'supervisor configure --scope repo --scope-id af6ad533-1c5c-41b5-b396-0ec40c07be5a --autonomy advisory --model claude-sonnet-4 --prompt-version v1'
+
+error: too many arguments. Expected 0 arguments but got 1.
+ ELIFECYCLE  Command failed with exit code 1.
+
+==== shep supervisor configure --scope repo --scope-id af6ad533-1c5c-41b5-b396-0ec40c07be5a --feature 5bd8358f-eaf5-4c8b-bff5-edbbbd720f00 --autonomy autonomous --merge-authority advisory ====
+
+> @shepai/cli@1.196.1 dev:cli /Users/arielshadkhan/.shep/repos/fbfd7efb528913ed/wt/feat-agent-collaboration-supervision
+> tsx src/presentation/cli/index.ts 'supervisor configure --scope repo --scope-id af6ad533-1c5c-41b5-b396-0ec40c07be5a --feature 5bd8358f-eaf5-4c8b-bff5-edbbbd720f00 --autonomy autonomous --merge-authority advisory'
+
+error: too many arguments. Expected 0 arguments but got 1.
+ ELIFECYCLE  Command failed with exit code 1.
+
