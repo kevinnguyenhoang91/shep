@@ -17,6 +17,8 @@ import {
   TableProperties,
   FolderKanban,
   MessageCircleQuestion,
+  ShieldCheck,
+  Bot,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -211,13 +213,27 @@ export function AppSidebar({
             active={pathname === '/skills'}
           />
           {featureFlags.collaboration ? (
-            <SidebarNavItem
-              icon={MessageCircleQuestion}
-              label={t('navigation.agentQuestions')}
-              href="/agent-questions"
-              active={pathname === '/agent-questions'}
-              badge={pendingQuestionCount}
-            />
+            <>
+              <SidebarNavItem
+                icon={MessageCircleQuestion}
+                label={t('navigation.agentQuestions')}
+                href="/agent-questions"
+                active={pathname === '/agent-questions'}
+                badge={pendingQuestionCount}
+              />
+              <SidebarNavItem
+                icon={ShieldCheck}
+                label="Supervisor"
+                href="/supervisor"
+                active={pathname?.startsWith('/supervisor') ?? false}
+              />
+              <SidebarNavItem
+                icon={Bot}
+                label="Agents"
+                href="/agents"
+                active={pathname?.startsWith('/agents') ?? false}
+              />
+            </>
           ) : null}
           <SidebarNavItem
             icon={Settings}
