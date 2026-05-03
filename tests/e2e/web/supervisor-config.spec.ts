@@ -24,12 +24,15 @@ import { openShepDb } from './helpers/collaboration-flag';
 const TEST_APP_ID = `e2e-app-supervisor-${randomUUID().slice(0, 8)}`;
 
 function clearPolicy(db: Database.Database, appId: string): void {
-  db.prepare('DELETE FROM supervisor_policies WHERE app_id = ?').run(appId);
+  db.prepare("DELETE FROM supervisor_policies WHERE scope_type = 'app' AND scope_id = ?").run(
+    appId
+  );
 }
 
 interface PolicyRow {
   id: string;
-  app_id: string;
+  scope_type: string;
+  scope_id: string | null;
   feature_id: string | null;
   enabled: number;
   autonomy_level: string;
@@ -41,7 +44,7 @@ interface PolicyRow {
 function readPolicy(db: Database.Database, appId: string): PolicyRow | undefined {
   return db
     .prepare(
-      'SELECT id, app_id, feature_id, enabled, autonomy_level, model_id, prompt_version, gate_authority_json FROM supervisor_policies WHERE app_id = ? AND feature_id IS NULL'
+      "SELECT id, scope_type, scope_id, feature_id, enabled, autonomy_level, model_id, prompt_version, gate_authority_json FROM supervisor_policies WHERE scope_type = 'app' AND scope_id = ? AND feature_id IS NULL"
     )
     .get(appId) as PolicyRow | undefined;
 }
