@@ -5,6 +5,7 @@ import type { IAgentPromptOverrideRepository } from '@shepai/core/application/po
 import { getFeatureFlags } from '@/lib/feature-flags';
 import { AgentList, type AgentListEntry } from '@/components/agent-editor/agent-list';
 import { CreateAgentDialog } from '@/components/agent-editor/create-agent-dialog';
+import { WelcomeBanner } from '@/components/onboarding/welcome-banner';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,13 @@ export default async function AgentsRoute() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
+      <WelcomeBanner
+        id="agents:v1"
+        title="Edit prompts, design graphs, or stand up a brand new agent."
+        description="Each agent has Prompts, Graph, and Playground tabs. Custom agents share the same surfaces — pick New agent to create one."
+        ctaLabel="Open the tutorial"
+        ctaHref="/onboarding#agents"
+      />
       <header className="flex items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold">Agents</h1>

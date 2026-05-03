@@ -920,7 +920,8 @@ describe('SQLite Migrations', () => {
       await runSQLiteMigrations(db);
       const applied = getAppliedMigrations(db);
       expect(applied[0]).toMatch(/^001-/);
-      expect(applied[applied.length - 1]).toMatch(/^0\d{2}-/);
+      // Names use a 3-digit ordinal (001..099 zero-padded, 100+ unpadded).
+      expect(applied[applied.length - 1]).toMatch(/^\d{3}-/);
     });
 
     it('should bootstrap seeder for database at user_version 20', async () => {

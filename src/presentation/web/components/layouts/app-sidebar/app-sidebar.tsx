@@ -19,6 +19,7 @@ import {
   MessageCircleQuestion,
   ShieldCheck,
   Bot,
+  GraduationCap,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -232,6 +233,12 @@ export function AppSidebar({
                 label="Agents"
                 href="/agents"
                 active={pathname?.startsWith('/agents') ?? false}
+              />
+              <SidebarNavItem
+                icon={GraduationCap}
+                label="Get started"
+                href="/onboarding"
+                active={pathname?.startsWith('/onboarding') ?? false}
               />
             </>
           ) : null}

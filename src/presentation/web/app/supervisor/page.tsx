@@ -13,6 +13,7 @@ import {
   type ScopeNameLookup,
 } from '@/components/supervisor/supervisor-dashboard';
 import { CreateSupervisorDialog } from '@/components/supervisor/create-supervisor-dialog';
+import { WelcomeBanner } from '@/components/onboarding/welcome-banner';
 
 /** Skip static pre-rendering — runtime DI container required. */
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,13 @@ export default async function SupervisorRoute() {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-6">
+      <WelcomeBanner
+        id="supervisor:v1"
+        title="New here? Read the 2-minute supervisor walkthrough."
+        description="Supervisors watch agents and decide what to approve, advise, escalate, or reject. Policies cascade from feature to repo to application to global."
+        ctaLabel="Open the tutorial"
+        ctaHref="/onboarding#supervisors"
+      />
       <div className="flex items-center justify-end">
         <CreateSupervisorDialog
           applications={scopeOptions.applications}
