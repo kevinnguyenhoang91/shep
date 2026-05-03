@@ -13,6 +13,7 @@ import { GetAgentGraphUseCase } from '@/application/use-cases/agents/get-agent-g
 import { UpsertAgentGraphOverrideUseCase } from '@/application/use-cases/agents/upsert-agent-graph-override.use-case.js';
 import { DeleteAgentGraphOverrideUseCase } from '@/application/use-cases/agents/delete-agent-graph-override.use-case.js';
 import { InMemoryAgentGraphOverrideRepository } from '@/infrastructure/adapters/in-memory/in-memory-agent-graph-override.repository.js';
+import { InMemoryCustomAgentRepository } from '@/infrastructure/adapters/in-memory/in-memory-custom-agent.repository.js';
 
 describe('Agent graph override use cases', () => {
   let repo: InMemoryAgentGraphOverrideRepository;
@@ -22,8 +23,9 @@ describe('Agent graph override use cases', () => {
 
   beforeEach(() => {
     repo = new InMemoryAgentGraphOverrideRepository();
-    get = new GetAgentGraphUseCase(repo);
-    upsert = new UpsertAgentGraphOverrideUseCase(repo);
+    const customAgentRepo = new InMemoryCustomAgentRepository();
+    get = new GetAgentGraphUseCase(repo, customAgentRepo);
+    upsert = new UpsertAgentGraphOverrideUseCase(repo, customAgentRepo);
     remove = new DeleteAgentGraphOverrideUseCase(repo);
   });
 

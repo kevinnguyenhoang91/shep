@@ -14,6 +14,7 @@ import { inject, injectable } from 'tsyringe';
 import { randomUUID } from 'node:crypto';
 
 import type { IAgentGraphOverrideRepository } from '../../ports/output/repositories/agent-graph-override-repository.interface.js';
+import type { ICustomAgentRepository } from '../../ports/output/repositories/custom-agent-repository.interface.js';
 import type { AgentGraphOverride } from '../../../domain/generated/output.js';
 import {
   isKnownGraphAgent,
@@ -33,16 +34,23 @@ export interface UpsertAgentGraphOverrideInput {
 export class UpsertAgentGraphOverrideUseCase {
   constructor(
     @inject('IAgentGraphOverrideRepository')
-    private readonly overrides: IAgentGraphOverrideRepository
+    private readonly overrides: IAgentGraphOverrideRepository,
+    @inject('ICustomAgentRepository')
+    private readonly customAgents: ICustomAgentRepository
   ) {}
 
   async execute(input: UpsertAgentGraphOverrideInput): Promise<AgentGraphOverride> {
     if (!input.agentType.trim()) throw new Error('agentType is required');
     if (!isKnownGraphAgent(input.agentType)) {
-      throw new Error(
-        `Unknown graph agent: ${input.agentType}. ` +
-          'Only agents registered in the built-in graph registry can be overridden.'
-      );
+      // Custom agents can carry their own graph descriptors too.
+      const custom = await this.customAgents.findByType(input.agentType);
+      if (!custom) {
+        throw new Error(
+          `Unknown graph agent: ${input.agentType}. ` +
+            'Only agents registered in the built-in graph registry or owned by a custom agent ' +
+            'can have a graph override.'
+        );
+      }
     }
     if (!Array.isArray(input.nodes) || input.nodes.length === 0) {
       throw new Error('nodes must be a non-empty array');

@@ -12,6 +12,7 @@ import {
   SupervisorDashboard,
   type ScopeNameLookup,
 } from '@/components/supervisor/supervisor-dashboard';
+import { CreateSupervisorDialog } from '@/components/supervisor/create-supervisor-dialog';
 
 /** Skip static pre-rendering — runtime DI container required. */
 export const dynamic = 'force-dynamic';
@@ -35,12 +36,81 @@ export default async function SupervisorRoute() {
   const recentDecisions = recentDecisionsRaw.map(toStreamShape);
 
   const names = await resolveScopeNames(policies);
+  const scopeOptions = await loadScopeOptions();
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col p-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-6">
+      <div className="flex items-center justify-end">
+        <CreateSupervisorDialog
+          applications={scopeOptions.applications}
+          repositories={scopeOptions.repositories}
+          features={scopeOptions.features}
+        />
+      </div>
       <SupervisorDashboard policies={policies} recentDecisions={recentDecisions} names={names} />
     </div>
   );
+}
+
+interface ScopeOptionsLoaded {
+  applications: { id: string; name: string }[];
+  repositories: { id: string; name: string }[];
+  features: { id: string; name: string; applicationId?: string; repositoryId?: string }[];
+}
+
+async function loadScopeOptions(): Promise<ScopeOptionsLoaded> {
+  const apps = await safeListApplications();
+  const repos = await safeListRepositories();
+  const features = await safeListFeatures();
+  return {
+    applications: apps.map((a) => ({ id: a.id, name: a.name })),
+    repositories: repos.map((r) => ({ id: r.id, name: r.name })),
+    features: features.map((f) => ({
+      id: f.id,
+      name: f.name,
+      ...(f.applicationId !== undefined && { applicationId: f.applicationId }),
+      ...(f.repositoryId !== undefined && { repositoryId: f.repositoryId }),
+    })),
+  };
+}
+
+async function safeListApplications(): Promise<{ id: string; name: string }[]> {
+  try {
+    const repo = resolve<IApplicationRepository>('IApplicationRepository');
+    return (await repo.list()).map((a) => ({ id: a.id, name: a.name }));
+  } catch {
+    return [];
+  }
+}
+
+async function safeListRepositories(): Promise<{ id: string; name: string }[]> {
+  try {
+    const repo = resolve<IRepositoryRepository>('IRepositoryRepository');
+    return (await repo.list()).map((r) => ({ id: r.id, name: r.name }));
+  } catch {
+    return [];
+  }
+}
+
+async function safeListFeatures(): Promise<
+  { id: string; name: string; applicationId?: string; repositoryId?: string }[]
+> {
+  try {
+    const repo = resolve<IFeatureRepository>('IFeatureRepository');
+    const all = await repo.list();
+    return all.map((f) => ({
+      id: f.id,
+      name: f.name,
+      ...(f.applicationId !== undefined && f.applicationId !== null
+        ? { applicationId: f.applicationId }
+        : {}),
+      ...(f.repositoryId !== undefined && f.repositoryId !== null
+        ? { repositoryId: f.repositoryId }
+        : {}),
+    }));
+  } catch {
+    return [];
+  }
 }
 
 function toStreamShape(decision: SupervisorDecision): SupervisorDecisionStreamEvent {

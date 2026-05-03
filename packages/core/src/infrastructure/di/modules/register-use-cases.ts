@@ -98,6 +98,9 @@ import { RunAgentPromptPlaygroundUseCase } from '../../../application/use-cases/
 import { GetAgentGraphUseCase } from '../../../application/use-cases/agents/get-agent-graph.use-case.js';
 import { UpsertAgentGraphOverrideUseCase } from '../../../application/use-cases/agents/upsert-agent-graph-override.use-case.js';
 import { DeleteAgentGraphOverrideUseCase } from '../../../application/use-cases/agents/delete-agent-graph-override.use-case.js';
+import { CreateCustomAgentUseCase } from '../../../application/use-cases/agents/create-custom-agent.use-case.js';
+import { ListCustomAgentsUseCase } from '../../../application/use-cases/agents/list-custom-agents.use-case.js';
+import { DeleteCustomAgentUseCase } from '../../../application/use-cases/agents/delete-custom-agent.use-case.js';
 import { EvaluateSupervisorDecisionUseCase } from '../../../application/use-cases/agents/evaluate-supervisor-decision.use-case.js';
 import { AgentQuestionSupervisorRouter } from '../../../application/use-cases/agents/agent-question-supervisor-router.js';
 import { EscalateToUserUseCase } from '../../../application/use-cases/agents/escalate-to-user.use-case.js';
@@ -212,6 +215,9 @@ export function registerUseCases(container: DependencyContainer): void {
   container.registerSingleton(GetAgentGraphUseCase);
   container.registerSingleton(UpsertAgentGraphOverrideUseCase);
   container.registerSingleton(DeleteAgentGraphOverrideUseCase);
+  container.registerSingleton(CreateCustomAgentUseCase);
+  container.registerSingleton(ListCustomAgentsUseCase);
+  container.registerSingleton(DeleteCustomAgentUseCase);
   container.registerSingleton(EvaluateSupervisorDecisionUseCase);
   container.registerSingleton(AgentQuestionSupervisorRouter);
   container.registerSingleton(EscalateToUserUseCase);
@@ -459,5 +465,14 @@ export function registerUseCases(container: DependencyContainer): void {
   });
   container.register('DeleteAgentGraphOverrideUseCase', {
     useFactory: (c) => c.resolve(DeleteAgentGraphOverrideUseCase),
+  });
+  container.register('CreateCustomAgentUseCase', {
+    useFactory: (c) => c.resolve(CreateCustomAgentUseCase),
+  });
+  container.register('ListCustomAgentsUseCase', {
+    useFactory: (c) => c.resolve(ListCustomAgentsUseCase),
+  });
+  container.register('DeleteCustomAgentUseCase', {
+    useFactory: (c) => c.resolve(DeleteCustomAgentUseCase),
   });
 }

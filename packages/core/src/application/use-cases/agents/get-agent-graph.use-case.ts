@@ -10,6 +10,7 @@
 import { inject, injectable } from 'tsyringe';
 
 import type { IAgentGraphOverrideRepository } from '../../ports/output/repositories/agent-graph-override-repository.interface.js';
+import type { ICustomAgentRepository } from '../../ports/output/repositories/custom-agent-repository.interface.js';
 import {
   getBuiltinGraph,
   type BuiltinGraphDescriptor,
@@ -35,32 +36,65 @@ export interface GetAgentGraphInput {
 export class GetAgentGraphUseCase {
   constructor(
     @inject('IAgentGraphOverrideRepository')
-    private readonly overrides: IAgentGraphOverrideRepository
+    private readonly overrides: IAgentGraphOverrideRepository,
+    @inject('ICustomAgentRepository')
+    private readonly customAgents: ICustomAgentRepository
   ) {}
 
   async execute(input: GetAgentGraphInput): Promise<AgentGraphResult | null> {
     const bundled = getBuiltinGraph(input.agentType);
-    if (!bundled) return null;
 
-    const override = await this.overrides.findActive(input.agentType);
-    if (!override) {
+    // Built-in: bundled descriptor exists; honour its shape.
+    if (bundled) {
+      const override = await this.overrides.findActive(input.agentType);
+      if (!override) {
+        return {
+          agentType: input.agentType,
+          nodes: bundled.nodes,
+          edges: bundled.edges,
+          hasOverride: false,
+          bundled,
+        };
+      }
+      const nodes = parseJsonArray<BuiltinGraphNode>(override.nodesJson, bundled.nodes);
+      const edges = parseJsonArray<BuiltinGraphEdge>(override.edgesJson, bundled.edges);
       return {
         agentType: input.agentType,
-        nodes: bundled.nodes,
-        edges: bundled.edges,
-        hasOverride: false,
+        nodes,
+        edges,
+        hasOverride: true,
         bundled,
       };
     }
 
-    const nodes = parseJsonArray<BuiltinGraphNode>(override.nodesJson, bundled.nodes);
-    const edges = parseJsonArray<BuiltinGraphEdge>(override.edgesJson, bundled.edges);
+    // Custom agent: bundled is an empty descriptor — the user authors
+    // every node and edge themselves.
+    const custom = await this.customAgents.findByType(input.agentType);
+    if (!custom) return null;
+
+    const emptyBundled: BuiltinGraphDescriptor = {
+      agentType: input.agentType,
+      nodes: [{ id: 'start', label: 'Start', description: 'edit me' }],
+      edges: [],
+    };
+    const override = await this.overrides.findActive(input.agentType);
+    if (!override) {
+      return {
+        agentType: input.agentType,
+        nodes: emptyBundled.nodes,
+        edges: emptyBundled.edges,
+        hasOverride: false,
+        bundled: emptyBundled,
+      };
+    }
+    const nodes = parseJsonArray<BuiltinGraphNode>(override.nodesJson, emptyBundled.nodes);
+    const edges = parseJsonArray<BuiltinGraphEdge>(override.edgesJson, emptyBundled.edges);
     return {
       agentType: input.agentType,
       nodes,
       edges,
       hasOverride: true,
-      bundled,
+      bundled: emptyBundled,
     };
   }
 }

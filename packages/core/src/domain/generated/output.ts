@@ -3981,6 +3981,28 @@ export type AgentGraphOverride = BaseEntity & {
 };
 
 /**
+ * User-created agent type, editable in the agent editor
+ */
+export type CustomAgent = BaseEntity & {
+  /**
+   * Stable agent type identifier (kebab-case, unique)
+   */
+  agentType: string;
+  /**
+   * Human-readable display name
+   */
+  name: string;
+  /**
+   * Short description of what this agent does
+   */
+  description: string;
+  /**
+   * Author of the agent
+   */
+  createdBy: string;
+};
+
+/**
  * A selectable option within a PRD questionnaire question
  */
 export type PrdOption = {

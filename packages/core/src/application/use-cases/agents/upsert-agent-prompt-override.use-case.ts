@@ -10,6 +10,7 @@ import { inject, injectable } from 'tsyringe';
 import { randomUUID } from 'node:crypto';
 
 import type { IAgentPromptOverrideRepository } from '../../ports/output/repositories/agent-prompt-override-repository.interface.js';
+import type { ICustomAgentRepository } from '../../ports/output/repositories/custom-agent-repository.interface.js';
 import type { AgentPromptOverride } from '../../../domain/generated/output.js';
 import { isKnownPromptSlot } from '../../services/builtin-prompt-registry.js';
 
@@ -25,7 +26,9 @@ export interface UpsertAgentPromptOverrideInput {
 export class UpsertAgentPromptOverrideUseCase {
   constructor(
     @inject('IAgentPromptOverrideRepository')
-    private readonly overrides: IAgentPromptOverrideRepository
+    private readonly overrides: IAgentPromptOverrideRepository,
+    @inject('ICustomAgentRepository')
+    private readonly customAgents: ICustomAgentRepository
   ) {}
 
   async execute(input: UpsertAgentPromptOverrideInput): Promise<AgentPromptOverride> {
@@ -35,10 +38,15 @@ export class UpsertAgentPromptOverrideUseCase {
       throw new Error('body must be a non-empty string');
     }
     if (!isKnownPromptSlot(input.agentType, input.promptId)) {
-      throw new Error(
-        `Unknown prompt slot: ${input.agentType}/${input.promptId}. ` +
-          'Only slots registered in the built-in prompt registry can be overridden.'
-      );
+      // Custom agents accept any slot the user invents.
+      const custom = await this.customAgents.findByType(input.agentType);
+      if (!custom) {
+        throw new Error(
+          `Unknown prompt slot: ${input.agentType}/${input.promptId}. ` +
+            'Only slots registered in the built-in prompt registry or owned by a custom agent ' +
+            'can be overridden.'
+        );
+      }
     }
 
     const existing = await this.overrides.findActive(input.agentType, input.promptId);

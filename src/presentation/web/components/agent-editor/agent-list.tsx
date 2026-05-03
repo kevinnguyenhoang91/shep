@@ -2,12 +2,17 @@
 
 import Link from 'next/link';
 import type { Route } from 'next';
-import { Bot, ArrowRight } from 'lucide-react';
+import { Bot, ArrowRight, Sparkles } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 export interface AgentListEntry {
   agentType: string;
   promptCount: number;
   overrideCount: number;
+  /** True when the entry was created by the user (custom_agents table). */
+  isCustom?: boolean;
+  /** Friendly display name (custom agents only — built-ins use agentType). */
+  displayName?: string;
 }
 
 export interface AgentListProps {
@@ -39,11 +44,24 @@ export function AgentList({ agents }: AgentListProps) {
           data-testid={`agent-row-${agent.agentType}`}
         >
           <div className="bg-primary/10 text-primary flex h-8 w-8 items-center justify-center rounded-md">
-            <Bot className="size-4" aria-hidden />
+            {agent.isCustom ? (
+              <Sparkles className="size-4" aria-hidden />
+            ) : (
+              <Bot className="size-4" aria-hidden />
+            )}
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
-            <p className="truncate text-sm font-medium">{agent.agentType}</p>
+            <div className="flex items-center gap-2">
+              <p className="truncate text-sm font-medium">{agent.displayName ?? agent.agentType}</p>
+              {agent.isCustom ? (
+                <Badge variant="secondary" className="shrink-0">
+                  Custom
+                </Badge>
+              ) : null}
+            </div>
             <p className="text-muted-foreground text-xs">
+              {agent.isCustom ? agent.agentType : null}
+              {agent.isCustom ? ' · ' : ''}
               {agent.promptCount} prompt{agent.promptCount === 1 ? '' : 's'}
               {agent.overrideCount > 0
                 ? ` · ${agent.overrideCount} override${agent.overrideCount === 1 ? '' : 's'}`

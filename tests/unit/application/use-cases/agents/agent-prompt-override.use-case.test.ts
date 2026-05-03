@@ -12,6 +12,7 @@ import { ListAgentPromptsUseCase } from '@/application/use-cases/agents/list-age
 import { UpsertAgentPromptOverrideUseCase } from '@/application/use-cases/agents/upsert-agent-prompt-override.use-case.js';
 import { DeleteAgentPromptOverrideUseCase } from '@/application/use-cases/agents/delete-agent-prompt-override.use-case.js';
 import { InMemoryAgentPromptOverrideRepository } from '@/infrastructure/adapters/in-memory/in-memory-agent-prompt-override.repository.js';
+import { InMemoryCustomAgentRepository } from '@/infrastructure/adapters/in-memory/in-memory-custom-agent.repository.js';
 
 describe('Agent prompt override use cases', () => {
   let repo: InMemoryAgentPromptOverrideRepository;
@@ -21,8 +22,9 @@ describe('Agent prompt override use cases', () => {
 
   beforeEach(() => {
     repo = new InMemoryAgentPromptOverrideRepository();
-    listPrompts = new ListAgentPromptsUseCase(repo);
-    upsert = new UpsertAgentPromptOverrideUseCase(repo);
+    const customAgentRepo = new InMemoryCustomAgentRepository();
+    listPrompts = new ListAgentPromptsUseCase(repo, customAgentRepo);
+    upsert = new UpsertAgentPromptOverrideUseCase(repo, customAgentRepo);
     remove = new DeleteAgentPromptOverrideUseCase(repo);
   });
 

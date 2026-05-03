@@ -100,3 +100,4 @@ import "./supervisor-policy.tsp";
 import "./supervisor-decision.tsp";
 import "./agent-prompt-override.tsp";
 import "./agent-graph-override.tsp";
+import "./custom-agent.tsp";

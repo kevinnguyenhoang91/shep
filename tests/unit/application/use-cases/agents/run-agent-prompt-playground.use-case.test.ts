@@ -13,6 +13,7 @@ import { RunAgentPromptPlaygroundUseCase } from '@/application/use-cases/agents/
 import { InMemoryAgentPromptOverrideRepository } from '@/infrastructure/adapters/in-memory/in-memory-agent-prompt-override.repository.js';
 import { SQLiteAgentPromptResolver } from '@/infrastructure/services/agents/prompt-resolver/sqlite-agent-prompt-resolver.service.js';
 import { UpsertAgentPromptOverrideUseCase } from '@/application/use-cases/agents/upsert-agent-prompt-override.use-case.js';
+import { InMemoryCustomAgentRepository } from '@/infrastructure/adapters/in-memory/in-memory-custom-agent.repository.js';
 import { AgentType, AgentFeature } from '@/domain/generated/output.js';
 import type {
   IAgentExecutor,
@@ -66,7 +67,7 @@ describe('RunAgentPromptPlaygroundUseCase', () => {
   beforeEach(() => {
     repo = new InMemoryAgentPromptOverrideRepository();
     resolver = new SQLiteAgentPromptResolver(repo);
-    upsert = new UpsertAgentPromptOverrideUseCase(repo);
+    upsert = new UpsertAgentPromptOverrideUseCase(repo, new InMemoryCustomAgentRepository());
   });
 
   it('forwards stub stream chunks as delta events ending with a done event', async () => {
