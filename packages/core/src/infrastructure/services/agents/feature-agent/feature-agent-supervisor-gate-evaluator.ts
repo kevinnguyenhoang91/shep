@@ -8,7 +8,7 @@
  * {@link evaluateForGate}. The evaluator:
  *
  *  1. Resolves the configured {@link SupervisorPolicy} for the
- *     (appId, featureId) scope. When no policy is configured the call
+ *     (scopeType, scopeId, featureId) scope. When no policy is configured the call
  *     is a no-op — pure additive behaviour preserves the existing
  *     human-only path (NFR-14).
  *  2. Computes the effective per-gate autonomy: a `gateAuthorityJson`
@@ -88,8 +88,12 @@ export class FeatureAgentSupervisorGateEvaluator {
     input: SupervisorGateEvaluationInput
   ): Promise<SupervisorGateEvaluationResult> {
     try {
-      const appId = await this.resolveAppId(input.repositoryPath);
-      const policy = await this.getPolicy.execute({ appId, featureId: input.featureId });
+      const { scopeType, scopeId } = await this.resolveScope(input.repositoryPath);
+      const policy = await this.getPolicy.execute({
+        scopeType,
+        scopeId,
+        featureId: input.featureId,
+      });
       if (!policy) {
         // No supervisor configured for this scope. The flag-off short
         // circuit further down inside EvaluateSupervisorDecisionUseCase
@@ -105,7 +109,8 @@ export class FeatureAgentSupervisorGateEvaluator {
       const result = await this.evaluateDecision.execute({
         event: {
           kind: 'gate',
-          appId,
+          scopeType,
+          scopeId,
           featureId: input.featureId,
           agentRunId: input.runId,
           gateId,
@@ -162,14 +167,16 @@ export class FeatureAgentSupervisorGateEvaluator {
     return false;
   }
 
-  private async resolveAppId(repositoryPath: string): Promise<string> {
+  private async resolveScope(
+    repositoryPath: string
+  ): Promise<{ scopeType: string; scopeId: string }> {
     try {
       const app = await this.applicationRepo.findByPath(repositoryPath);
-      if (app?.id) return app.id;
+      if (app?.id) return { scopeType: 'app', scopeId: app.id };
     } catch {
-      // Fall through to path-based scope.
+      // Fall through to repo-based scope.
     }
-    return repositoryPath;
+    return { scopeType: 'repo', scopeId: repositoryPath };
   }
 }
 

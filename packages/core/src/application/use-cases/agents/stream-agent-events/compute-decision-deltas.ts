@@ -58,7 +58,8 @@ export function computeDecisionDeltas(args: ComputeDecisionDeltasArgs): Streamed
     events.push({
       kind: 'supervisor_decision',
       decisionId: d.id,
-      appId: d.appId,
+      scopeType: d.scopeType,
+      scopeId: d.scopeId,
       featureId: d.featureId,
       supervisorRunId: d.supervisorRunId,
       sourceEventKind: d.sourceEventKind,

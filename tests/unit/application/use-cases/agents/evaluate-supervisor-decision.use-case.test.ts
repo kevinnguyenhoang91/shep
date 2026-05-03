@@ -24,6 +24,7 @@ import {
   NotificationEventType,
   NotificationSeverity,
   SupervisorAutonomy,
+  SupervisorScopeType,
   SupervisorVerdict,
   type ActivityEntry,
   type Settings,
@@ -60,7 +61,8 @@ class InMemoryActivityLogRepository implements IActivityLogRepository {
 function gateEvent(): SupervisorGateEvent {
   return {
     kind: 'gate',
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     agentRunId: 'run-1',
     gateId: 'plan',
     sourceEventId: 'gate-1',
@@ -103,7 +105,8 @@ describe('EvaluateSupervisorDecisionUseCase', () => {
 
   it('returns evaluated=false with skippedReason="flag-off" when flag is off', async () => {
     await configure.execute({
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       autonomyLevel: SupervisorAutonomy.advisory,
     });
     const useCase = makeUseCase(false);
@@ -131,7 +134,8 @@ describe('EvaluateSupervisorDecisionUseCase', () => {
 
   it('persists a SupervisorDecision and mirrors to activity_log on the happy path', async () => {
     await configure.execute({
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       autonomyLevel: SupervisorAutonomy.advisory,
     });
     const useCase = makeUseCase(true);
@@ -144,7 +148,8 @@ describe('EvaluateSupervisorDecisionUseCase', () => {
     expect(result.evaluated).toBe(true);
     expect(result.decision).toBeDefined();
     expect(result.decision?.verdict).toBe(SupervisorVerdict.advise);
-    expect(result.decision?.appId).toBe('app-1');
+    expect(result.decision?.scopeType).toBe('app');
+    expect(result.decision?.scopeId).toBe('app-1');
     expect(result.decision?.sourceEventId).toBe('gate-1');
     expect(result.decision?.sourceEventKind).toBe('gate');
     expect(result.decision?.modelId).toBeDefined();
@@ -167,7 +172,8 @@ describe('EvaluateSupervisorDecisionUseCase', () => {
 
   it('fires SupervisorEscalated notification when verdict is escalate', async () => {
     await configure.execute({
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       autonomyLevel: SupervisorAutonomy.advisory,
     });
     const escalateAgent: ISupervisorAgent = new StubSupervisorAgentExecutor({
@@ -196,7 +202,8 @@ describe('EvaluateSupervisorDecisionUseCase', () => {
 
   it('does NOT fire SupervisorEscalated for non-escalate verdicts', async () => {
     await configure.execute({
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       autonomyLevel: SupervisorAutonomy.advisory,
     });
     const escalate = makeEscalateToUserStub();
@@ -212,7 +219,8 @@ describe('EvaluateSupervisorDecisionUseCase', () => {
 
   it('absorbs evaluator failures, fires SupervisorFailed, and writes no decision row', async () => {
     await configure.execute({
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       autonomyLevel: SupervisorAutonomy.advisory,
     });
     const throwingAgent: ISupervisorAgent = {
@@ -232,7 +240,7 @@ describe('EvaluateSupervisorDecisionUseCase', () => {
     expect(result.decision).toBeUndefined();
 
     // No SupervisorDecision row was persisted on the failure path.
-    expect(await decisionRepo.listByScope('app-1', undefined)).toHaveLength(0);
+    expect(await decisionRepo.listByScope('app', 'app-1', undefined)).toHaveLength(0);
 
     // The failure surfaces as a SupervisorFailed notification through
     // EscalateToUserUseCase.
@@ -245,11 +253,13 @@ describe('EvaluateSupervisorDecisionUseCase', () => {
 
   it('uses the feature-scoped policy when both feature and app rows exist', async () => {
     await configure.execute({
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       autonomyLevel: SupervisorAutonomy.advisory,
     });
     const featurePolicy = await configure.execute({
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       featureId: 'feat-7',
       autonomyLevel: SupervisorAutonomy.cosign,
     });
@@ -265,7 +275,11 @@ describe('EvaluateSupervisorDecisionUseCase', () => {
     expect(result.decision?.featureId).toBe('feat-7');
     // The supervisor saw the feature-scoped policy via the resolution
     // helper; we verify by re-fetching what the helper would return.
-    const resolved = await getPolicy.execute({ appId: 'app-1', featureId: 'feat-7' });
+    const resolved = await getPolicy.execute({
+      scopeType: 'app',
+      scopeId: 'app-1',
+      featureId: 'feat-7',
+    });
     expect(resolved?.id).toBe(featurePolicy.id);
   });
 });

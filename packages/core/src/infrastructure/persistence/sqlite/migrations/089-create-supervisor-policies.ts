@@ -1,14 +1,18 @@
 /**
  * Migration 089: Create supervisor_policies table (spec 093).
  *
- * Per-app (with optional per-feature override) supervisor policy.
- * Resolution order: feature-scoped first, fall back to app-scoped.
+ * Scope-based supervisor policy: scope_type determines the level
+ * ('global', 'org', 'app', 'feature'), scope_id identifies the target
+ * (nullable for global scope), and feature_id provides an optional
+ * per-feature override within a scope.
+ *
+ * Resolution order: most specific scope first (feature > app > org > global).
  *
  * Indexes:
- *  - unique (app_id, COALESCE(feature_id, '')) ensures at most one
- *    policy per scope tuple. SQLite expression indexes use COALESCE
- *    because NULL values are treated as distinct in regular UNIQUE
- *    indexes — we want NULL feature_id to collide with itself.
+ *  - unique (scope_type, COALESCE(scope_id, ''), COALESCE(feature_id, ''))
+ *    ensures at most one policy per scope tuple. SQLite expression indexes
+ *    use COALESCE because NULL values are treated as distinct in regular
+ *    UNIQUE indexes — we want NULL scope_id/feature_id to collide with itself.
  */
 
 import type { MigrationParams } from 'umzug';
@@ -23,7 +27,8 @@ export async function up({ context: db }: MigrationParams<Database.Database>): P
     db.exec(`
       CREATE TABLE supervisor_policies (
         id                              TEXT PRIMARY KEY,
-        app_id                          TEXT NOT NULL,
+        scope_type                      TEXT NOT NULL DEFAULT 'app',
+        scope_id                        TEXT,
         feature_id                      TEXT,
         enabled                         INTEGER NOT NULL DEFAULT 0,
         autonomy_level                  TEXT NOT NULL DEFAULT 'advisory',
@@ -43,12 +48,14 @@ export async function up({ context: db }: MigrationParams<Database.Database>): P
 
   if (!indexNames.has('idx_supervisor_policies_unique_scope')) {
     db.exec(
-      "CREATE UNIQUE INDEX idx_supervisor_policies_unique_scope ON supervisor_policies(app_id, COALESCE(feature_id, ''))"
+      "CREATE UNIQUE INDEX idx_supervisor_policies_unique_scope ON supervisor_policies(scope_type, COALESCE(scope_id, ''), COALESCE(feature_id, ''))"
     );
   }
 
-  if (!indexNames.has('idx_supervisor_policies_app_id')) {
-    db.exec('CREATE INDEX idx_supervisor_policies_app_id ON supervisor_policies(app_id)');
+  if (!indexNames.has('idx_supervisor_policies_scope')) {
+    db.exec(
+      'CREATE INDEX idx_supervisor_policies_scope ON supervisor_policies(scope_type, scope_id)'
+    );
   }
 }
 

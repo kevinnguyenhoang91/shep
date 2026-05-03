@@ -10,7 +10,8 @@ function decision(
   return {
     kind: 'supervisor_decision',
     decisionId: 'dec-1',
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     supervisorRunId: 'sup-1',
     sourceEventKind: 'gate',
     sourceEventId: 'run-1',

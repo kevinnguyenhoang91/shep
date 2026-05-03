@@ -39,7 +39,8 @@ const GATE_KEYS = ['prd', 'plan', 'merge'] as const;
 type GateKey = (typeof GATE_KEYS)[number];
 
 export interface SupervisorConfigFormProps {
-  appId: string;
+  scopeType: string;
+  scopeId?: string;
   featureId?: string;
   /** When `null`, the form starts blank (no policy configured yet). */
   initialPolicy: SupervisorPolicy | null;
@@ -50,7 +51,8 @@ export interface SupervisorConfigFormProps {
 }
 
 interface SubmitInput {
-  appId: string;
+  scopeType: string;
+  scopeId?: string;
   featureId?: string;
   autonomyLevel: SupervisorAutonomy;
   modelId?: string;
@@ -75,7 +77,8 @@ function parseGateAuthority(json?: string): Partial<Record<GateKey, SupervisorAu
 }
 
 export function SupervisorConfigForm({
-  appId,
+  scopeType,
+  scopeId,
   featureId,
   initialPolicy,
   onSubmitOverride,
@@ -104,7 +107,8 @@ export function SupervisorConfigForm({
     setIsSubmitting(true);
 
     const input: SubmitInput = {
-      appId,
+      scopeType,
+      scopeId,
       featureId,
       autonomyLevel,
       modelId: modelId.trim() || undefined,
@@ -152,8 +156,8 @@ export function SupervisorConfigForm({
         <h2 className="text-lg font-semibold">Supervisor agent</h2>
         <p className="text-muted-foreground text-sm">
           {featureId
-            ? 'Per-feature override. Falls back to the app-level policy when unset.'
-            : 'App-level policy. Applies to every feature unless overridden.'}
+            ? 'Per-feature override. Falls back to the scope-level policy when unset.'
+            : `${scopeType.charAt(0).toUpperCase() + scopeType.slice(1)}-level policy. Applies to every feature unless overridden.`}
         </p>
       </header>
 

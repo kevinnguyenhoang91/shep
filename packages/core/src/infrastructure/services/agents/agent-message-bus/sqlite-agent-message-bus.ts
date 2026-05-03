@@ -157,7 +157,7 @@ export class SQLiteAgentMessageBus implements IAgentMessageBus {
           // Mark delivered_at so the partial undelivered index stays flat.
           if (!row.deliveredAt) {
             try {
-              await this.repository.markDelivered(row.appId, row.id, new Date());
+              await this.repository.markDelivered(row.appId ?? '', row.id, new Date());
             } catch {
               // Best-effort — ignore races where another reader marked it first.
             }

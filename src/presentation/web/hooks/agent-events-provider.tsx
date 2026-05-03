@@ -84,12 +84,13 @@ export function useOperationLogAppend(
 }
 
 /**
- * Spec 093 — agent message stream scoped to an (appId, featureId?) pair.
+ * Spec 093 — agent message stream scoped to a (scopeType, scopeId?, featureId?) tuple.
  * Returns the cumulative list and the most recent envelope so consumers can
  * either render history or react to the latest delta.
  */
 export interface AgentMessageScope {
-  appId: string;
+  scopeType: string;
+  scopeId?: string;
   featureId?: string;
 }
 
@@ -99,17 +100,16 @@ export function useAgentMessages(scope: AgentMessageScope): {
 } {
   const ctx = useContext(AgentEventsContext);
   if (!ctx) return { messages: [], last: null };
-  const messages = ctx.agentMessages.filter((m) => matchesScope(m.appId, m.featureId, scope));
+  const messages = ctx.agentMessages.filter((m) => matchesMessageScope(m, scope));
   const last =
-    ctx.lastAgentMessage &&
-    matchesScope(ctx.lastAgentMessage.appId, ctx.lastAgentMessage.featureId, scope)
+    ctx.lastAgentMessage && matchesMessageScope(ctx.lastAgentMessage, scope)
       ? ctx.lastAgentMessage
       : null;
   return { messages, last };
 }
 
 /**
- * Spec 093 — agent question stream scoped by app/feature.
+ * Spec 093 — agent question stream scoped by scope type/id/feature.
  */
 export function useAgentQuestions(scope: AgentMessageScope): {
   questions: AgentQuestionStreamEvent[];
@@ -117,17 +117,16 @@ export function useAgentQuestions(scope: AgentMessageScope): {
 } {
   const ctx = useContext(AgentEventsContext);
   if (!ctx) return { questions: [], last: null };
-  const questions = ctx.agentQuestions.filter((q) => matchesScope(q.appId, q.featureId, scope));
+  const questions = ctx.agentQuestions.filter((q) => matchesMessageScope(q, scope));
   const last =
-    ctx.lastAgentQuestion &&
-    matchesScope(ctx.lastAgentQuestion.appId, ctx.lastAgentQuestion.featureId, scope)
+    ctx.lastAgentQuestion && matchesMessageScope(ctx.lastAgentQuestion, scope)
       ? ctx.lastAgentQuestion
       : null;
   return { questions, last };
 }
 
 /**
- * Spec 093 — supervisor decision stream scoped by app/feature.
+ * Spec 093 — supervisor decision stream scoped by scope type/id/feature.
  */
 export function useSupervisorDecisions(scope: AgentMessageScope): {
   decisions: SupervisorDecisionStreamEvent[];
@@ -135,23 +134,31 @@ export function useSupervisorDecisions(scope: AgentMessageScope): {
 } {
   const ctx = useContext(AgentEventsContext);
   if (!ctx) return { decisions: [], last: null };
-  const decisions = ctx.supervisorDecisions.filter((d) =>
-    matchesScope(d.appId, d.featureId, scope)
-  );
+  const decisions = ctx.supervisorDecisions.filter((d) => matchesDecisionScope(d, scope));
   const last =
-    ctx.lastSupervisorDecision &&
-    matchesScope(ctx.lastSupervisorDecision.appId, ctx.lastSupervisorDecision.featureId, scope)
+    ctx.lastSupervisorDecision && matchesDecisionScope(ctx.lastSupervisorDecision, scope)
       ? ctx.lastSupervisorDecision
       : null;
   return { decisions, last };
 }
 
-function matchesScope(
-  appId: string,
-  featureId: string | undefined,
+function matchesMessageScope(
+  event: { appId?: string; repositoryId?: string; featureId?: string },
   scope: AgentMessageScope
 ): boolean {
-  if (appId !== scope.appId) return false;
-  if (scope.featureId !== undefined && featureId !== scope.featureId) return false;
+  if (scope.scopeType === 'app' && scope.scopeId && event.appId !== scope.scopeId) return false;
+  if (scope.scopeType === 'repo' && scope.scopeId && event.repositoryId !== scope.scopeId)
+    return false;
+  if (scope.featureId !== undefined && event.featureId !== scope.featureId) return false;
+  return true;
+}
+
+function matchesDecisionScope(
+  event: { scopeType: string; scopeId?: string; featureId?: string },
+  scope: AgentMessageScope
+): boolean {
+  if (scope.scopeType !== event.scopeType) return false;
+  if (scope.scopeId && event.scopeId !== scope.scopeId) return false;
+  if (scope.featureId !== undefined && event.featureId !== scope.featureId) return false;
   return true;
 }

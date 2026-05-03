@@ -2,9 +2,12 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: SupervisorDecision.yaml
 type: object
 properties:
-  appId:
+  scopeType:
     type: string
-    description: App scope identifier (NFR-7 isolation)
+    description: Scope level of the policy that triggered this decision (global, repo, app)
+  scopeId:
+    type: string
+    description: App or repo UUID from the triggering policy (null for global)
   featureId:
     type: string
     description: Optional feature scope identifier
@@ -36,7 +39,7 @@ properties:
     type: number
     description: Optional 0..1 confidence reported by the evaluator
 required:
-  - appId
+  - scopeType
   - supervisorRunId
   - sourceEventKind
   - sourceEventId

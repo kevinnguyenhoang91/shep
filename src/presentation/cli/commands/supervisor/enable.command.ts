@@ -2,7 +2,8 @@
  * shep supervisor enable
  *
  * Flips the `enabled` flag on the SupervisorPolicy for the
- * (appId, featureId?) scope without touching any other field. Idempotent.
+ * (scopeType, scopeId?, featureId?) scope without touching any other
+ * field. Idempotent.
  */
 
 import { Command } from 'commander';
@@ -11,25 +12,28 @@ import { EnableSupervisorUseCase } from '@/application/use-cases/agents/enable-s
 import { messages } from '../../ui/index.js';
 
 interface EnableOptions {
-  app: string;
+  scope: string;
+  scopeId?: string;
   feature?: string;
 }
 
 export function createEnableCommand(): Command {
   return new Command('enable')
     .description('Enable an existing supervisor policy')
-    .requiredOption('--app <id>', 'Application id (required)')
+    .requiredOption('--scope <type>', 'Scope type: global, repo, or app')
+    .option('--scope-id <id>', 'Scope identifier (app or repo UUID; omit for global)')
     .option('--feature <id>', 'Feature id for a per-feature override')
     .action(async (options: EnableOptions) => {
       try {
         const useCase = container.resolve(EnableSupervisorUseCase);
         const policy = await useCase.execute({
-          appId: options.app,
+          scopeType: options.scope,
+          scopeId: options.scopeId,
           featureId: options.feature,
         });
         messages.newline();
         messages.success(
-          `Supervisor enabled for ${policy.appId}${policy.featureId ? `/${policy.featureId}` : ''}`
+          `Supervisor enabled for ${policy.scopeType}${policy.scopeId ? `:${policy.scopeId}` : ''}${policy.featureId ? `/${policy.featureId}` : ''}`
         );
         messages.newline();
       } catch (error) {

@@ -5,11 +5,16 @@
  * supervisor_policies table. Boolean stored as INTEGER 0/1.
  */
 
-import type { SupervisorAutonomy, SupervisorPolicy } from '../../../../domain/generated/output.js';
+import type {
+  SupervisorAutonomy,
+  SupervisorPolicy,
+  SupervisorScopeType,
+} from '../../../../domain/generated/output.js';
 
 export interface SupervisorPolicyRow {
   id: string;
-  app_id: string;
+  scope_type: string;
+  scope_id: string | null;
   feature_id: string | null;
   enabled: number;
   autonomy_level: string;
@@ -32,7 +37,8 @@ function toMillis(value: SupervisorPolicy['createdAt']): number {
 export function toDatabase(policy: SupervisorPolicy): SupervisorPolicyRow {
   return {
     id: policy.id,
-    app_id: policy.appId,
+    scope_type: policy.scopeType,
+    scope_id: policy.scopeId ?? null,
     feature_id: policy.featureId ?? null,
     enabled: policy.enabled ? 1 : 0,
     autonomy_level: policy.autonomyLevel,
@@ -49,7 +55,8 @@ export function toDatabase(policy: SupervisorPolicy): SupervisorPolicyRow {
 export function fromDatabase(row: SupervisorPolicyRow): SupervisorPolicy {
   return {
     id: row.id,
-    appId: row.app_id,
+    scopeType: row.scope_type as SupervisorScopeType,
+    scopeId: row.scope_id ?? undefined,
     featureId: row.feature_id ?? undefined,
     enabled: row.enabled === 1,
     autonomyLevel: row.autonomy_level as SupervisorAutonomy,

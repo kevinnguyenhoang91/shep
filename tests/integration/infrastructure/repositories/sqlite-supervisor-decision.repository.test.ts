@@ -15,7 +15,8 @@ function makeDecision(overrides: Partial<SupervisorDecision> = {}): SupervisorDe
   const now = new Date();
   return {
     id: overrides.id ?? `dec-${Math.random().toString(36).slice(2, 9)}`,
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     featureId: undefined,
     supervisorRunId: 'sup-1',
     sourceEventKind: 'gate',
@@ -90,9 +91,9 @@ describe('SQLiteSupervisorDecisionRepository', () => {
   });
 
   it('listByScope is app-scoped (no leakage)', async () => {
-    await repo.create(makeDecision({ id: 'd1', appId: 'app-1' }));
-    await repo.create(makeDecision({ id: 'd2', appId: 'app-2' }));
-    const a = await repo.listByScope('app-1', undefined);
+    await repo.create(makeDecision({ id: 'd1', scopeType: 'app', scopeId: 'app-1' }));
+    await repo.create(makeDecision({ id: 'd2', scopeType: 'app', scopeId: 'app-2' }));
+    const a = await repo.listByScope('app', 'app-1', undefined);
     expect(a.map((d) => d.id)).toEqual(['d1']);
   });
 
@@ -107,10 +108,10 @@ describe('SQLiteSupervisorDecisionRepository', () => {
       makeDecision({ id: 'other', featureId: 'f2', createdAt: recent, updatedAt: recent })
     );
 
-    const since = await repo.listByScope('app-1', 'f1', { since: new Date(2026, 3, 1) });
+    const since = await repo.listByScope('app', 'app-1', 'f1', { since: new Date(2026, 3, 1) });
     expect(since.map((d) => d.id)).toEqual(['new']);
 
-    const limited = await repo.listByScope('app-1', undefined, { limit: 1 });
+    const limited = await repo.listByScope('app', 'app-1', undefined, { limit: 1 });
     expect(limited).toHaveLength(1);
   });
 });

@@ -1,18 +1,19 @@
 /**
  * shep supervisor configure
  *
- * Creates or replaces a SupervisorPolicy for the (appId, featureId?)
- * scope (spec 093, FR-13). Wraps ConfigureSupervisorUseCase.
+ * Creates or replaces a SupervisorPolicy for the (scopeType, scopeId?,
+ * featureId?) scope (spec 093, FR-13). Wraps ConfigureSupervisorUseCase.
  */
 
 import { Command, Option } from 'commander';
 import { container } from '@/infrastructure/di/container.js';
 import { ConfigureSupervisorUseCase } from '@/application/use-cases/agents/configure-supervisor.use-case.js';
-import { SupervisorAutonomy } from '@/domain/generated/output.js';
+import { SupervisorAutonomy, type SupervisorScopeType } from '@/domain/generated/output.js';
 import { colors, messages } from '../../ui/index.js';
 
 interface ConfigureOptions {
-  app: string;
+  scope: string;
+  scopeId?: string;
   feature?: string;
   autonomy: SupervisorAutonomy;
   model?: string;
@@ -27,7 +28,8 @@ const AUTONOMY_VALUES = Object.values(SupervisorAutonomy) as string[];
 export function createConfigureCommand(): Command {
   return new Command('configure')
     .description('Create or update a supervisor policy')
-    .requiredOption('--app <id>', 'Application id (required)')
+    .requiredOption('--scope <type>', 'Scope type: global, repo, or app')
+    .option('--scope-id <id>', 'Scope identifier (app or repo UUID; omit for global)')
     .option('--feature <id>', 'Feature id for a per-feature override')
     .addOption(
       new Option('--autonomy <level>', 'Default autonomy level')
@@ -56,7 +58,8 @@ export function createConfigureCommand(): Command {
         if (options.mergeAuthority) gateAuthority.merge = options.mergeAuthority;
 
         const policy = await useCase.execute({
-          appId: options.app,
+          scopeType: options.scope as SupervisorScopeType,
+          scopeId: options.scopeId,
           featureId: options.feature,
           autonomyLevel: options.autonomy,
           modelId: options.model,
@@ -66,7 +69,7 @@ export function createConfigureCommand(): Command {
 
         messages.newline();
         messages.success(
-          `Supervisor policy saved (${policy.appId}${policy.featureId ? `/${policy.featureId}` : ''})`
+          `Supervisor policy saved (${policy.scopeType}${policy.scopeId ? `:${policy.scopeId}` : ''}${policy.featureId ? `/${policy.featureId}` : ''})`
         );
         console.log(`  ${colors.muted('autonomy')}    ${colors.info(policy.autonomyLevel)}`);
         if (policy.modelId) console.log(`  ${colors.muted('model')}       ${policy.modelId}`);

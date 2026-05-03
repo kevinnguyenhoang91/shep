@@ -2,12 +2,15 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: SupervisorPolicy.yaml
 type: object
 properties:
-  appId:
+  scopeType:
+    $ref: SupervisorScopeType.yaml
+    description: Level at which this policy applies (global, repo, or app)
+  scopeId:
     type: string
-    description: App scope identifier (required)
+    description: Scope identifier — app or repo UUID (null for global policies)
   featureId:
     type: string
-    description: Feature scope identifier (optional override)
+    description: Feature scope identifier (optional per-feature override)
   enabled:
     type: boolean
     description: Master enable toggle
@@ -30,9 +33,9 @@ properties:
     type: string
     description: JSON object overriding the user's notification preferences for supervisor events
 required:
-  - appId
+  - scopeType
   - enabled
   - autonomyLevel
 allOf:
   - $ref: BaseEntity.yaml
-description: Per-app supervisor policy with optional per-feature override
+description: "Supervisor policy with cascading scope: global → repo → app → feature"

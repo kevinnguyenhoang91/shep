@@ -15,7 +15,8 @@ function makeDecision(overrides: Partial<SupervisorDecision> = {}): SupervisorDe
   const now = new Date();
   return {
     id: overrides.id ?? `dec-${Math.random().toString(36).slice(2, 9)}`,
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     featureId: undefined,
     supervisorRunId: 'sup-run-1',
     sourceEventKind: 'gate',
@@ -81,16 +82,16 @@ describe('InMemorySupervisorDecisionRepository', () => {
   });
 
   it('listByScope is app-scoped (no leakage)', async () => {
-    await repo.create(makeDecision({ id: 'd1', appId: 'app-1' }));
-    await repo.create(makeDecision({ id: 'd2', appId: 'app-2' }));
-    const a = await repo.listByScope('app-1', undefined);
+    await repo.create(makeDecision({ id: 'd1', scopeType: 'app', scopeId: 'app-1' }));
+    await repo.create(makeDecision({ id: 'd2', scopeType: 'app', scopeId: 'app-2' }));
+    const a = await repo.listByScope('app', 'app-1', undefined);
     expect(a.map((d) => d.id)).toEqual(['d1']);
   });
 
   it('listByScope filters by featureId when supplied', async () => {
     await repo.create(makeDecision({ id: 'd1', featureId: 'f1' }));
     await repo.create(makeDecision({ id: 'd2', featureId: 'f2' }));
-    const result = await repo.listByScope('app-1', 'f1');
+    const result = await repo.listByScope('app', 'app-1', 'f1');
     expect(result.map((d) => d.id)).toEqual(['d1']);
   });
 
@@ -107,12 +108,12 @@ describe('InMemorySupervisorDecisionRepository', () => {
       })
     );
 
-    const since = await repo.listByScope('app-1', undefined, {
+    const since = await repo.listByScope('app', 'app-1', undefined, {
       since: new Date(2026, 3, 1),
     });
     expect(since.map((d) => d.id).sort()).toEqual(['new1', 'new2']);
 
-    const limited = await repo.listByScope('app-1', undefined, { limit: 1 });
+    const limited = await repo.listByScope('app', 'app-1', undefined, { limit: 1 });
     expect(limited).toHaveLength(1);
   });
 });

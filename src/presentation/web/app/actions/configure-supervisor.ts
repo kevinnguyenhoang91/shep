@@ -5,10 +5,15 @@ import type { ConfigureSupervisorUseCase } from '@shepai/core/application/use-ca
 import type { GetSupervisorPolicyUseCase } from '@shepai/core/application/use-cases/agents/get-supervisor-policy.use-case';
 import type { EnableSupervisorUseCase } from '@shepai/core/application/use-cases/agents/enable-supervisor.use-case';
 import type { DisableSupervisorUseCase } from '@shepai/core/application/use-cases/agents/disable-supervisor.use-case';
-import type { SupervisorAutonomy, SupervisorPolicy } from '@shepai/core/domain/generated/output';
+import type {
+  SupervisorAutonomy,
+  SupervisorPolicy,
+  SupervisorScopeType,
+} from '@shepai/core/domain/generated/output';
 
 export interface ConfigureSupervisorActionInput {
-  appId: string;
+  scopeType: string;
+  scopeId?: string;
   featureId?: string;
   autonomyLevel: SupervisorAutonomy;
   modelId?: string;
@@ -27,7 +32,10 @@ export async function configureSupervisor(
 ): Promise<ConfigureSupervisorActionResult> {
   try {
     const useCase = resolve<ConfigureSupervisorUseCase>('ConfigureSupervisorUseCase');
-    const policy = await useCase.execute(input);
+    const policy = await useCase.execute({
+      ...input,
+      scopeType: input.scopeType as SupervisorScopeType,
+    });
     return { ok: true, policy };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to configure supervisor';
@@ -36,7 +44,8 @@ export async function configureSupervisor(
 }
 
 export async function getSupervisorPolicy(input: {
-  appId: string;
+  scopeType: string;
+  scopeId?: string;
   featureId?: string;
 }): Promise<{ ok: true; policy: SupervisorPolicy | null } | { ok: false; error: string }> {
   try {
@@ -50,7 +59,8 @@ export async function getSupervisorPolicy(input: {
 }
 
 export async function enableSupervisor(input: {
-  appId: string;
+  scopeType: string;
+  scopeId?: string;
   featureId?: string;
 }): Promise<ConfigureSupervisorActionResult> {
   try {
@@ -64,7 +74,8 @@ export async function enableSupervisor(input: {
 }
 
 export async function disableSupervisor(input: {
-  appId: string;
+  scopeType: string;
+  scopeId?: string;
   featureId?: string;
 }): Promise<ConfigureSupervisorActionResult> {
   try {

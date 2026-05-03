@@ -4,7 +4,10 @@ type: object
 properties:
   appId:
     type: string
-    description: App scope identifier (NFR-7 isolation)
+    description: App scope identifier (set when question originates in app context)
+  repositoryId:
+    type: string
+    description: Repository scope identifier (set for standalone-repo agent work)
   featureId:
     type: string
     description: Optional feature scope identifier
@@ -44,7 +47,6 @@ properties:
     format: date-time
     description: Auto-resolution deadline (optional, used with defaultAnswer)
 required:
-  - appId
   - agentRunId
   - kind
   - prompt

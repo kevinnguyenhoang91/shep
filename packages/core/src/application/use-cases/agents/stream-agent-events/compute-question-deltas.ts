@@ -51,6 +51,7 @@ function toEventEnvelope(q: AgentQuestion, transition: 'new' | 'status'): AgentQ
     kind: 'agent_question',
     questionId: q.id,
     appId: q.appId,
+    repositoryId: q.repositoryId,
     featureId: q.featureId,
     agentRunId: q.agentRunId,
     questionKind: q.kind,

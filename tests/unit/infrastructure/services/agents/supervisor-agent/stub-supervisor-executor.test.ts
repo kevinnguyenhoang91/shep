@@ -24,7 +24,8 @@ function makePolicy(overrides: Partial<SupervisorPolicy> = {}): SupervisorPolicy
   const now = new Date();
   return {
     id: 'pol-1',
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     enabled: true,
     autonomyLevel: SupervisorAutonomy.advisory,
     createdAt: now,
@@ -38,7 +39,8 @@ describe('StubSupervisorAgentExecutor', () => {
     const stub = new StubSupervisorAgentExecutor();
     const event: SupervisorGateEvent = {
       kind: 'gate',
-      appId: 'app-1',
+      scopeType: 'app',
+      scopeId: 'app-1',
       agentRunId: 'run-1',
       gateId: 'prd',
       sourceEventId: 'gate-1',
@@ -52,7 +54,8 @@ describe('StubSupervisorAgentExecutor', () => {
     const stub = new StubSupervisorAgentExecutor();
     const event: SupervisorQuestionEvent = {
       kind: 'question',
-      appId: 'app-1',
+      scopeType: 'app',
+      scopeId: 'app-1',
       agentRunId: 'run-1',
       questionId: 'q-1',
       questionKind: 'blocking',
@@ -67,7 +70,8 @@ describe('StubSupervisorAgentExecutor', () => {
     const stub = new StubSupervisorAgentExecutor();
     const event: SupervisorMessageEvent = {
       kind: 'message',
-      appId: 'app-1',
+      scopeType: 'app',
+      scopeId: 'app-1',
       messageId: 'm-1',
       messageKind: 'status',
       fromActor: 'agent:run-1',
@@ -92,7 +96,8 @@ describe('StubSupervisorAgentExecutor', () => {
     });
     const event: SupervisorGateEvent = {
       kind: 'gate',
-      appId: 'app-1',
+      scopeType: 'app',
+      scopeId: 'app-1',
       agentRunId: 'run-1',
       gateId: 'merge',
       sourceEventId: 'gate-2',
@@ -111,7 +116,8 @@ describe('StubSupervisorAgentExecutor', () => {
     });
     const event: SupervisorGateEvent = {
       kind: 'gate',
-      appId: 'app-1',
+      scopeType: 'app',
+      scopeId: 'app-1',
       agentRunId: 'run-1',
       gateId: 'prd',
       sourceEventId: 'gate-1',

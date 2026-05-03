@@ -1,7 +1,8 @@
 import type { SupervisorPolicy } from '@shepai/core/domain/generated/output';
 
 interface ConfigureSupervisorActionInput {
-  appId: string;
+  scopeType: string;
+  scopeId?: string;
   featureId?: string;
 }
 
@@ -18,7 +19,8 @@ export async function configureSupervisor(
 }
 
 export async function getSupervisorPolicy(_input: {
-  appId: string;
+  scopeType: string;
+  scopeId?: string;
   featureId?: string;
 }): Promise<{ ok: true; policy: SupervisorPolicy | null }> {
   return { ok: true, policy: null };

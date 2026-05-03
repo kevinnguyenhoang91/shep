@@ -2,9 +2,10 @@
  * ConfigureSupervisorUseCase
  *
  * Creates or replaces a {@link SupervisorPolicy} for the
- * (appId, featureId?) scope. Validation is performed before any
- * persistence so callers see typed {@link InvalidSupervisorPolicyError}
- * rejections rather than partial writes.
+ * (scopeType, scopeId?, featureId?) scope. Validation is performed
+ * before any persistence so callers see typed
+ * {@link InvalidSupervisorPolicyError} rejections rather than partial
+ * writes.
  *
  * Behaviour:
  *  - When no policy exists for the scope, a new row is inserted with
@@ -19,7 +20,11 @@ import { inject, injectable } from 'tsyringe';
 import { randomUUID } from 'node:crypto';
 
 import type { ISupervisorPolicyRepository } from '../../ports/output/repositories/supervisor-policy-repository.interface.js';
-import { SupervisorAutonomy, type SupervisorPolicy } from '../../../domain/generated/output.js';
+import {
+  SupervisorAutonomy,
+  type SupervisorPolicy,
+  type SupervisorScopeType,
+} from '../../../domain/generated/output.js';
 import { InvalidSupervisorPolicyError } from '../../../domain/errors/invalid-supervisor-policy.error.js';
 
 /** Approval-gate keys recognised by gateAuthority overrides. */
@@ -35,7 +40,8 @@ export interface SupervisorPolicyRule {
 }
 
 export interface ConfigureSupervisorInput {
-  appId: string;
+  scopeType: SupervisorScopeType;
+  scopeId?: string;
   featureId?: string;
   autonomyLevel: SupervisorAutonomy;
   modelId?: string;
@@ -56,16 +62,21 @@ export class ConfigureSupervisorUseCase {
     validateInput(input);
 
     // Look up by exact scope so a feature-scoped configure does not pick up
-    // an app-scoped fallback row.
+    // a scope-level fallback row.
     const existing =
       input.featureId !== undefined
-        ? await this.policyRepository.findByFeature(input.appId, input.featureId)
-        : await this.policyRepository.findByApp(input.appId);
+        ? await this.policyRepository.findByScopeAndFeature(
+            input.scopeType,
+            input.scopeId,
+            input.featureId
+          )
+        : await this.policyRepository.findByScope(input.scopeType, input.scopeId);
 
     const now = new Date();
     const policy: SupervisorPolicy = {
       id: existing?.id ?? randomUUID(),
-      appId: input.appId,
+      scopeType: input.scopeType,
+      scopeId: input.scopeId,
       featureId: input.featureId,
       enabled: existing?.enabled ?? true,
       autonomyLevel: input.autonomyLevel,
@@ -97,8 +108,8 @@ export class ConfigureSupervisorUseCase {
 }
 
 function validateInput(input: ConfigureSupervisorInput): void {
-  if (typeof input.appId !== 'string' || input.appId.trim().length === 0) {
-    throw new InvalidSupervisorPolicyError('appId', 'must be a non-empty string');
+  if (typeof input.scopeType !== 'string' || input.scopeType.trim().length === 0) {
+    throw new InvalidSupervisorPolicyError('scopeType', 'must be a non-empty string');
   }
   if (input.featureId?.trim().length === 0) {
     throw new InvalidSupervisorPolicyError('featureId', 'must be a non-empty string when supplied');

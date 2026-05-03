@@ -48,7 +48,7 @@ Hard rules (NEVER violate):
 function policySummary(policy: SupervisorPolicy): string {
   return [
     `Effective policy:`,
-    `  scope:           app=${policy.appId}${policy.featureId ? `, feature=${policy.featureId}` : ''}`,
+    `  scope:           scope=${policy.scopeType}:${policy.scopeId ?? 'global'}${policy.featureId ? `, feature=${policy.featureId}` : ''}`,
     `  enabled:         ${policy.enabled}`,
     `  autonomyLevel:   ${policy.autonomyLevel}`,
     policy.modelId ? `  model:           ${policy.modelId}` : null,

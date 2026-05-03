@@ -37,6 +37,7 @@ import {
   AgentQuestionKind,
   AgentQuestionStatus,
   SupervisorAutonomy,
+  SupervisorScopeType,
   SupervisorVerdict,
   type ActivityEntry,
   type AgentQuestion,
@@ -157,7 +158,11 @@ async function configurePolicy(
   autonomy: SupervisorAutonomy
 ): Promise<void> {
   const configure = new ConfigureSupervisorUseCase(policyRepo);
-  await configure.execute({ appId: 'app-1', autonomyLevel: autonomy });
+  await configure.execute({
+    scopeType: SupervisorScopeType.app,
+    scopeId: 'app-1',
+    autonomyLevel: autonomy,
+  });
 }
 
 describe('AgentQuestionSupervisorRouter', () => {
@@ -177,7 +182,7 @@ describe('AgentQuestionSupervisorRouter', () => {
       expect(result.evaluated).toBe(false);
       expect(result.answered).toBe(false);
       expect(bundle.answerSpy).not.toHaveBeenCalled();
-      expect(await bundle.decisionRepo.listByScope('app-1', undefined)).toHaveLength(0);
+      expect(await bundle.decisionRepo.listByScope('app', 'app-1', undefined)).toHaveLength(0);
     });
   });
 
@@ -258,7 +263,7 @@ describe('AgentQuestionSupervisorRouter', () => {
       expect(result.effectiveAutonomy).toBe(SupervisorAutonomy.advisory);
       expect(bundle.answerSpy).not.toHaveBeenCalled();
       // The decision was still persisted via EvaluateSupervisorDecisionUseCase.
-      const decisions = await bundle.decisionRepo.listByScope('app-1', undefined);
+      const decisions = await bundle.decisionRepo.listByScope('app', 'app-1', undefined);
       expect(decisions).toHaveLength(1);
     });
   });

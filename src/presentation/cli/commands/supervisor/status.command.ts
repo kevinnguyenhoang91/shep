@@ -1,8 +1,8 @@
 /**
  * shep supervisor status
  *
- * Shows the effective SupervisorPolicy for the (appId, featureId?)
- * scope, falling back from feature → app per the resolution rules in
+ * Shows the effective SupervisorPolicy for the (scopeType, scopeId?,
+ * featureId?) scope, falling back per the resolution rules in
  * GetSupervisorPolicyUseCase.
  */
 
@@ -12,20 +12,23 @@ import { GetSupervisorPolicyUseCase } from '@/application/use-cases/agents/get-s
 import { colors, messages, symbols } from '../../ui/index.js';
 
 interface StatusOptions {
-  app: string;
+  scope: string;
+  scopeId?: string;
   feature?: string;
 }
 
 export function createStatusCommand(): Command {
   return new Command('status')
-    .description('Show the effective supervisor policy for an app or feature')
-    .requiredOption('--app <id>', 'Application id (required)')
+    .description('Show the effective supervisor policy for a scope')
+    .requiredOption('--scope <type>', 'Scope type: global, repo, or app')
+    .option('--scope-id <id>', 'Scope identifier (app or repo UUID; omit for global)')
     .option('--feature <id>', 'Feature id for a per-feature override')
     .action(async (options: StatusOptions) => {
       try {
         const useCase = container.resolve(GetSupervisorPolicyUseCase);
         const policy = await useCase.execute({
-          appId: options.app,
+          scopeType: options.scope,
+          scopeId: options.scopeId,
           featureId: options.feature,
         });
 
@@ -38,7 +41,7 @@ export function createStatusCommand(): Command {
 
         messages.newline();
         console.log(
-          `  ${colors.muted('scope')}      ${policy.appId}${policy.featureId ? `/${policy.featureId}` : ' (app-wide)'}`
+          `  ${colors.muted('scope')}      ${policy.scopeType}${policy.scopeId ? `:${policy.scopeId}` : ''}${policy.featureId ? `/${policy.featureId}` : ''}`
         );
         console.log(
           `  ${colors.muted('enabled')}    ${policy.enabled ? colors.success('yes') : colors.muted('no')}`

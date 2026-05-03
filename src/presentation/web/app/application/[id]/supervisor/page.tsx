@@ -23,18 +23,23 @@ export default async function SupervisorRoute({ params, searchParams }: RoutePro
   const featureId = feature?.trim() ? feature : undefined;
 
   const useCase = resolve<GetSupervisorPolicyUseCase>('GetSupervisorPolicyUseCase');
-  const policy = await useCase.execute({ appId: id, featureId });
+  const policy = await useCase.execute({ scopeType: 'app', scopeId: id, featureId });
 
   return (
     <div className="flex h-full flex-col gap-6 p-6">
       <header>
         <h1 className="text-2xl font-semibold">Supervisor</h1>
         <p className="text-muted-foreground text-sm">
-          Configure a delegated guardian agent for this application
-          {featureId ? ' feature' : ''}.
+          Configure a delegated guardian agent for this scope
+          {featureId ? ' (feature override)' : ''}.
         </p>
       </header>
-      <SupervisorConfigForm appId={id} featureId={featureId} initialPolicy={policy} />
+      <SupervisorConfigForm
+        scopeType="app"
+        scopeId={id}
+        featureId={featureId}
+        initialPolicy={policy}
+      />
     </div>
   );
 }

@@ -1,9 +1,9 @@
 /**
  * SQLite SupervisorPolicy Repository (spec 093)
  *
- * Backed by the supervisor_policies table (migration 089). Uniqueness is
- * enforced at the schema layer via the unique-(app_id, COALESCE(feature_id, ''))
- * index. {@link findPolicyForScope} implements the documented feature->app
+ * Backed by the supervisor_policies table. Uniqueness is enforced at the
+ * schema layer via the unique-(scope_type, scope_id, COALESCE(feature_id, ''))
+ * index. {@link findPolicyForScope} implements the documented feature->scope
  * fallback (research decision 7).
  */
 
@@ -25,12 +25,12 @@ export class SQLiteSupervisorPolicyRepository implements ISupervisorPolicyReposi
     const row = toDatabase(policy);
     const stmt = this.db.prepare(`
       INSERT INTO supervisor_policies (
-        id, app_id, feature_id, enabled, autonomy_level,
+        id, scope_type, scope_id, feature_id, enabled, autonomy_level,
         gate_authority_json, model_id, prompt_version,
         policy_rules_json, notification_overrides_json,
         created_at, updated_at
       ) VALUES (
-        @id, @app_id, @feature_id, @enabled, @autonomy_level,
+        @id, @scope_type, @scope_id, @feature_id, @enabled, @autonomy_level,
         @gate_authority_json, @model_id, @prompt_version,
         @policy_rules_json, @notification_overrides_json,
         @created_at, @updated_at
@@ -43,7 +43,8 @@ export class SQLiteSupervisorPolicyRepository implements ISupervisorPolicyReposi
     const row = toDatabase(policy);
     const stmt = this.db.prepare(`
       UPDATE supervisor_policies SET
-        app_id = @app_id,
+        scope_type = @scope_type,
+        scope_id = @scope_id,
         feature_id = @feature_id,
         enabled = @enabled,
         autonomy_level = @autonomy_level,
@@ -69,37 +70,54 @@ export class SQLiteSupervisorPolicyRepository implements ISupervisorPolicyReposi
     return row ? fromDatabase(row) : null;
   }
 
-  async findByApp(appId: string): Promise<SupervisorPolicy | null> {
+  async findByScope(scopeType: string, scopeId?: string): Promise<SupervisorPolicy | null> {
     const row = this.db
-      .prepare('SELECT * FROM supervisor_policies WHERE app_id = ? AND feature_id IS NULL LIMIT 1')
-      .get(appId) as SupervisorPolicyRow | undefined;
+      .prepare(
+        `SELECT * FROM supervisor_policies
+         WHERE scope_type = ? AND COALESCE(scope_id, '') = COALESCE(?, '')
+           AND feature_id IS NULL
+         LIMIT 1`
+      )
+      .get(scopeType, scopeId ?? null) as SupervisorPolicyRow | undefined;
     return row ? fromDatabase(row) : null;
   }
 
-  async findByFeature(appId: string, featureId: string): Promise<SupervisorPolicy | null> {
+  async findByScopeAndFeature(
+    scopeType: string,
+    scopeId: string | undefined,
+    featureId: string
+  ): Promise<SupervisorPolicy | null> {
     const row = this.db
-      .prepare('SELECT * FROM supervisor_policies WHERE app_id = ? AND feature_id = ? LIMIT 1')
-      .get(appId, featureId) as SupervisorPolicyRow | undefined;
+      .prepare(
+        `SELECT * FROM supervisor_policies
+         WHERE scope_type = ? AND COALESCE(scope_id, '') = COALESCE(?, '')
+           AND feature_id = ?
+         LIMIT 1`
+      )
+      .get(scopeType, scopeId ?? null, featureId) as SupervisorPolicyRow | undefined;
     return row ? fromDatabase(row) : null;
   }
 
   async findPolicyForScope(
-    appId: string,
+    scopeType: string,
+    scopeId: string | undefined,
     featureId: string | undefined
   ): Promise<SupervisorPolicy | null> {
     if (featureId !== undefined) {
-      const featureRow = await this.findByFeature(appId, featureId);
+      const featureRow = await this.findByScopeAndFeature(scopeType, scopeId, featureId);
       if (featureRow) return featureRow;
     }
-    return this.findByApp(appId);
+    return this.findByScope(scopeType, scopeId);
   }
 
-  async listByApp(appId: string): Promise<SupervisorPolicy[]> {
+  async listByScope(scopeType: string, scopeId?: string): Promise<SupervisorPolicy[]> {
     const rows = this.db
       .prepare(
-        'SELECT * FROM supervisor_policies WHERE app_id = ? ORDER BY feature_id IS NULL DESC, feature_id ASC'
+        `SELECT * FROM supervisor_policies
+         WHERE scope_type = ? AND COALESCE(scope_id, '') = COALESCE(?, '')
+         ORDER BY feature_id IS NULL DESC, feature_id ASC`
       )
-      .all(appId) as SupervisorPolicyRow[];
+      .all(scopeType, scopeId ?? null) as SupervisorPolicyRow[];
     return rows.map(fromDatabase);
   }
 }

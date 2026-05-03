@@ -8,7 +8,7 @@
 
 import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SupervisorAutonomy } from '@/domain/generated/output.js';
+import { SupervisorAutonomy, SupervisorScopeType } from '@/domain/generated/output.js';
 import type { SupervisorPolicy } from '@/domain/generated/output.js';
 
 const {
@@ -76,7 +76,8 @@ import { createRejectCommand } from '../../../../../../src/presentation/cli/comm
 function policy(overrides: Partial<SupervisorPolicy> = {}): SupervisorPolicy {
   return {
     id: 'pol-1',
-    appId: 'app-1',
+    scopeType: SupervisorScopeType.app,
+    scopeId: 'app-1',
     enabled: true,
     autonomyLevel: SupervisorAutonomy.advisory,
     createdAt: new Date(),
@@ -117,14 +118,24 @@ describe('shep supervisor commands', () => {
 
     const cmd = createConfigureCommand();
     await cmd.parseAsync(
-      ['--app', 'app-1', '--autonomy', 'cosign', '--merge-authority', 'autonomous'],
+      [
+        '--scope',
+        'app',
+        '--scope-id',
+        'app-1',
+        '--autonomy',
+        'cosign',
+        '--merge-authority',
+        'autonomous',
+      ],
       { from: 'user' }
     );
 
     expect(configureExecute).toHaveBeenCalledOnce();
     expect(configureExecute).toHaveBeenCalledWith(
       expect.objectContaining({
-        appId: 'app-1',
+        scopeType: 'app',
+        scopeId: 'app-1',
         autonomyLevel: SupervisorAutonomy.cosign,
         gateAuthority: { merge: SupervisorAutonomy.autonomous },
       })
@@ -136,31 +147,45 @@ describe('shep supervisor commands', () => {
     statusExecute.mockResolvedValue(policy({ modelId: 'claude-sonnet' }));
 
     const cmd = createStatusCommand();
-    await cmd.parseAsync(['--app', 'app-1'], { from: 'user' });
+    await cmd.parseAsync(['--scope', 'app', '--scope-id', 'app-1'], { from: 'user' });
 
-    expect(statusExecute).toHaveBeenCalledWith({ appId: 'app-1', featureId: undefined });
+    expect(statusExecute).toHaveBeenCalledWith({
+      scopeType: 'app',
+      scopeId: 'app-1',
+      featureId: undefined,
+    });
     expect(process.exitCode).toBeUndefined();
   });
 
   it('status reports when no policy is configured', async () => {
     statusExecute.mockResolvedValue(null);
     const cmd = createStatusCommand();
-    await cmd.parseAsync(['--app', 'app-2'], { from: 'user' });
+    await cmd.parseAsync(['--scope', 'app', '--scope-id', 'app-2'], { from: 'user' });
     expect(process.exitCode).toBeUndefined();
   });
 
   it('enable invokes EnableSupervisorUseCase', async () => {
     enableExecute.mockResolvedValue(policy());
     const cmd = createEnableCommand();
-    await cmd.parseAsync(['--app', 'app-1'], { from: 'user' });
-    expect(enableExecute).toHaveBeenCalledWith({ appId: 'app-1', featureId: undefined });
+    await cmd.parseAsync(['--scope', 'app', '--scope-id', 'app-1'], { from: 'user' });
+    expect(enableExecute).toHaveBeenCalledWith({
+      scopeType: 'app',
+      scopeId: 'app-1',
+      featureId: undefined,
+    });
   });
 
   it('disable invokes DisableSupervisorUseCase', async () => {
     disableExecute.mockResolvedValue(policy({ enabled: false }));
     const cmd = createDisableCommand();
-    await cmd.parseAsync(['--app', 'app-1', '--feature', 'feat-9'], { from: 'user' });
-    expect(disableExecute).toHaveBeenCalledWith({ appId: 'app-1', featureId: 'feat-9' });
+    await cmd.parseAsync(['--scope', 'app', '--scope-id', 'app-1', '--feature', 'feat-9'], {
+      from: 'user',
+    });
+    expect(disableExecute).toHaveBeenCalledWith({
+      scopeType: 'app',
+      scopeId: 'app-1',
+      featureId: 'feat-9',
+    });
   });
 
   it('approve uses the supervisor:<id> actor namespace', async () => {

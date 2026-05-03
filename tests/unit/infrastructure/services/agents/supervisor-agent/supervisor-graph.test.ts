@@ -28,7 +28,8 @@ function makePolicy(overrides: Partial<SupervisorPolicy> = {}): SupervisorPolicy
   const now = new Date();
   return {
     id: 'pol-1',
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     enabled: true,
     autonomyLevel: SupervisorAutonomy.advisory,
     modelId: 'claude-sonnet-4-6',
@@ -58,7 +59,8 @@ function makeStubExecutor(result: string | Error, delayMs = 0): IAgentExecutor {
 function gateEvent(): SupervisorGateEvent {
   return {
     kind: 'gate',
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     agentRunId: 'run-1',
     gateId: 'plan',
     sourceEventId: 'gate-1',

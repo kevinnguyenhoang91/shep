@@ -1,13 +1,39 @@
 /**
  * @module Shep.Agents.SupervisorPolicy
  *
- * Per-app (with optional per-feature override) supervisor policy that
- * controls how a delegated supervisor agent evaluates approval gates,
- * questions, and lifecycle events.
+ * Supervisor policy that controls how a delegated supervisor agent
+ * evaluates approval gates, questions, and lifecycle events.
+ *
+ * Supports three scope levels — global, repository, and application —
+ * with optional per-feature overrides. Resolution cascade:
+ * feature → repo → app → global.
  *
  * @see specs/093-agent-collaboration-supervision/research.yaml
  */
 import "../common/base.tsp";
+
+/**
+ * Supervisor Scope Type
+ *
+ * Determines the level at which a supervisor policy applies.
+ *
+ * | Value  | Description                                                          |
+ * |--------|----------------------------------------------------------------------|
+ * | global | Applies to all agent work when no narrower policy exists             |
+ * | repo   | Scoped to a specific repository (standalone or app-owned)            |
+ * | app    | Scoped to a Shep application (covers all repos/features in the app) |
+ */
+@doc("Level at which a supervisor policy applies")
+enum SupervisorScopeType {
+  @doc("Global policy — applies when no narrower scope matches")
+  global: "global",
+
+  @doc("Repository-scoped policy — covers all features in a repo")
+  repo: "repo",
+
+  @doc("Application-scoped policy — covers all repos/features in the app")
+  app: "app",
+}
 
 /**
  * Supervisor Autonomy
@@ -37,34 +63,44 @@ enum SupervisorAutonomy {
 /**
  * Supervisor Policy
  *
- * Persisted policy resolved by (appId, featureId?) — feature-scoped
- * policy first, falling back to app-scoped. JSON columns
- * (`gateAuthorityJson`, `policyRulesJson`, `notificationOverridesJson`)
- * carry structured config that evolves independently of the row.
+ * Persisted policy resolved by scope cascade: feature → repo → app → global.
+ * JSON columns (`gateAuthorityJson`, `policyRulesJson`,
+ * `notificationOverridesJson`) carry structured config that evolves
+ * independently of the row.
+ *
+ * Scope rules:
+ * - `global` policy: `scopeId` is null, `featureId` is null
+ * - `repo` policy: `scopeId` is the repository UUID
+ * - `app` policy: `scopeId` is the application UUID
+ * - Per-feature override: any scope type + `featureId` set
  *
  * ## Properties
  *
- * | Property                   | Type                | Required | Description                                                  |
- * |----------------------------|---------------------|----------|--------------------------------------------------------------|
- * | id                         | UUID                | Yes      | Unique identifier (from BaseEntity)                          |
- * | appId                      | string              | Yes      | Required scope                                               |
- * | featureId                  | string              | No       | Optional override scope                                      |
- * | enabled                    | boolean             | Yes      | Master enable toggle                                         |
- * | autonomyLevel              | SupervisorAutonomy  | Yes      | Default autonomy (advisory by default)                       |
- * | gateAuthorityJson          | string              | No       | Per-gate autonomy override JSON map                          |
- * | modelId                    | string              | No       | LLM model id (resolved through IAgentExecutorProvider)       |
- * | promptVersion              | string              | No       | Reproducibility marker for the evaluator prompt              |
- * | policyRulesJson            | string              | No       | JSON array of structured rules                               |
- * | notificationOverridesJson  | string              | No       | JSON object overriding notification preferences              |
- * | createdAt                  | utcDateTime         | Yes      | From BaseEntity                                              |
- * | updatedAt                  | utcDateTime         | Yes      | From BaseEntity                                              |
+ * | Property                   | Type                  | Required | Description                                                  |
+ * |----------------------------|-----------------------|----------|--------------------------------------------------------------|
+ * | id                         | UUID                  | Yes      | Unique identifier (from BaseEntity)                          |
+ * | scopeType                  | SupervisorScopeType   | Yes      | Level at which this policy applies                           |
+ * | scopeId                    | string                | No       | App or repo UUID (null for global policies)                  |
+ * | featureId                  | string                | No       | Optional per-feature override                                |
+ * | enabled                    | boolean               | Yes      | Master enable toggle                                         |
+ * | autonomyLevel              | SupervisorAutonomy    | Yes      | Default autonomy (advisory by default)                       |
+ * | gateAuthorityJson          | string                | No       | Per-gate autonomy override JSON map                          |
+ * | modelId                    | string                | No       | LLM model id (resolved through IAgentExecutorProvider)       |
+ * | promptVersion              | string                | No       | Reproducibility marker for the evaluator prompt              |
+ * | policyRulesJson            | string                | No       | JSON array of structured rules                               |
+ * | notificationOverridesJson  | string                | No       | JSON object overriding notification preferences              |
+ * | createdAt                  | utcDateTime           | Yes      | From BaseEntity                                              |
+ * | updatedAt                  | utcDateTime           | Yes      | From BaseEntity                                              |
  */
-@doc("Per-app supervisor policy with optional per-feature override")
+@doc("Supervisor policy with cascading scope: global → repo → app → feature")
 model SupervisorPolicy extends BaseEntity {
-  @doc("App scope identifier (required)")
-  appId: string;
+  @doc("Level at which this policy applies (global, repo, or app)")
+  scopeType: SupervisorScopeType;
 
-  @doc("Feature scope identifier (optional override)")
+  @doc("Scope identifier — app or repo UUID (null for global policies)")
+  scopeId?: string;
+
+  @doc("Feature scope identifier (optional per-feature override)")
   featureId?: string;
 
   @doc("Master enable toggle")

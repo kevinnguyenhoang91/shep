@@ -7,7 +7,7 @@
  *   1. Short-circuit when the `collaboration` feature flag is off
  *      (NFR-14 byte-identical default behaviour).
  *   2. Resolve the effective {@link SupervisorPolicy} for the event's
- *      scope via {@link GetSupervisorPolicyUseCase} (feature-then-app
+ *      scope via {@link GetSupervisorPolicyUseCase} (feature-then-scope
  *      fallback). When no policy exists the caller is told nothing was
  *      done.
  *   3. Call {@link ISupervisorAgent.evaluate} for the LLM (or stub)
@@ -96,7 +96,8 @@ export class EvaluateSupervisorDecisionUseCase {
     const { event, supervisorRunId } = input;
 
     const policy = await this.getPolicy.execute({
-      appId: event.appId,
+      scopeType: event.scopeType,
+      scopeId: event.scopeId,
       featureId: event.featureId,
     });
     if (!policy) {
@@ -132,7 +133,8 @@ export class EvaluateSupervisorDecisionUseCase {
 
     const decision: SupervisorDecision = {
       id: randomUUID(),
-      appId: event.appId,
+      scopeType: event.scopeType,
+      scopeId: event.scopeId,
       featureId: event.featureId,
       supervisorRunId,
       sourceEventKind: event.kind,

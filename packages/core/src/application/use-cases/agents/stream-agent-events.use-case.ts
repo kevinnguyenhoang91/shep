@@ -500,7 +500,7 @@ export class StreamAgentEventsUseCase {
         supervisorDecisionCache.set(appId, cache);
       }
       try {
-        const decisions = await this.supervisorDecisionRepo.listByScope(appId, undefined, {
+        const decisions = await this.supervisorDecisionRepo.listByScope('app', appId, undefined, {
           since: cache.lastSeenAt > 0 ? new Date(cache.lastSeenAt) : undefined,
         });
         for (const event of computeDecisionDeltas({ decisions, cache })) {

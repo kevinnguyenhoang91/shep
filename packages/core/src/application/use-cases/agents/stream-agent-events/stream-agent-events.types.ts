@@ -62,7 +62,8 @@ export interface NotificationStreamEvent {
 export interface AgentMessageStreamEvent {
   kind: 'agent_message';
   messageId: string;
-  appId: string;
+  appId?: string;
+  repositoryId?: string;
   featureId?: string;
   fromActor: string;
   fromAgentRunId?: string;
@@ -88,7 +89,8 @@ export interface AgentMessageStreamEvent {
 export interface AgentQuestionStreamEvent {
   kind: 'agent_question';
   questionId: string;
-  appId: string;
+  appId?: string;
+  repositoryId?: string;
   featureId?: string;
   agentRunId: string;
   questionKind: AgentQuestionKind;
@@ -115,7 +117,8 @@ export interface AgentQuestionStreamEvent {
 export interface SupervisorDecisionStreamEvent {
   kind: 'supervisor_decision';
   decisionId: string;
-  appId: string;
+  scopeType: string;
+  scopeId?: string;
   featureId?: string;
   supervisorRunId: string;
   sourceEventKind: string;

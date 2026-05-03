@@ -4,7 +4,10 @@ type: object
 properties:
   appId:
     type: string
-    description: App scope identifier (NFR-7 isolation; never cross-app)
+    description: App scope identifier (set when message originates in an app context)
+  repositoryId:
+    type: string
+    description: Repository scope identifier (set for standalone-repo agent work)
   featureId:
     type: string
     description: Optional feature scope identifier
@@ -34,7 +37,6 @@ properties:
     format: date-time
     description: Timestamp when the bus marked this message delivered to subscribers
 required:
-  - appId
   - fromActor
   - toTarget
   - toKind

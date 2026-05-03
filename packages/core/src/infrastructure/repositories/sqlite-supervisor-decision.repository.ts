@@ -26,12 +26,12 @@ export class SQLiteSupervisorDecisionRepository implements ISupervisorDecisionRe
     const row = toDatabase(decision);
     const stmt = this.db.prepare(`
       INSERT INTO supervisor_decisions (
-        id, app_id, feature_id, supervisor_run_id,
+        id, scope_type, scope_id, feature_id, supervisor_run_id,
         source_event_kind, source_event_id, verdict, rationale,
         model_id, prompt_version, rule_ref, confidence,
         created_at, updated_at
       ) VALUES (
-        @id, @app_id, @feature_id, @supervisor_run_id,
+        @id, @scope_type, @scope_id, @feature_id, @supervisor_run_id,
         @source_event_kind, @source_event_id, @verdict, @rationale,
         @model_id, @prompt_version, @rule_ref, @confidence,
         @created_at, @updated_at
@@ -69,12 +69,13 @@ export class SQLiteSupervisorDecisionRepository implements ISupervisorDecisionRe
   }
 
   async listByScope(
-    appId: string,
+    scopeType: string,
+    scopeId: string | undefined,
     featureId: string | undefined,
     filters: SupervisorDecisionListFilters = {}
   ): Promise<SupervisorDecision[]> {
-    const conditions: string[] = ['app_id = ?'];
-    const params: unknown[] = [appId];
+    const conditions: string[] = ['scope_type = ?', "COALESCE(scope_id, '') = COALESCE(?, '')"];
+    const params: unknown[] = [scopeType, scopeId ?? null];
 
     if (featureId !== undefined) {
       conditions.push('feature_id = ?');

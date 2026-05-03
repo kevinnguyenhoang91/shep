@@ -2,16 +2,28 @@
  * In-Memory SupervisorPolicy Repository
  *
  * Test-friendly adapter for {@link ISupervisorPolicyRepository}. Enforces
- * the unique-(appId, featureId) constraint and the feature-then-app
- * scope fallback documented in research decision 7.
+ * the unique-(scopeType, scopeId, featureId) constraint and the
+ * feature-then-scope fallback documented in research decision 7.
  */
 
 import { injectable } from 'tsyringe';
 import type { ISupervisorPolicyRepository } from '@/application/ports/output/repositories/supervisor-policy-repository.interface.js';
 import type { SupervisorPolicy } from '@/domain/generated/output.js';
 
-function scopeKey(appId: string, featureId: string | null | undefined): string {
-  return `${appId}::${featureId ?? ''}`;
+function scopeKey(
+  scopeType: string,
+  scopeId: string | null | undefined,
+  featureId: string | null | undefined
+): string {
+  return `${scopeType}::${scopeId ?? ''}::${featureId ?? ''}`;
+}
+
+function scopeMatches(
+  row: SupervisorPolicy,
+  scopeType: string,
+  scopeId: string | null | undefined
+): boolean {
+  return row.scopeType === scopeType && (row.scopeId ?? undefined) === (scopeId ?? undefined);
 }
 
 @injectable()
@@ -22,11 +34,11 @@ export class InMemorySupervisorPolicyRepository implements ISupervisorPolicyRepo
     if (this.policies.has(policy.id)) {
       throw new Error(`SupervisorPolicy with id "${policy.id}" already exists`);
     }
-    const key = scopeKey(policy.appId, policy.featureId ?? undefined);
+    const key = scopeKey(policy.scopeType, policy.scopeId, policy.featureId ?? undefined);
     for (const existing of this.policies.values()) {
-      if (scopeKey(existing.appId, existing.featureId ?? undefined) === key) {
+      if (scopeKey(existing.scopeType, existing.scopeId, existing.featureId ?? undefined) === key) {
         throw new Error(
-          `SupervisorPolicy already exists for appId=${policy.appId}, featureId=${policy.featureId ?? '(null)'}`
+          `SupervisorPolicy already exists for scopeType=${policy.scopeType}, scopeId=${policy.scopeId ?? '(null)'}, featureId=${policy.featureId ?? '(null)'}`
         );
       }
     }
@@ -49,18 +61,25 @@ export class InMemorySupervisorPolicyRepository implements ISupervisorPolicyRepo
     return row ? { ...row } : null;
   }
 
-  async findByApp(appId: string): Promise<SupervisorPolicy | null> {
+  async findByScope(scopeType: string, scopeId?: string): Promise<SupervisorPolicy | null> {
     for (const row of this.policies.values()) {
-      if (row.appId === appId && (row.featureId === undefined || row.featureId === null)) {
+      if (
+        scopeMatches(row, scopeType, scopeId) &&
+        (row.featureId === undefined || row.featureId === null)
+      ) {
         return { ...row };
       }
     }
     return null;
   }
 
-  async findByFeature(appId: string, featureId: string): Promise<SupervisorPolicy | null> {
+  async findByScopeAndFeature(
+    scopeType: string,
+    scopeId: string | undefined,
+    featureId: string
+  ): Promise<SupervisorPolicy | null> {
     for (const row of this.policies.values()) {
-      if (row.appId === appId && row.featureId === featureId) {
+      if (scopeMatches(row, scopeType, scopeId) && row.featureId === featureId) {
         return { ...row };
       }
     }
@@ -68,20 +87,21 @@ export class InMemorySupervisorPolicyRepository implements ISupervisorPolicyRepo
   }
 
   async findPolicyForScope(
-    appId: string,
+    scopeType: string,
+    scopeId: string | undefined,
     featureId: string | undefined
   ): Promise<SupervisorPolicy | null> {
     if (featureId !== undefined) {
-      const featureRow = await this.findByFeature(appId, featureId);
+      const featureRow = await this.findByScopeAndFeature(scopeType, scopeId, featureId);
       if (featureRow) return featureRow;
     }
-    return this.findByApp(appId);
+    return this.findByScope(scopeType, scopeId);
   }
 
-  async listByApp(appId: string): Promise<SupervisorPolicy[]> {
+  async listByScope(scopeType: string, scopeId?: string): Promise<SupervisorPolicy[]> {
     const result: SupervisorPolicy[] = [];
     for (const row of this.policies.values()) {
-      if (row.appId === appId) result.push({ ...row });
+      if (scopeMatches(row, scopeType, scopeId)) result.push({ ...row });
     }
     return result;
   }

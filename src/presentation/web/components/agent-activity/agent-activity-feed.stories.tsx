@@ -39,7 +39,8 @@ function message(overrides: Partial<AgentMessageStreamEvent> = {}): AgentMessage
 
 export const Empty: Story = {
   args: {
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     featureId: 'feat-1',
     overrideMessages: [],
   },
@@ -47,7 +48,8 @@ export const Empty: Story = {
 
 export const FewMessages: Story = {
   args: {
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     featureId: 'feat-1',
     overrideMessages: [
       message({ messageId: 'm1' }),
@@ -63,7 +65,8 @@ export const FewMessages: Story = {
 
 export const ManyMessages: Story = {
   args: {
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     featureId: 'feat-1',
     overrideMessages: Array.from({ length: 12 }, (_, i) =>
       message({
@@ -83,7 +86,8 @@ export const ManyMessages: Story = {
 
 export const Error: Story = {
   args: {
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     featureId: 'feat-1',
     overrideMessages: [],
     errorMessage: 'Failed to load agent activity feed',

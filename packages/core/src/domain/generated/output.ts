@@ -806,17 +806,26 @@ export type Settings = BaseEntity & {
    */
   defaultHomePage?: DefaultHomePage;
 };
+export enum SupervisorScopeType {
+  global = 'global',
+  repo = 'repo',
+  app = 'app',
+}
 
 /**
- * Per-app supervisor policy with optional per-feature override
+ * Supervisor policy with cascading scope: global → repo → app → feature
  */
 export type SupervisorPolicy = BaseEntity & {
   /**
-   * App scope identifier (required)
+   * Level at which this policy applies (global, repo, or app)
    */
-  appId: string;
+  scopeType: SupervisorScopeType;
   /**
-   * Feature scope identifier (optional override)
+   * Scope identifier — app or repo UUID (null for global policies)
+   */
+  scopeId?: string;
+  /**
+   * Feature scope identifier (optional per-feature override)
    */
   featureId?: string;
   /**
@@ -3723,9 +3732,13 @@ export enum AgentMessageKind {
  */
 export type AgentMessage = BaseEntity & {
   /**
-   * App scope identifier (NFR-7 isolation; never cross-app)
+   * App scope identifier (set when message originates in an app context)
    */
-  appId: string;
+  appId?: string;
+  /**
+   * Repository scope identifier (set for standalone-repo agent work)
+   */
+  repositoryId?: string;
   /**
    * Optional feature scope identifier
    */
@@ -3785,9 +3798,13 @@ export enum AgentQuestionStatus {
  */
 export type AgentQuestion = BaseEntity & {
   /**
-   * App scope identifier (NFR-7 isolation)
+   * App scope identifier (set when question originates in app context)
    */
-  appId: string;
+  appId?: string;
+  /**
+   * Repository scope identifier (set for standalone-repo agent work)
+   */
+  repositoryId?: string;
   /**
    * Optional feature scope identifier
    */
@@ -3849,9 +3866,13 @@ export enum SupervisorVerdict {
  */
 export type SupervisorDecision = BaseEntity & {
   /**
-   * App scope identifier (NFR-7 isolation)
+   * Scope level of the policy that triggered this decision (global, repo, app)
    */
-  appId: string;
+  scopeType: string;
+  /**
+   * App or repo UUID from the triggering policy (null for global)
+   */
+  scopeId?: string;
   /**
    * Optional feature scope identifier
    */

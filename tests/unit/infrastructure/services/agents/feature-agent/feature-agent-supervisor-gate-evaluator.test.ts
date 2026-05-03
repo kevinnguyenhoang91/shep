@@ -36,6 +36,7 @@ import { InMemorySupervisorPolicyRepository } from '@/infrastructure/adapters/in
 import {
   AgentRunStatus,
   SupervisorAutonomy,
+  SupervisorScopeType,
   SupervisorVerdict,
   type ActivityEntry,
   type AgentRun,
@@ -248,7 +249,11 @@ async function configurePolicy(
   autonomy: SupervisorAutonomy
 ): Promise<void> {
   const configure = new ConfigureSupervisorUseCase(policyRepo);
-  await configure.execute({ appId: 'app-1', autonomyLevel: autonomy });
+  await configure.execute({
+    scopeType: SupervisorScopeType.app,
+    scopeId: 'app-1',
+    autonomyLevel: autonomy,
+  });
 }
 
 describe('FeatureAgentSupervisorGateEvaluator', () => {
@@ -319,7 +324,7 @@ describe('FeatureAgentSupervisorGateEvaluator', () => {
       expect(bundle.approveSpy).not.toHaveBeenCalled();
       expect(bundle.rejectSpy).not.toHaveBeenCalled();
       // The decision was still persisted via EvaluateSupervisorDecisionUseCase.
-      const decisions = await bundle.decisionRepo.listByScope('app-1', undefined);
+      const decisions = await bundle.decisionRepo.listByScope('app', 'app-1', undefined);
       expect(decisions).toHaveLength(1);
     });
   });
@@ -384,7 +389,8 @@ describe('resolveEffectiveAutonomy', () => {
   function policy(overrides: Partial<SupervisorPolicy> = {}): SupervisorPolicy {
     return {
       id: 'p-1',
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       featureId: undefined,
       enabled: true,
       autonomyLevel: SupervisorAutonomy.advisory,

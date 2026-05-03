@@ -21,7 +21,8 @@ function makeDecision(overrides: Partial<SupervisorDecision> = {}): SupervisorDe
   const now = new Date('2026-04-01T10:00:00Z');
   return {
     id: 'd-1',
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     featureId: undefined,
     supervisorRunId: 'sup-run-1',
     sourceEventKind: 'gate',
@@ -72,7 +73,8 @@ describe('computeDecisionDeltas', () => {
       decisions: [
         makeDecision({
           id: 'd-x',
-          appId: 'app-7',
+          scopeType: 'app',
+          scopeId: 'app-7',
           featureId: 'feat-3',
           supervisorRunId: 'sup-9',
           sourceEventKind: 'question',
@@ -93,7 +95,8 @@ describe('computeDecisionDeltas', () => {
     const ev = events[0];
     if (ev.kind !== 'supervisor_decision') throw new Error('expected supervisor_decision event');
     expect(ev.decisionId).toBe('d-x');
-    expect(ev.appId).toBe('app-7');
+    expect(ev.scopeType).toBe('app');
+    expect(ev.scopeId).toBe('app-7');
     expect(ev.featureId).toBe('feat-3');
     expect(ev.supervisorRunId).toBe('sup-9');
     expect(ev.sourceEventKind).toBe('question');

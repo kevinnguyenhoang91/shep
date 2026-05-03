@@ -19,7 +19,8 @@ function makePolicy(): SupervisorPolicy {
   const now = new Date();
   return {
     id: 'pol-1',
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     enabled: true,
     autonomyLevel: SupervisorAutonomy.advisory,
     createdAt: now,
@@ -32,7 +33,8 @@ describe('InMemorySupervisorAgent', () => {
     const adapter = new InMemorySupervisorAgent();
     const event: SupervisorGateEvent = {
       kind: 'gate',
-      appId: 'app-1',
+      scopeType: 'app',
+      scopeId: 'app-1',
       agentRunId: 'run-1',
       gateId: 'plan',
       sourceEventId: 'gate-1',
@@ -57,7 +59,8 @@ describe('InMemorySupervisorAgent', () => {
     const decision = await adapter.evaluate({
       event: {
         kind: 'gate',
-        appId: 'app-1',
+        scopeType: 'app',
+        scopeId: 'app-1',
         agentRunId: 'run-1',
         gateId: 'merge',
         sourceEventId: 'gate-2',

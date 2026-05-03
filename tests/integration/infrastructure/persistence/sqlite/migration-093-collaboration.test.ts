@@ -120,34 +120,34 @@ describe('Migration 087-091 — collaboration & supervision schema', () => {
       expect(tableExists(db, 'supervisor_policies')).toBe(true);
       const indexes = getTableIndexes(db, 'supervisor_policies');
       expect(indexes).toContain('idx_supervisor_policies_unique_scope');
-      expect(indexes).toContain('idx_supervisor_policies_app_id');
+      expect(indexes).toContain('idx_supervisor_policies_scope');
     });
 
-    it('enforces unique (app_id, feature_id) including NULL feature_id', () => {
+    it('enforces unique (scope_type, scope_id, feature_id) including NULL feature_id', () => {
       const now = Date.now();
       db.prepare(
-        `INSERT INTO supervisor_policies (id, app_id, feature_id, enabled, autonomy_level, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).run('p1', 'app-1', null, 1, 'advisory', now, now);
+        `INSERT INTO supervisor_policies (id, scope_type, scope_id, feature_id, enabled, autonomy_level, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run('p1', 'app', 'app-1', null, 1, 'advisory', now, now);
 
-      // Duplicate (app_id, NULL feature_id) must fail
+      // Duplicate (scope_type, scope_id, NULL feature_id) must fail
       expect(() =>
         db
           .prepare(
-            `INSERT INTO supervisor_policies (id, app_id, feature_id, enabled, autonomy_level, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`
+            `INSERT INTO supervisor_policies (id, scope_type, scope_id, feature_id, enabled, autonomy_level, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
           )
-          .run('p2', 'app-1', null, 1, 'advisory', now, now)
+          .run('p2', 'app', 'app-1', null, 1, 'advisory', now, now)
       ).toThrow();
 
-      // Distinct feature_id is allowed for the same app
+      // Distinct feature_id is allowed for the same scope
       expect(() =>
         db
           .prepare(
-            `INSERT INTO supervisor_policies (id, app_id, feature_id, enabled, autonomy_level, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`
+            `INSERT INTO supervisor_policies (id, scope_type, scope_id, feature_id, enabled, autonomy_level, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
           )
-          .run('p3', 'app-1', 'feat-1', 1, 'advisory', now, now)
+          .run('p3', 'app', 'app-1', 'feat-1', 1, 'advisory', now, now)
       ).not.toThrow();
     });
 

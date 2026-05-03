@@ -89,9 +89,13 @@ export class AgentQuestionSupervisorRouter {
       return { evaluated: false, answered: false };
     }
 
+    const scopeType = question.appId ? 'app' : question.repositoryId ? 'repo' : 'global';
+    const scopeId = question.appId ?? question.repositoryId;
+
     try {
       const policy = await this.getPolicy.execute({
-        appId: question.appId,
+        scopeType,
+        scopeId,
         featureId: question.featureId,
       });
       if (!policy) {
@@ -102,7 +106,8 @@ export class AgentQuestionSupervisorRouter {
       const result = await this.evaluateDecision.execute({
         event: {
           kind: 'question',
-          appId: question.appId,
+          scopeType,
+          scopeId,
           featureId: question.featureId,
           agentRunId: question.agentRunId,
           questionId: question.id,
@@ -156,7 +161,7 @@ export class AgentQuestionSupervisorRouter {
 
     try {
       await this.answerAgentQuestion.execute({
-        appId: question.appId,
+        appId: question.appId ?? '',
         questionId: question.id,
         answer,
         answeredBy: `supervisor:${supervisorRunId}`,

@@ -96,7 +96,8 @@ enum AgentQuestionStatus {
  * | Property       | Type                   | Required | Description                                       |
  * |----------------|------------------------|----------|---------------------------------------------------|
  * | id             | UUID                   | Yes      | Unique identifier (from BaseEntity)               |
- * | appId          | string                 | Yes      | App scope (NFR-7 isolation)                       |
+ * | appId          | string                 | No       | App scope when question originates in app context |
+ * | repositoryId   | string                 | No       | Repo scope for standalone-repo agent work         |
  * | featureId      | string                 | No       | Feature scope when applicable                     |
  * | agentRunId     | string                 | Yes      | The agent run that raised the question            |
  * | kind           | AgentQuestionKind      | Yes      | Three-tier urgency                                |
@@ -114,8 +115,11 @@ enum AgentQuestionStatus {
  */
 @doc("A question raised by an agent toward the user, supervisor, or either")
 model AgentQuestion extends BaseEntity {
-  @doc("App scope identifier (NFR-7 isolation)")
-  appId: string;
+  @doc("App scope identifier (set when question originates in app context)")
+  appId?: string;
+
+  @doc("Repository scope identifier (set for standalone-repo agent work)")
+  repositoryId?: string;
 
   @doc("Optional feature scope identifier")
   featureId?: string;

@@ -57,6 +57,7 @@ export function computeMessageDeltas(args: ComputeMessageDeltasArgs): StreamedAg
       kind: 'agent_message',
       messageId: m.id,
       appId: m.appId,
+      repositoryId: m.repositoryId,
       featureId: m.featureId,
       fromActor: m.fromActor,
       fromAgentRunId: m.fromAgentRunId,

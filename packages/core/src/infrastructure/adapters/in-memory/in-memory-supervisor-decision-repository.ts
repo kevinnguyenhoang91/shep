@@ -60,7 +60,8 @@ export class InMemorySupervisorDecisionRepository implements ISupervisorDecision
   }
 
   async listByScope(
-    appId: string,
+    scopeType: string,
+    scopeId: string | undefined,
     featureId: string | undefined,
     filters: SupervisorDecisionListFilters = {}
   ): Promise<SupervisorDecision[]> {
@@ -68,7 +69,8 @@ export class InMemorySupervisorDecisionRepository implements ISupervisorDecision
     const result: SupervisorDecision[] = [];
 
     for (const row of this.decisions.values()) {
-      if (row.appId !== appId) continue;
+      if (row.scopeType !== scopeType) continue;
+      if ((row.scopeId ?? undefined) !== (scopeId ?? undefined)) continue;
       if (featureId !== undefined && row.featureId !== featureId) continue;
       if (sinceMillis !== undefined && toMillis(row.createdAt) < sinceMillis) continue;
       result.push({ ...row });

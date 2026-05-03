@@ -9,7 +9,8 @@ import type { SupervisorDecision, SupervisorVerdict } from '../../../../domain/g
 
 export interface SupervisorDecisionRow {
   id: string;
-  app_id: string;
+  scope_type: string;
+  scope_id: string | null;
   feature_id: string | null;
   supervisor_run_id: string;
   source_event_kind: string;
@@ -34,7 +35,8 @@ function toMillis(value: SupervisorDecision['createdAt']): number {
 export function toDatabase(decision: SupervisorDecision): SupervisorDecisionRow {
   return {
     id: decision.id,
-    app_id: decision.appId,
+    scope_type: decision.scopeType,
+    scope_id: decision.scopeId ?? null,
     feature_id: decision.featureId ?? null,
     supervisor_run_id: decision.supervisorRunId,
     source_event_kind: decision.sourceEventKind,
@@ -53,7 +55,8 @@ export function toDatabase(decision: SupervisorDecision): SupervisorDecisionRow 
 export function fromDatabase(row: SupervisorDecisionRow): SupervisorDecision {
   return {
     id: row.id,
-    appId: row.app_id,
+    scopeType: row.scope_type,
+    scopeId: row.scope_id ?? undefined,
     featureId: row.feature_id ?? undefined,
     supervisorRunId: row.supervisor_run_id,
     sourceEventKind: row.source_event_kind,

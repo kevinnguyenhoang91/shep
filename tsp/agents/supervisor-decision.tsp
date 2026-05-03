@@ -43,12 +43,16 @@ enum SupervisorVerdict {
  * model + prompt version, optional confidence, and the rule reference so
  * decisions remain inspectable across model rotations.
  *
+ * Scope fields mirror the policy that triggered the decision so audit
+ * queries can filter by scope without joining supervisor_policies.
+ *
  * ## Properties
  *
  * | Property         | Type              | Required | Description                                              |
  * |------------------|-------------------|----------|----------------------------------------------------------|
  * | id               | UUID              | Yes      | Unique identifier (from BaseEntity)                      |
- * | appId            | string            | Yes      | App scope (NFR-7 isolation)                              |
+ * | scopeType        | string            | Yes      | Scope level of the policy that triggered the decision    |
+ * | scopeId          | string            | No       | App or repo UUID (null for global policies)              |
  * | featureId        | string            | No       | Feature scope when applicable                            |
  * | supervisorRunId  | string            | Yes      | Agent run id of the supervisor that produced this        |
  * | sourceEventKind  | string            | Yes      | Kind of event (gate, question, message)                  |
@@ -64,8 +68,11 @@ enum SupervisorVerdict {
  */
 @doc("Immutable audit record of a supervisor decision")
 model SupervisorDecision extends BaseEntity {
-  @doc("App scope identifier (NFR-7 isolation)")
-  appId: string;
+  @doc("Scope level of the policy that triggered this decision (global, repo, app)")
+  scopeType: string;
+
+  @doc("App or repo UUID from the triggering policy (null for global)")
+  scopeId?: string;
 
   @doc("Optional feature scope identifier")
   featureId?: string;

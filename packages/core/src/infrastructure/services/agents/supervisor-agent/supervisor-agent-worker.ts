@@ -2,7 +2,7 @@
  * SupervisorAgentWorker — long-lived in-process subscriber that forwards
  * supervisor events to the {@link ISupervisorAgent} evaluator.
  *
- * One worker exists per `(appId, featureId?)` scope. It mirrors the
+ * One worker exists per `(scopeType, scopeId?, featureId?)` scope. It mirrors the
  * feature-agent-worker shape:
  *   - owns its own `AgentRun` row (`agentName='supervisor'`),
  *   - heartbeats at the same cadence as the feature agent (30s),
@@ -42,12 +42,17 @@ export const SUPERVISOR_IDLE_TTL_MS = 10 * 60 * 1000;
 export const SUPERVISOR_AGENT_NAME = 'supervisor';
 
 /** Internal scope key used by the registry. */
-function scopeKey(appId: string, featureId: string | undefined): string {
-  return `${appId}::${featureId ?? ''}`;
+function scopeKey(
+  scopeType: string,
+  scopeId: string | undefined,
+  featureId: string | undefined
+): string {
+  return `${scopeType}:${scopeId ?? ''}::${featureId ?? ''}`;
 }
 
 export interface SupervisorAgentWorkerScope {
-  appId: string;
+  scopeType: string;
+  scopeId?: string;
   featureId?: string;
 }
 
@@ -118,7 +123,7 @@ export class SupervisorAgentWorker {
       agentType: AgentType.ClaudeCode,
       agentName: SUPERVISOR_AGENT_NAME,
       status: AgentRunStatus.running,
-      prompt: `supervisor for ${scopeKey(this.scope.appId, this.scope.featureId)}`,
+      prompt: `supervisor for ${scopeKey(this.scope.scopeType, this.scope.scopeId, this.scope.featureId)}`,
       threadId: `supervisor-${this.runId}`,
       pid: process.pid,
       lastHeartbeat: now,
@@ -218,7 +223,7 @@ export class SupervisorAgentWorker {
 export type SupervisorAgentWorkerRegistryDeps = SupervisorAgentWorkerDeps;
 
 /**
- * Lazily starts (and reaps) one worker per `(appId, featureId?)` scope.
+ * Lazily starts (and reaps) one worker per `(scopeType, scopeId?, featureId?)` scope.
  *
  * Production code submits events via `submitEvent`; the registry starts
  * a worker on first event for a new scope and reuses warm workers for
@@ -240,10 +245,11 @@ export class SupervisorAgentWorkerRegistry {
   ): Promise<SupervisorDecisionResult> {
     const policy = carrier.policy;
     const scope: SupervisorAgentWorkerScope = {
-      appId: policy.appId,
+      scopeType: policy.scopeType,
+      scopeId: policy.scopeId,
       featureId: policy.featureId,
     };
-    const key = scopeKey(scope.appId, scope.featureId);
+    const key = scopeKey(scope.scopeType, scope.scopeId, scope.featureId);
 
     let worker = this.workers.get(key);
     if (!worker) {
@@ -264,15 +270,19 @@ export class SupervisorAgentWorkerRegistry {
   }
 
   /** True if a warm worker exists for the given scope. */
-  hasWorker(appId: string, featureId: string | undefined): boolean {
-    const worker = this.workers.get(scopeKey(appId, featureId));
+  hasWorker(
+    scopeType: string,
+    scopeId: string | undefined,
+    featureId: string | undefined
+  ): boolean {
+    const worker = this.workers.get(scopeKey(scopeType, scopeId, featureId));
     return worker?.isRunning() ?? false;
   }
 
   private async createAndStartWorker(
     scope: SupervisorAgentWorkerScope
   ): Promise<SupervisorAgentWorker> {
-    const key = scopeKey(scope.appId, scope.featureId);
+    const key = scopeKey(scope.scopeType, scope.scopeId, scope.featureId);
 
     const innerOnReaped = this.deps.onReaped;
     const worker = new SupervisorAgentWorker(scope, {

@@ -33,7 +33,7 @@ function toMillis(value: AgentMessage['createdAt']): number {
 export function toDatabase(message: AgentMessage): AgentMessageRow {
   return {
     id: message.id,
-    app_id: message.appId,
+    app_id: message.appId ?? '',
     feature_id: message.featureId ?? null,
     from_agent_run_id: message.fromAgentRunId ?? null,
     from_actor: message.fromActor,

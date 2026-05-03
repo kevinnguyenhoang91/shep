@@ -57,7 +57,8 @@ enum AgentMessageKind {
  * | Property        | Type             | Required | Description                                            |
  * |-----------------|------------------|----------|--------------------------------------------------------|
  * | id              | UUID             | Yes      | Unique identifier (from BaseEntity)                    |
- * | appId           | string           | Yes      | App scope (NFR-7 isolation)                            |
+ * | appId           | string           | No       | App scope when message originates in an app context    |
+ * | repositoryId    | string           | No       | Repo scope for standalone-repo agent work              |
  * | featureId       | string           | No       | Feature scope when applicable                          |
  * | fromAgentRunId  | string           | No       | Sender agent run id (omitted for `user`/`supervisor`)  |
  * | fromActor       | string           | Yes      | Sender actor namespace: `agent:<id>`/`user:<id>`/...   |
@@ -72,8 +73,11 @@ enum AgentMessageKind {
  */
 @doc("Inter-agent / agent↔user / agent↔supervisor message persisted on the bus")
 model AgentMessage extends BaseEntity {
-  @doc("App scope identifier (NFR-7 isolation; never cross-app)")
-  appId: string;
+  @doc("App scope identifier (set when message originates in an app context)")
+  appId?: string;
+
+  @doc("Repository scope identifier (set for standalone-repo agent work)")
+  repositoryId?: string;
 
   @doc("Optional feature scope identifier")
   featureId?: string;

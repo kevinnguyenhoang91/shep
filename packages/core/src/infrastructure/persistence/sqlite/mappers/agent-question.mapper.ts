@@ -41,7 +41,7 @@ function toMillis(value: AgentQuestion['createdAt']): number {
 export function toDatabase(question: AgentQuestion): AgentQuestionRow {
   return {
     id: question.id,
-    app_id: question.appId,
+    app_id: question.appId ?? '',
     feature_id: question.featureId ?? null,
     agent_run_id: question.agentRunId,
     kind: question.kind,

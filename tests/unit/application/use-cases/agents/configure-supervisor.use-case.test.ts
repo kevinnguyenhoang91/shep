@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import { ConfigureSupervisorUseCase } from '@/application/use-cases/agents/configure-supervisor.use-case.js';
 import { InMemorySupervisorPolicyRepository } from '@/infrastructure/adapters/in-memory/in-memory-supervisor-policy-repository.js';
-import { SupervisorAutonomy } from '@/domain/generated/output.js';
+import { SupervisorAutonomy, SupervisorScopeType } from '@/domain/generated/output.js';
 import { InvalidSupervisorPolicyError } from '@/domain/errors/invalid-supervisor-policy.error.js';
 
 describe('ConfigureSupervisorUseCase', () => {
@@ -23,39 +23,43 @@ describe('ConfigureSupervisorUseCase', () => {
     useCase = new ConfigureSupervisorUseCase(repo);
   });
 
-  it('creates a new app-scoped policy with sensible defaults', async () => {
+  it('creates a new scope-level policy with sensible defaults', async () => {
     const policy = await useCase.execute({
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       autonomyLevel: SupervisorAutonomy.advisory,
     });
 
     expect(policy.id).toBeDefined();
-    expect(policy.appId).toBe('app-1');
+    expect(policy.scopeType).toBe(SupervisorScopeType.app);
+    expect(policy.scopeId).toBe('app-1');
     expect(policy.featureId).toBeUndefined();
     expect(policy.enabled).toBe(true);
     expect(policy.autonomyLevel).toBe(SupervisorAutonomy.advisory);
     expect(policy.createdAt).toBeInstanceOf(Date);
     expect(policy.updatedAt).toBeInstanceOf(Date);
 
-    const stored = await repo.findByApp('app-1');
+    const stored = await repo.findByScope('app', 'app-1');
     expect(stored?.id).toBe(policy.id);
   });
 
   it('creates a feature-scoped override when featureId is provided', async () => {
     const policy = await useCase.execute({
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       featureId: 'feat-7',
       autonomyLevel: SupervisorAutonomy.cosign,
     });
 
     expect(policy.featureId).toBe('feat-7');
-    const stored = await repo.findByFeature('app-1', 'feat-7');
+    const stored = await repo.findByScopeAndFeature('app', 'app-1', 'feat-7');
     expect(stored?.id).toBe(policy.id);
   });
 
   it('updates the existing policy in place when one already exists for the scope', async () => {
     const first = await useCase.execute({
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       autonomyLevel: SupervisorAutonomy.advisory,
     });
 
@@ -63,7 +67,8 @@ describe('ConfigureSupervisorUseCase', () => {
     await new Promise((r) => setTimeout(r, 5));
 
     const second = await useCase.execute({
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       autonomyLevel: SupervisorAutonomy.autonomous,
       modelId: 'claude-opus-4',
       promptVersion: 'v3',
@@ -75,12 +80,13 @@ describe('ConfigureSupervisorUseCase', () => {
     expect(second.promptVersion).toBe('v3');
     expect(second.updatedAt.getTime()).toBeGreaterThan(first.updatedAt.getTime());
 
-    expect(await repo.listByApp('app-1')).toHaveLength(1);
+    expect(await repo.listByScope('app', 'app-1')).toHaveLength(1);
   });
 
   it('persists structured gateAuthority and policyRules as JSON', async () => {
     const policy = await useCase.execute({
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       autonomyLevel: SupervisorAutonomy.advisory,
       gateAuthority: { prd: SupervisorAutonomy.advisory, merge: SupervisorAutonomy.autonomous },
       policyRules: [{ ruleId: 'r1', condition: 'hasTests', action: 'approve' }],
@@ -97,16 +103,17 @@ describe('ConfigureSupervisorUseCase', () => {
   it('rejects an unknown autonomy level', async () => {
     await expect(
       useCase.execute({
-        appId: 'app-1',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
         autonomyLevel: 'godmode' as SupervisorAutonomy,
       })
     ).rejects.toThrow(InvalidSupervisorPolicyError);
   });
 
-  it('rejects a missing appId', async () => {
+  it('rejects a missing scopeType', async () => {
     await expect(
       useCase.execute({
-        appId: '',
+        scopeType: '' as SupervisorScopeType,
         autonomyLevel: SupervisorAutonomy.advisory,
       })
     ).rejects.toThrow(InvalidSupervisorPolicyError);
@@ -115,7 +122,8 @@ describe('ConfigureSupervisorUseCase', () => {
   it('rejects gateAuthority entries with unknown gate keys', async () => {
     await expect(
       useCase.execute({
-        appId: 'app-1',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
         autonomyLevel: SupervisorAutonomy.advisory,
         gateAuthority: { unknownGate: SupervisorAutonomy.advisory } as Record<
           string,
@@ -128,7 +136,8 @@ describe('ConfigureSupervisorUseCase', () => {
   it('rejects gateAuthority entries with invalid autonomy values', async () => {
     await expect(
       useCase.execute({
-        appId: 'app-1',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
         autonomyLevel: SupervisorAutonomy.advisory,
         gateAuthority: { prd: 'godmode' as SupervisorAutonomy },
       })
@@ -138,7 +147,8 @@ describe('ConfigureSupervisorUseCase', () => {
   it('rejects policy rules without a ruleId', async () => {
     await expect(
       useCase.execute({
-        appId: 'app-1',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
         autonomyLevel: SupervisorAutonomy.advisory,
         policyRules: [{ condition: 'hasTests', action: 'approve' } as never],
       })

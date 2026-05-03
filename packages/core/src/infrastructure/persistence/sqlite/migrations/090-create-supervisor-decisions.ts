@@ -8,7 +8,7 @@
  * Indexes:
  *  - (source_event_kind, source_event_id) for "find decisions for this gate".
  *  - (supervisor_run_id) for run-scoped lookups.
- *  - (app_id, feature_id, created_at) for scoped audit queries.
+ *  - (scope_type, scope_id, feature_id, created_at) for scoped audit queries.
  */
 
 import type { MigrationParams } from 'umzug';
@@ -23,7 +23,8 @@ export async function up({ context: db }: MigrationParams<Database.Database>): P
     db.exec(`
       CREATE TABLE supervisor_decisions (
         id                  TEXT PRIMARY KEY,
-        app_id              TEXT NOT NULL,
+        scope_type          TEXT NOT NULL,
+        scope_id            TEXT,
         feature_id          TEXT,
         supervisor_run_id   TEXT NOT NULL,
         source_event_kind   TEXT NOT NULL,
@@ -57,7 +58,7 @@ export async function up({ context: db }: MigrationParams<Database.Database>): P
 
   if (!indexNames.has('idx_supervisor_decisions_scope_recency')) {
     db.exec(
-      'CREATE INDEX idx_supervisor_decisions_scope_recency ON supervisor_decisions(app_id, feature_id, created_at)'
+      'CREATE INDEX idx_supervisor_decisions_scope_recency ON supervisor_decisions(scope_type, scope_id, feature_id, created_at)'
     );
   }
 }

@@ -16,7 +16,8 @@ const KIND_VARIANT: Record<AgentMessageKind, 'default' | 'destructive' | 'second
 };
 
 export interface AgentActivityFeedProps {
-  appId: string;
+  scopeType: string;
+  scopeId?: string;
   featureId?: string;
   /** Seed messages rendered before any SSE events arrive (e.g. from a server fetch). */
   initialMessages?: AgentMessageStreamEvent[];
@@ -29,14 +30,15 @@ export interface AgentActivityFeedProps {
 }
 
 export function AgentActivityFeed({
-  appId,
+  scopeType,
+  scopeId,
   featureId,
   initialMessages = [],
   overrideMessages,
   errorMessage = null,
   limit = 100,
 }: AgentActivityFeedProps) {
-  const live = useAgentMessages({ appId, featureId });
+  const live = useAgentMessages({ scopeType, scopeId, featureId });
   const liveMessages = overrideMessages ?? live.messages;
 
   const merged = useMemo(() => {

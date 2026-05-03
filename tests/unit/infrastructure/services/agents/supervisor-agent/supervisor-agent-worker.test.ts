@@ -16,6 +16,7 @@ import { InMemorySupervisorAgent } from '@/infrastructure/adapters/in-memory/in-
 import {
   AgentRunStatus,
   SupervisorAutonomy,
+  SupervisorScopeType,
   SupervisorVerdict,
   type SupervisorPolicy,
 } from '@/domain/generated/output.js';
@@ -29,7 +30,8 @@ function makePolicy(overrides: Partial<SupervisorPolicy> = {}): SupervisorPolicy
   const now = new Date();
   return {
     id: 'pol-1',
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     enabled: true,
     autonomyLevel: SupervisorAutonomy.advisory,
     createdAt: now,
@@ -41,7 +43,8 @@ function makePolicy(overrides: Partial<SupervisorPolicy> = {}): SupervisorPolicy
 function gateEvent(): SupervisorGateEvent {
   return {
     kind: 'gate',
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     agentRunId: 'run-1',
     gateId: 'plan',
     sourceEventId: 'gate-1',
@@ -72,7 +75,7 @@ describe('SupervisorAgentWorker', () => {
   it('start() persists an AgentRun row with agentName="supervisor"', async () => {
     const runRepo = makeRunRepo();
     const worker = new SupervisorAgentWorker(
-      { appId: 'app-1', featureId: 'feat-1' },
+      { scopeType: 'app', scopeId: 'app-1', featureId: 'feat-1' },
       {
         supervisorAgent: new InMemorySupervisorAgent(),
         runRepository: runRepo,
@@ -93,7 +96,7 @@ describe('SupervisorAgentWorker', () => {
     const runRepo = makeRunRepo();
     const onDecision = vi.fn().mockResolvedValue(undefined);
     const worker = new SupervisorAgentWorker(
-      { appId: 'app-1' },
+      { scopeType: 'app', scopeId: 'app-1' },
       {
         supervisorAgent: new InMemorySupervisorAgent(),
         runRepository: runRepo,
@@ -107,7 +110,8 @@ describe('SupervisorAgentWorker', () => {
     expect(decision.verdict).toBe(SupervisorVerdict.advise);
     expect(onDecision).toHaveBeenCalledOnce();
     const [scope, runId, event, dec] = onDecision.mock.calls[0];
-    expect(scope.appId).toBe('app-1');
+    expect(scope.scopeType).toBe('app');
+    expect(scope.scopeId).toBe('app-1');
     expect(runId).toBe(worker.runId);
     expect(event.kind).toBe('gate');
     expect(dec.verdict).toBe(SupervisorVerdict.advise);
@@ -116,7 +120,7 @@ describe('SupervisorAgentWorker', () => {
   it('heartbeat updates the run row at the configured cadence', async () => {
     const runRepo = makeRunRepo();
     const worker = new SupervisorAgentWorker(
-      { appId: 'app-1' },
+      { scopeType: 'app', scopeId: 'app-1' },
       {
         supervisorAgent: new InMemorySupervisorAgent(),
         runRepository: runRepo,
@@ -138,7 +142,7 @@ describe('SupervisorAgentWorker', () => {
     const runRepo = makeRunRepo();
     const onReaped = vi.fn().mockResolvedValue(undefined);
     const worker = new SupervisorAgentWorker(
-      { appId: 'app-1' },
+      { scopeType: 'app', scopeId: 'app-1' },
       {
         supervisorAgent: new InMemorySupervisorAgent(),
         runRepository: runRepo,
@@ -165,7 +169,7 @@ describe('SupervisorAgentWorker', () => {
     const runRepo = makeRunRepo();
     const onReaped = vi.fn().mockResolvedValue(undefined);
     const worker = new SupervisorAgentWorker(
-      { appId: 'app-1' },
+      { scopeType: 'app', scopeId: 'app-1' },
       {
         supervisorAgent: new InMemorySupervisorAgent(),
         runRepository: runRepo,
@@ -193,7 +197,7 @@ describe('SupervisorAgentWorker', () => {
 
   it('submit() before start() throws', async () => {
     const worker = new SupervisorAgentWorker(
-      { appId: 'app-1' },
+      { scopeType: 'app', scopeId: 'app-1' },
       {
         supervisorAgent: new InMemorySupervisorAgent(),
         runRepository: makeRunRepo(),
@@ -205,7 +209,7 @@ describe('SupervisorAgentWorker', () => {
   it('stop() is idempotent', async () => {
     const runRepo = makeRunRepo();
     const worker = new SupervisorAgentWorker(
-      { appId: 'app-1' },
+      { scopeType: 'app', scopeId: 'app-1' },
       {
         supervisorAgent: new InMemorySupervisorAgent(),
         runRepository: runRepo,
@@ -239,9 +243,9 @@ describe('SupervisorAgentWorkerRegistry', () => {
       idleTtlMs: 100_000,
     });
 
-    expect(registry.hasWorker('app-1', undefined)).toBe(false);
+    expect(registry.hasWorker('app', 'app-1', undefined)).toBe(false);
     await registry.submitEvent(gateEvent(), { policy: makePolicy() });
-    expect(registry.hasWorker('app-1', undefined)).toBe(true);
+    expect(registry.hasWorker('app', 'app-1', undefined)).toBe(true);
     expect(runRepo.create).toHaveBeenCalledOnce();
     await registry.stopAll();
   });
@@ -270,14 +274,23 @@ describe('SupervisorAgentWorkerRegistry', () => {
     });
 
     await registry.submitEvent(gateEvent(), {
-      policy: makePolicy({ appId: 'app-1', featureId: undefined }),
+      policy: makePolicy({
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
+        featureId: undefined,
+      }),
     });
     await registry.submitEvent(gateEvent(), {
-      policy: makePolicy({ id: 'pol-2', appId: 'app-2', featureId: undefined }),
+      policy: makePolicy({
+        id: 'pol-2',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-2',
+        featureId: undefined,
+      }),
     });
     expect(runRepo.create).toHaveBeenCalledTimes(2);
-    expect(registry.hasWorker('app-1', undefined)).toBe(true);
-    expect(registry.hasWorker('app-2', undefined)).toBe(true);
+    expect(registry.hasWorker('app', 'app-1', undefined)).toBe(true);
+    expect(registry.hasWorker('app', 'app-2', undefined)).toBe(true);
     await registry.stopAll();
   });
 
@@ -291,13 +304,13 @@ describe('SupervisorAgentWorkerRegistry', () => {
     });
 
     await registry.submitEvent(gateEvent(), { policy: makePolicy() });
-    expect(registry.hasWorker('app-1', undefined)).toBe(true);
+    expect(registry.hasWorker('app', 'app-1', undefined)).toBe(true);
     await vi.advanceTimersByTimeAsync(1_500);
-    expect(registry.hasWorker('app-1', undefined)).toBe(false);
+    expect(registry.hasWorker('app', 'app-1', undefined)).toBe(false);
 
     // A new event after reap should boot a fresh worker.
     await registry.submitEvent(gateEvent(), { policy: makePolicy() });
-    expect(registry.hasWorker('app-1', undefined)).toBe(true);
+    expect(registry.hasWorker('app', 'app-1', undefined)).toBe(true);
     expect(runRepo.create).toHaveBeenCalledTimes(2);
     await registry.stopAll();
   });
@@ -335,6 +348,6 @@ describe('SupervisorAgentWorker integration — full lifecycle', () => {
 
     await vi.advanceTimersByTimeAsync(1_500);
     expect(reaped).toHaveLength(1);
-    expect(registry.hasWorker('app-1', undefined)).toBe(false);
+    expect(registry.hasWorker('app', 'app-1', undefined)).toBe(false);
   });
 });

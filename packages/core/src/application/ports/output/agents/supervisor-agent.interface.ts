@@ -38,8 +38,10 @@ export type SupervisorEventKind = 'gate' | 'question' | 'message';
  */
 export interface SupervisorGateEvent {
   kind: 'gate';
-  /** Required app scope (NFR-7). */
-  appId: string;
+  /** Scope type (global, repo, or app). */
+  scopeType: string;
+  /** Optional scope identifier (repo slug or app id). */
+  scopeId?: string;
   /** Optional feature scope. */
   featureId?: string;
   /** Agent run that hit the gate. */
@@ -55,7 +57,10 @@ export interface SupervisorGateEvent {
 /** Question raised by an agent (interactive or background). */
 export interface SupervisorQuestionEvent {
   kind: 'question';
-  appId: string;
+  /** Scope type (global, repo, or app). */
+  scopeType: string;
+  /** Optional scope identifier (repo slug or app id). */
+  scopeId?: string;
   featureId?: string;
   agentRunId: string;
   questionId: string;
@@ -71,7 +76,10 @@ export interface SupervisorQuestionEvent {
 /** Inter-agent message observed on the bus. */
 export interface SupervisorMessageEvent {
   kind: 'message';
-  appId: string;
+  /** Scope type (global, repo, or app). */
+  scopeType: string;
+  /** Optional scope identifier (repo slug or app id). */
+  scopeId?: string;
   featureId?: string;
   /** Message id (also used as the audit `sourceEventId`). */
   messageId: string;

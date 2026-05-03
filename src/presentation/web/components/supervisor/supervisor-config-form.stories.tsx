@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { SupervisorConfigForm } from './supervisor-config-form';
-import { SupervisorAutonomy } from '@shepai/core/domain/generated/output';
+import { SupervisorAutonomy, SupervisorScopeType } from '@shepai/core/domain/generated/output';
 import type { SupervisorPolicy } from '@shepai/core/domain/generated/output';
 
 const meta: Meta<typeof SupervisorConfigForm> = {
@@ -21,7 +21,8 @@ type Story = StoryObj<typeof SupervisorConfigForm>;
 
 const samplePolicy: SupervisorPolicy = {
   id: 'pol-123',
-  appId: 'app-1',
+  scopeType: SupervisorScopeType.app,
+  scopeId: 'app-1',
   enabled: true,
   autonomyLevel: SupervisorAutonomy.advisory,
   modelId: 'claude-sonnet-4',
@@ -35,7 +36,8 @@ const samplePolicy: SupervisorPolicy = {
 
 export const Default: Story = {
   args: {
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     initialPolicy: null,
     onSubmitOverride: async () => ({ ok: true }),
   },
@@ -43,7 +45,8 @@ export const Default: Story = {
 
 export const ExistingPolicy: Story = {
   args: {
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     initialPolicy: samplePolicy,
     onSubmitOverride: async () => ({ ok: true }),
   },
@@ -51,7 +54,8 @@ export const ExistingPolicy: Story = {
 
 export const FeatureOverride: Story = {
   args: {
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     featureId: 'feat-7',
     initialPolicy: null,
     onSubmitOverride: async () => ({ ok: true }),
@@ -60,7 +64,8 @@ export const FeatureOverride: Story = {
 
 export const Loading: Story = {
   args: {
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     initialPolicy: null,
     forceState: 'loading',
     onSubmitOverride: async () => ({ ok: true }),
@@ -69,7 +74,8 @@ export const Loading: Story = {
 
 export const Error: Story = {
   args: {
-    appId: 'app-1',
+    scopeType: 'app',
+    scopeId: 'app-1',
     initialPolicy: null,
     forceState: 'error',
     onSubmitOverride: async () => ({ ok: false, error: 'Validation failed' }),

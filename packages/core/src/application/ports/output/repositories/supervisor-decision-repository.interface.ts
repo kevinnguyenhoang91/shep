@@ -3,7 +3,7 @@
  *
  * Defines the contract for SupervisorDecision persistence (spec 093).
  * Append-only audit records — no `update` method, no soft-delete.
- * Every list query MUST be scoped by appId (NFR-7).
+ * Every list query MUST be scoped by scopeType/scopeId (NFR-7).
  */
 
 import type { SupervisorDecision } from '../../../../domain/generated/output.js';
@@ -41,11 +41,12 @@ export interface ISupervisorDecisionRepository {
   listBySupervisorRun(supervisorRunId: string): Promise<SupervisorDecision[]>;
 
   /**
-   * List decisions for an app (and optionally a feature) ordered by
-   * createdAt desc. Always app-scoped.
+   * List decisions for a scope (and optionally a feature) ordered by
+   * createdAt desc. Always scope-qualified.
    */
   listByScope(
-    appId: string,
+    scopeType: string,
+    scopeId: string | undefined,
     featureId: string | undefined,
     filters?: SupervisorDecisionListFilters
   ): Promise<SupervisorDecision[]>;

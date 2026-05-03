@@ -2,14 +2,15 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SupervisorConfigForm } from '@/components/supervisor/supervisor-config-form';
-import { SupervisorAutonomy } from '@/domain/generated/output';
+import { SupervisorAutonomy, SupervisorScopeType } from '@/domain/generated/output';
 import type { SupervisorPolicy } from '@/domain/generated/output';
 
 describe('SupervisorConfigForm', () => {
   it('renders the autonomy selector with the default advisory level', () => {
     render(
       <SupervisorConfigForm
-        appId="app-1"
+        scopeType="app"
+        scopeId="app-1"
         initialPolicy={null}
         onSubmitOverride={vi.fn().mockResolvedValue({ ok: true })}
       />
@@ -22,7 +23,8 @@ describe('SupervisorConfigForm', () => {
   it('hydrates fields from an existing policy', () => {
     const policy: SupervisorPolicy = {
       id: 'pol-1',
-      appId: 'app-1',
+      scopeType: SupervisorScopeType.app,
+      scopeId: 'app-1',
       enabled: true,
       autonomyLevel: SupervisorAutonomy.cosign,
       modelId: 'claude-sonnet-4',
@@ -36,7 +38,8 @@ describe('SupervisorConfigForm', () => {
 
     render(
       <SupervisorConfigForm
-        appId="app-1"
+        scopeType="app"
+        scopeId="app-1"
         initialPolicy={policy}
         onSubmitOverride={vi.fn().mockResolvedValue({ ok: true })}
       />
@@ -54,7 +57,8 @@ describe('SupervisorConfigForm', () => {
 
     render(
       <SupervisorConfigForm
-        appId="app-1"
+        scopeType="app"
+        scopeId="app-1"
         featureId="feat-99"
         initialPolicy={null}
         onSubmitOverride={onSubmit}
@@ -69,7 +73,8 @@ describe('SupervisorConfigForm', () => {
     });
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
-        appId: 'app-1',
+        scopeType: 'app',
+        scopeId: 'app-1',
         featureId: 'feat-99',
         autonomyLevel: SupervisorAutonomy.advisory,
         modelId: 'claude-haiku',
@@ -81,7 +86,14 @@ describe('SupervisorConfigForm', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue({ ok: false, error: 'Invalid' });
 
-    render(<SupervisorConfigForm appId="app-1" initialPolicy={null} onSubmitOverride={onSubmit} />);
+    render(
+      <SupervisorConfigForm
+        scopeType="app"
+        scopeId="app-1"
+        initialPolicy={null}
+        onSubmitOverride={onSubmit}
+      />
+    );
 
     await user.click(screen.getByTestId('submit'));
 
@@ -91,7 +103,8 @@ describe('SupervisorConfigForm', () => {
   it('shows loading state when forceState is loading', () => {
     render(
       <SupervisorConfigForm
-        appId="app-1"
+        scopeType="app"
+        scopeId="app-1"
         initialPolicy={null}
         forceState="loading"
         onSubmitOverride={vi.fn()}

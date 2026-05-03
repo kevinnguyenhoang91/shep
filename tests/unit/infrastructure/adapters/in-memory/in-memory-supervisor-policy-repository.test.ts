@@ -1,21 +1,22 @@
 /**
  * InMemorySupervisorPolicyRepository — unit tests
  *
- * Verifies the unique-(appId, featureId) constraint and the
- * feature→app scope fallback specified in research decision 7.
+ * Verifies the unique-(scopeType, scopeId, featureId) constraint and the
+ * feature→scope fallback specified in research decision 7.
  */
 
 import 'reflect-metadata';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemorySupervisorPolicyRepository } from '@/infrastructure/adapters/in-memory/in-memory-supervisor-policy-repository.js';
 import type { SupervisorPolicy } from '@/domain/generated/output.js';
-import { SupervisorAutonomy } from '@/domain/generated/output.js';
+import { SupervisorAutonomy, SupervisorScopeType } from '@/domain/generated/output.js';
 
 function makePolicy(overrides: Partial<SupervisorPolicy> = {}): SupervisorPolicy {
   const now = new Date();
   return {
     id: overrides.id ?? `pol-${Math.random().toString(36).slice(2, 9)}`,
-    appId: 'app-1',
+    scopeType: SupervisorScopeType.app,
+    scopeId: 'app-1',
     featureId: undefined,
     enabled: true,
     autonomyLevel: SupervisorAutonomy.advisory,
@@ -44,56 +45,154 @@ describe('InMemorySupervisorPolicyRepository', () => {
     expect(found?.id).toBe('p1');
   });
 
-  it('rejects duplicate (appId, featureId)', async () => {
-    await repo.create(makePolicy({ id: 'p1', appId: 'app-1', featureId: undefined }));
+  it('rejects duplicate (scopeType, scopeId, featureId)', async () => {
+    await repo.create(
+      makePolicy({
+        id: 'p1',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
+        featureId: undefined,
+      })
+    );
     await expect(
-      repo.create(makePolicy({ id: 'p2', appId: 'app-1', featureId: undefined }))
+      repo.create(
+        makePolicy({
+          id: 'p2',
+          scopeType: SupervisorScopeType.app,
+          scopeId: 'app-1',
+          featureId: undefined,
+        })
+      )
     ).rejects.toThrow();
   });
 
-  it('rejects duplicate (appId, featureId) with same feature', async () => {
-    await repo.create(makePolicy({ id: 'p1', appId: 'app-1', featureId: 'f1' }));
+  it('rejects duplicate (scopeType, scopeId, featureId) with same feature', async () => {
+    await repo.create(
+      makePolicy({
+        id: 'p1',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
+        featureId: 'f1',
+      })
+    );
     await expect(
-      repo.create(makePolicy({ id: 'p2', appId: 'app-1', featureId: 'f1' }))
+      repo.create(
+        makePolicy({
+          id: 'p2',
+          scopeType: SupervisorScopeType.app,
+          scopeId: 'app-1',
+          featureId: 'f1',
+        })
+      )
     ).rejects.toThrow();
   });
 
-  it('allows distinct (appId, featureId) combinations', async () => {
-    await repo.create(makePolicy({ id: 'p1', appId: 'app-1', featureId: undefined }));
-    await repo.create(makePolicy({ id: 'p2', appId: 'app-1', featureId: 'f1' }));
-    await repo.create(makePolicy({ id: 'p3', appId: 'app-2', featureId: undefined }));
-    expect(await repo.listByApp('app-1')).toHaveLength(2);
+  it('allows distinct (scopeType, scopeId, featureId) combinations', async () => {
+    await repo.create(
+      makePolicy({
+        id: 'p1',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
+        featureId: undefined,
+      })
+    );
+    await repo.create(
+      makePolicy({
+        id: 'p2',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
+        featureId: 'f1',
+      })
+    );
+    await repo.create(
+      makePolicy({
+        id: 'p3',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-2',
+        featureId: undefined,
+      })
+    );
+    expect(await repo.listByScope('app', 'app-1')).toHaveLength(2);
   });
 
-  it('findByApp returns only the app-scoped row (featureId IS NULL)', async () => {
-    await repo.create(makePolicy({ id: 'p1', appId: 'app-1', featureId: undefined }));
-    await repo.create(makePolicy({ id: 'p2', appId: 'app-1', featureId: 'f1' }));
-    const found = await repo.findByApp('app-1');
+  it('findByScope returns only the scope-level row (featureId IS NULL)', async () => {
+    await repo.create(
+      makePolicy({
+        id: 'p1',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
+        featureId: undefined,
+      })
+    );
+    await repo.create(
+      makePolicy({
+        id: 'p2',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
+        featureId: 'f1',
+      })
+    );
+    const found = await repo.findByScope('app', 'app-1');
     expect(found?.id).toBe('p1');
   });
 
-  it('findByFeature returns the feature-scoped row', async () => {
-    await repo.create(makePolicy({ id: 'p1', appId: 'app-1', featureId: undefined }));
-    await repo.create(makePolicy({ id: 'p2', appId: 'app-1', featureId: 'f1' }));
-    const found = await repo.findByFeature('app-1', 'f1');
+  it('findByScopeAndFeature returns the feature-scoped row', async () => {
+    await repo.create(
+      makePolicy({
+        id: 'p1',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
+        featureId: undefined,
+      })
+    );
+    await repo.create(
+      makePolicy({
+        id: 'p2',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
+        featureId: 'f1',
+      })
+    );
+    const found = await repo.findByScopeAndFeature('app', 'app-1', 'f1');
     expect(found?.id).toBe('p2');
   });
 
   it('findPolicyForScope returns the feature override when present', async () => {
-    await repo.create(makePolicy({ id: 'app-pol', appId: 'app-1', featureId: undefined }));
-    await repo.create(makePolicy({ id: 'feat-pol', appId: 'app-1', featureId: 'f1' }));
-    const found = await repo.findPolicyForScope('app-1', 'f1');
+    await repo.create(
+      makePolicy({
+        id: 'app-pol',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
+        featureId: undefined,
+      })
+    );
+    await repo.create(
+      makePolicy({
+        id: 'feat-pol',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
+        featureId: 'f1',
+      })
+    );
+    const found = await repo.findPolicyForScope('app', 'app-1', 'f1');
     expect(found?.id).toBe('feat-pol');
   });
 
-  it('findPolicyForScope falls back to the app row when no feature override exists', async () => {
-    await repo.create(makePolicy({ id: 'app-pol', appId: 'app-1', featureId: undefined }));
-    const found = await repo.findPolicyForScope('app-1', 'f-missing');
+  it('findPolicyForScope falls back to the scope row when no feature override exists', async () => {
+    await repo.create(
+      makePolicy({
+        id: 'app-pol',
+        scopeType: SupervisorScopeType.app,
+        scopeId: 'app-1',
+        featureId: undefined,
+      })
+    );
+    const found = await repo.findPolicyForScope('app', 'app-1', 'f-missing');
     expect(found?.id).toBe('app-pol');
   });
 
-  it('findPolicyForScope returns null when neither feature nor app row exists', async () => {
-    const found = await repo.findPolicyForScope('app-missing', 'f-missing');
+  it('findPolicyForScope returns null when neither feature nor scope row exists', async () => {
+    const found = await repo.findPolicyForScope('app', 'app-missing', 'f-missing');
     expect(found).toBeNull();
   });
 
@@ -114,10 +213,14 @@ describe('InMemorySupervisorPolicyRepository', () => {
     expect(await repo.findById('p1')).toBeNull();
   });
 
-  it('listByApp is app-scoped (no leakage)', async () => {
-    await repo.create(makePolicy({ id: 'p1', appId: 'app-1' }));
-    await repo.create(makePolicy({ id: 'p2', appId: 'app-2' }));
-    const app1 = await repo.listByApp('app-1');
+  it('listByScope is scope-filtered (no leakage)', async () => {
+    await repo.create(
+      makePolicy({ id: 'p1', scopeType: SupervisorScopeType.app, scopeId: 'app-1' })
+    );
+    await repo.create(
+      makePolicy({ id: 'p2', scopeType: SupervisorScopeType.app, scopeId: 'app-2' })
+    );
+    const app1 = await repo.listByScope('app', 'app-1');
     expect(app1.map((p) => p.id)).toEqual(['p1']);
   });
 });

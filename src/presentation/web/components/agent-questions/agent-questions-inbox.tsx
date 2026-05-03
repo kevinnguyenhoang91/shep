@@ -109,7 +109,7 @@ export function AgentQuestionsInbox({
     try {
       const handler = answerOverride ?? answerAgentQuestion;
       const result = await handler({
-        appId: q.appId,
+        appId: q.appId ?? '',
         questionId: q.id,
         answer,
         answeredBy: currentActor,
@@ -142,7 +142,7 @@ export function AgentQuestionsInbox({
     try {
       const handler = cancelOverride ?? cancelAgentQuestion;
       const result = await handler({
-        appId: q.appId,
+        appId: q.appId ?? '',
         questionId: q.id,
         cancelledBy: currentActor,
       });

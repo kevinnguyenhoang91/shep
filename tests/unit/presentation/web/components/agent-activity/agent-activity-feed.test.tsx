@@ -23,14 +23,17 @@ function message(overrides: Partial<AgentMessageStreamEvent> = {}): AgentMessage
 
 describe('AgentActivityFeed', () => {
   it('renders the empty state when no messages exist', () => {
-    render(<AgentActivityFeed appId="app-1" featureId="feat-1" overrideMessages={[]} />);
+    render(
+      <AgentActivityFeed scopeType="app" scopeId="app-1" featureId="feat-1" overrideMessages={[]} />
+    );
     expect(screen.getByTestId('agent-activity-empty')).toBeInTheDocument();
   });
 
   it('renders seed messages immediately', () => {
     render(
       <AgentActivityFeed
-        appId="app-1"
+        scopeType="app"
+        scopeId="app-1"
         featureId="feat-1"
         initialMessages={[message({ messageId: 'seed-1' })]}
         overrideMessages={[]}
@@ -42,7 +45,8 @@ describe('AgentActivityFeed', () => {
   it('appends live override messages alongside seeded ones', () => {
     render(
       <AgentActivityFeed
-        appId="app-1"
+        scopeType="app"
+        scopeId="app-1"
         featureId="feat-1"
         initialMessages={[message({ messageId: 'seed-1' })]}
         overrideMessages={[
@@ -61,7 +65,8 @@ describe('AgentActivityFeed', () => {
   it('renders the from-actor and a JSON-formatted payload', () => {
     render(
       <AgentActivityFeed
-        appId="app-1"
+        scopeType="app"
+        scopeId="app-1"
         featureId="feat-1"
         overrideMessages={[
           message({ messageId: 'm-x', fromActor: 'agent:run-9', payload: '{"ok":true}' }),
@@ -75,7 +80,8 @@ describe('AgentActivityFeed', () => {
   it('renders an inline error banner when errorMessage is provided', () => {
     render(
       <AgentActivityFeed
-        appId="app-1"
+        scopeType="app"
+        scopeId="app-1"
         featureId="feat-1"
         overrideMessages={[]}
         errorMessage="boom"
@@ -87,7 +93,8 @@ describe('AgentActivityFeed', () => {
   it('deduplicates by messageId when seed and live overlap', () => {
     render(
       <AgentActivityFeed
-        appId="app-1"
+        scopeType="app"
+        scopeId="app-1"
         featureId="feat-1"
         initialMessages={[message({ messageId: 'dup' })]}
         overrideMessages={[
