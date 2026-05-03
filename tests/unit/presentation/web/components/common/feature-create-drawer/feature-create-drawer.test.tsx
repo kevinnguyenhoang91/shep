@@ -250,7 +250,7 @@ describe('FeatureCreateDrawer', () => {
 
       await user.type(screen.getByPlaceholderText(descriptionPlaceholder), 'Add a feature');
       // Switch to non-fast mode first so PRD/Plan switches are enabled
-      await user.click(screen.getByTestId('build-mode-application'));
+      await user.click(screen.getByTestId('build-mode-spec'));
       await user.click(screen.getByLabelText('PRD'));
       await user.click(screen.getByRole('button', { name: '+ Create Feature' }));
 
@@ -268,7 +268,7 @@ describe('FeatureCreateDrawer', () => {
 
       await user.type(screen.getByPlaceholderText(descriptionPlaceholder), 'Add a feature');
       // Switch to non-fast mode first so PRD/Plan switches are enabled
-      await user.click(screen.getByTestId('build-mode-application'));
+      await user.click(screen.getByTestId('build-mode-spec'));
       await user.click(screen.getByLabelText('PRD'));
       await user.click(screen.getByLabelText('Plan'));
       await user.click(screen.getByLabelText('Merge'));
@@ -533,8 +533,8 @@ describe('FeatureCreateDrawer', () => {
       await user.click(screen.getByLabelText('PR'));
 
       // Switch to non-fast mode so PRD/Plan switches can be toggled
-      await user.click(screen.getByTestId('build-mode-application'));
-      expect(screen.getByTestId('build-mode-application')).toHaveAttribute('aria-pressed', 'true');
+      await user.click(screen.getByTestId('build-mode-spec'));
+      expect(screen.getByTestId('build-mode-spec')).toHaveAttribute('aria-pressed', 'true');
 
       // Select a parent feature
       await user.click(screen.getByTestId('parent-feature-combobox'));
@@ -724,11 +724,11 @@ describe('FeatureCreateDrawer', () => {
   });
 
   describe('build mode picker', () => {
-    it('renders the three mode buttons', () => {
+    it('renders the fast and spec mode buttons but no application option', () => {
       renderDrawer();
-      expect(screen.getByTestId('build-mode-application')).toBeInTheDocument();
       expect(screen.getByTestId('build-mode-fast')).toBeInTheDocument();
       expect(screen.getByTestId('build-mode-spec')).toBeInTheDocument();
+      expect(screen.queryByTestId('build-mode-application')).not.toBeInTheDocument();
     });
 
     it('defaults to fast when no initialMode and no workflowDefaults', () => {
@@ -751,7 +751,7 @@ describe('FeatureCreateDrawer', () => {
       expect(screen.getByTestId('build-mode-fast')).toHaveAttribute('aria-pressed', 'true');
     });
 
-    it('respects workflowDefaults.fast=false (selects application)', () => {
+    it('respects workflowDefaults.fast=false (selects spec)', () => {
       const defaults: WorkflowDefaults = {
         approvalGates: { allowPrd: false, allowPlan: false, allowMerge: false },
         push: false,
@@ -763,7 +763,7 @@ describe('FeatureCreateDrawer', () => {
         injectSkills: false,
       };
       renderDrawer({ workflowDefaults: defaults });
-      expect(screen.getByTestId('build-mode-application')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId('build-mode-spec')).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('initialMode prop overrides workflowDefaults', () => {
@@ -784,8 +784,8 @@ describe('FeatureCreateDrawer', () => {
     it('clicking a mode button selects it', async () => {
       const user = userEvent.setup();
       renderDrawer();
-      await user.click(screen.getByTestId('build-mode-application'));
-      expect(screen.getByTestId('build-mode-application')).toHaveAttribute('aria-pressed', 'true');
+      await user.click(screen.getByTestId('build-mode-spec'));
+      expect(screen.getByTestId('build-mode-spec')).toHaveAttribute('aria-pressed', 'true');
       expect(screen.getByTestId('build-mode-fast')).toHaveAttribute('aria-pressed', 'false');
     });
 
@@ -799,18 +799,6 @@ describe('FeatureCreateDrawer', () => {
 
       expect(onSubmit).toHaveBeenCalledOnce();
       expect(onSubmit.mock.calls[0][0]).toEqual(expect.objectContaining({ fast: true }));
-    });
-
-    it('mode=application submits with fast: false', async () => {
-      const onSubmit = vi.fn();
-      const user = userEvent.setup();
-      renderDrawer({ onSubmit, initialMode: 'application' });
-
-      await user.type(screen.getByPlaceholderText(descriptionPlaceholder), 'Add OAuth login');
-      await user.click(screen.getByRole('button', { name: '+ Create Feature' }));
-
-      expect(onSubmit).toHaveBeenCalledOnce();
-      expect(onSubmit.mock.calls[0][0]).toEqual(expect.objectContaining({ fast: false }));
     });
 
     it('mode=spec submits with fast: false', async () => {
@@ -827,7 +815,6 @@ describe('FeatureCreateDrawer', () => {
 
     it('mode buttons are disabled while isSubmitting', () => {
       renderDrawer({ isSubmitting: true });
-      expect(screen.getByTestId('build-mode-application')).toBeDisabled();
       expect(screen.getByTestId('build-mode-fast')).toBeDisabled();
       expect(screen.getByTestId('build-mode-spec')).toBeDisabled();
     });
@@ -838,8 +825,8 @@ describe('FeatureCreateDrawer', () => {
       renderDrawer({ onSubmit });
 
       await user.type(screen.getByPlaceholderText(descriptionPlaceholder), 'My Feature');
-      await user.click(screen.getByTestId('build-mode-application'));
-      expect(screen.getByTestId('build-mode-application')).toHaveAttribute('aria-pressed', 'true');
+      await user.click(screen.getByTestId('build-mode-spec'));
+      expect(screen.getByTestId('build-mode-spec')).toHaveAttribute('aria-pressed', 'true');
 
       await user.click(screen.getByRole('button', { name: '+ Create Feature' }));
 
@@ -1496,6 +1483,132 @@ describe('FeatureCreateDrawer', () => {
 
       expect(onSubmit).toHaveBeenCalledOnce();
       expect(onSubmit.mock.calls[0][0].forkAndPr).toBe(false);
+    });
+  });
+
+  describe('initialApplicationId — application-scoped lock behavior', () => {
+    it('defaults to spec when initialApplicationId is set and no explicit initialMode', () => {
+      renderDrawer({
+        repositoryPath: '/Users/dev/my-repo',
+        initialApplicationId: 'app-001',
+      });
+      expect(screen.getByTestId('build-mode-spec')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId('build-mode-fast')).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('honors explicit initialMode=fast even when initialApplicationId is set', () => {
+      renderDrawer({
+        repositoryPath: '/Users/dev/my-repo',
+        initialApplicationId: 'app-001',
+        initialMode: 'fast',
+      });
+      expect(screen.getByTestId('build-mode-fast')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId('build-mode-spec')).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('keeps the mode picker editable when initialApplicationId is set', async () => {
+      const user = userEvent.setup();
+      renderDrawer({
+        repositoryPath: '/Users/dev/my-repo',
+        initialApplicationId: 'app-001',
+      });
+      // Buttons are NOT disabled — launching from an application should
+      // feel like launching from a regular repository.
+      expect(screen.getByTestId('build-mode-fast')).toBeEnabled();
+      expect(screen.getByTestId('build-mode-spec')).toBeEnabled();
+
+      // Switching from the seeded `spec` to `fast` works.
+      await user.click(screen.getByTestId('build-mode-fast'));
+      expect(screen.getByTestId('build-mode-fast')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId('build-mode-spec')).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('renders repo as locked read-only label (not combobox) when initialApplicationId is set', () => {
+      const sampleRepos = [{ id: 'repo-001', name: 'my-app', path: '/Users/dev/projects/my-app' }];
+      // Even though repositoryPath is empty (which would normally show the combobox),
+      // an app-scoped invocation must always render the locked read-only label.
+      renderDrawer({
+        repositoryPath: '',
+        repositories: sampleRepos,
+        initialApplicationId: 'app-001',
+      });
+      expect(screen.queryByTestId('repository-combobox')).not.toBeInTheDocument();
+      const section = screen.getByTestId('repo-readonly-section');
+      expect(section).toHaveAttribute('data-locked-by-application', 'true');
+      const label = screen.getByTestId('repo-readonly-label');
+      expect(label).toHaveAttribute('aria-disabled', 'true');
+      expect(label).toHaveAttribute('title', expect.stringMatching(/locked/i));
+    });
+
+    it('renders repo readonly label with the supplied repositoryPath name when app-scoped', () => {
+      const sampleRepos = [{ id: 'repo-001', name: 'my-app', path: '/Users/dev/projects/my-app' }];
+      renderDrawer({
+        repositoryPath: '/Users/dev/projects/my-app',
+        repositories: sampleRepos,
+        initialApplicationId: 'app-001',
+      });
+      expect(screen.getByTestId('repo-readonly-label')).toHaveTextContent('my-app');
+    });
+
+    it('leaves description editable when initialApplicationId is set', async () => {
+      const user = userEvent.setup();
+      renderDrawer({
+        repositoryPath: '/Users/dev/my-repo',
+        initialApplicationId: 'app-001',
+      });
+      const descInput = screen.getByPlaceholderText(descriptionPlaceholder);
+      await user.type(descInput, 'Implement RBAC');
+      expect(descInput).toHaveValue('Implement RBAC');
+    });
+
+    it('submit payload uses fast=false (spec mode) when initialApplicationId is set', async () => {
+      const onSubmit = vi.fn();
+      const user = userEvent.setup();
+      renderDrawer({
+        repositoryPath: '/Users/dev/my-repo',
+        initialApplicationId: 'app-001',
+        onSubmit,
+      });
+
+      await user.type(screen.getByPlaceholderText(descriptionPlaceholder), 'Implement RBAC');
+      await user.click(screen.getByRole('button', { name: '+ Create Feature' }));
+
+      expect(onSubmit).toHaveBeenCalledOnce();
+      expect(onSubmit.mock.calls[0][0]).toEqual(
+        expect.objectContaining({
+          repositoryPath: '/Users/dev/my-repo',
+          fast: false,
+        })
+      );
+    });
+
+    it('mode + repo controls are enabled and unlocked when initialApplicationId is undefined', () => {
+      const sampleRepos = [{ id: 'repo-001', name: 'my-app', path: '/Users/dev/projects/my-app' }];
+      renderDrawer({
+        repositoryPath: '',
+        repositories: sampleRepos,
+      });
+      // Repo: combobox visible (NOT locked read-only)
+      expect(screen.getByTestId('repository-combobox')).toBeInTheDocument();
+      expect(screen.queryByTestId('repo-readonly-section')).not.toBeInTheDocument();
+      // Mode buttons: enabled, no lock title
+      expect(screen.getByTestId('build-mode-fast')).toBeEnabled();
+      expect(screen.getByTestId('build-mode-spec')).toBeEnabled();
+      expect(screen.getByTestId('build-mode-spec')).not.toHaveAttribute('title');
+    });
+
+    it('non-app-scoped initialMode=spec keeps repo selector enabled (regression guard for FAB → spec path)', () => {
+      const sampleRepos = [{ id: 'repo-001', name: 'my-app', path: '/Users/dev/projects/my-app' }];
+      renderDrawer({
+        repositoryPath: '',
+        repositories: sampleRepos,
+        initialMode: 'spec',
+      });
+      expect(screen.getByTestId('repository-combobox')).toBeInTheDocument();
+      // Mode buttons: spec is selected but the segmented control is NOT locked.
+      expect(screen.getByTestId('build-mode-spec')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId('build-mode-spec')).toBeEnabled();
+      expect(screen.getByTestId('build-mode-fast')).toBeEnabled();
     });
   });
 });

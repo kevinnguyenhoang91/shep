@@ -15,6 +15,13 @@ export interface CreateDrawerClientProps {
   initialParentId?: string;
   initialDescription?: string;
   initialMode?: BuildMode;
+  /**
+   * When set, the drawer is scoped to an existing Application: repository
+   * path + mode are pinned by the parent and the resulting feature row is
+   * persisted with this applicationId. The drawer renders the repo + mode
+   * selectors as disabled with a tooltip explaining the lock.
+   */
+  initialApplicationId?: string;
   features: ParentFeatureOption[];
   repositories?: RepositoryOption[];
   workflowDefaults?: WorkflowDefaults;
@@ -23,18 +30,20 @@ export interface CreateDrawerClientProps {
   canPushDirectly?: boolean;
 }
 
-export function CreateDrawerClient({
-  repositoryPath,
-  initialParentId,
-  initialDescription,
-  initialMode,
-  features,
-  repositories,
-  workflowDefaults,
-  currentAgentType,
-  currentModel,
-  canPushDirectly,
-}: CreateDrawerClientProps) {
+export function CreateDrawerClient(props: CreateDrawerClientProps) {
+  const {
+    repositoryPath,
+    initialParentId,
+    initialDescription,
+    initialMode,
+    initialApplicationId,
+    features,
+    repositories,
+    workflowDefaults,
+    currentAgentType,
+    currentModel,
+    canPushDirectly,
+  } = props;
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -85,6 +94,7 @@ export function CreateDrawerClient({
                 description: result.feature!.description,
                 repositoryPath: result.feature!.repositoryPath,
                 parentId: data.parentId,
+                applicationId: result.feature!.applicationId ?? data.applicationId,
               },
             })
           );
@@ -109,6 +119,7 @@ export function CreateDrawerClient({
       initialParentId={initialParentId}
       initialDescription={initialDescription}
       initialMode={initialMode}
+      initialApplicationId={initialApplicationId}
       isSubmitting={isSubmitting}
       currentAgentType={currentAgentType}
       currentModel={currentModel}

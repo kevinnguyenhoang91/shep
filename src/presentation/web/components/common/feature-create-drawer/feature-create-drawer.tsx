@@ -39,6 +39,7 @@ import { pickFolder } from '@/components/common/add-repository-button/pick-folde
 import { ReactFileManagerDialog } from '@/components/common/react-file-manager-dialog';
 import { useFeatureFlags } from '@/hooks/feature-flags-context';
 import { addRepository } from '@/app/actions/add-repository';
+import { BuildMode as BuildModeEnum } from '@shepai/core/domain/generated/output';
 import { pickFiles } from './pick-files';
 
 export type { FileAttachment } from '@shepai/core/infrastructure/services/file-dialog.service';
@@ -56,22 +57,27 @@ export interface FormAttachment {
 }
 
 /**
- * Build mode for the create drawer. Maps to the `fast` boolean on submit:
- * - `fast`        → fast=true  (skip SDLC phases, implement straight from prompt)
- * - `application` → fast=false (full app-style workflow)
- * - `spec`        → fast=false (spec-driven workflow, same operational behavior
- *                   as `application` today; the distinction is a UI signal)
+ * Build mode for the create drawer. Type alias derived from the generated
+ * TypeSpec `BuildMode` enum so the UI cannot drift from the domain. Internal
+ * code uses the enum members (`BuildModeEnum.Fast | .Spec`) per the
+ * no-magic-values rule; the exported type is a string-literal union so call
+ * sites can pass either enum members (preferred) or matching string literals.
  *
- * Kept as a UI-only type — the persisted Feature still uses `fast: boolean`.
+ * Note: the TypeSpec enum still includes `Application` for legacy rows that
+ * were created before the picker was simplified — those features keep
+ * working, but the drawer no longer offers `Application` as a selectable
+ * option since it is operationally identical to `Spec` (both set fast=false).
  */
-export type BuildMode = 'application' | 'fast' | 'spec';
+export type BuildMode = `${BuildModeEnum}`;
 
-const BUILD_MODE_ORDER: readonly BuildMode[] = ['application', 'fast', 'spec'] as const;
+const BUILD_MODE_ORDER: readonly BuildMode[] = [BuildModeEnum.Fast, BuildModeEnum.Spec] as const;
 
 const BUILD_MODE_META: Record<BuildMode, { icon: typeof Zap; labelKey: string }> = {
-  application: { icon: LayoutGrid, labelKey: 'createDrawer.modeApplication' },
-  fast: { icon: Zap, labelKey: 'createDrawer.modeFast' },
-  spec: { icon: ClipboardList, labelKey: 'createDrawer.modeSpec' },
+  // Application is retained in the meta map only so legacy `buildMode='application'`
+  // rows do not crash if they ever flow through this path; it is never rendered.
+  [BuildModeEnum.Application]: { icon: LayoutGrid, labelKey: 'createDrawer.modeApplication' },
+  [BuildModeEnum.Fast]: { icon: Zap, labelKey: 'createDrawer.modeFast' },
+  [BuildModeEnum.Spec]: { icon: ClipboardList, labelKey: 'createDrawer.modeSpec' },
 };
 
 /** Minimal feature descriptor for the parent selector. */
@@ -121,6 +127,11 @@ export interface FeatureCreatePayload {
   /** Optional model override for this feature run */
   model?: string;
   sessionId?: string;
+  /** When the drawer was launched scoped to an Application, the
+   *  application's domain UUID. Persisted on the Feature so the
+   *  Control Center can render an app→feature parent edge instead
+   *  of a virtual repository node. */
+  applicationId?: string;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -219,9 +230,29 @@ export interface FeatureCreateDrawerProps {
    * Pre-select a build mode (e.g. when the drawer is opened from a UI that
    * already chose one — apps page "fast" / "spec" buttons, FAB-with-mode).
    * When omitted, falls back to workflowDefaults.fast (true → 'fast', false →
-   * 'application'); fully omitted defaults select 'fast'.
+   * 'spec'); fully omitted defaults select 'fast'.
+   *
+   * App-scoped invocations (`initialApplicationId` set) seed the picker with
+   * `Spec` by default but the mode remains user-editable, so launching a
+   * feature against an application behaves like launching one against a
+   * regular repository — the user can switch to Fast in one click.
    */
   initialMode?: BuildMode;
+  /**
+   * Application context for the drawer. When set:
+   * - the repository selector is rendered as a locked read-only label (the
+   *   app determines the repo, so the user cannot pick a different one)
+   * - the mode picker stays editable; it just defaults to `Spec` so the SDD
+   *   intent is the easy path while the user can still pick `Fast`
+   * - all other fields (description, attachments, advanced toggles) remain
+   *   editable
+   *
+   * Used by entry points launched from an Application (app card "+" button,
+   * FAB context-aware action, app top-bar "Open in Control Center") so the
+   * created feature is correctly scoped to the application without forcing
+   * the user into a single mode.
+   */
+  initialApplicationId?: string;
 }
 
 function resolveInitialMode(
@@ -229,8 +260,8 @@ function resolveInitialMode(
   workflowDefaults: WorkflowDefaults | undefined
 ): BuildMode {
   if (initialMode) return initialMode;
-  if (workflowDefaults?.fast === false) return 'application';
-  return 'fast';
+  if (workflowDefaults?.fast === false) return BuildModeEnum.Spec;
+  return BuildModeEnum.Fast;
 }
 
 export function FeatureCreateDrawer({
@@ -248,16 +279,27 @@ export function FeatureCreateDrawer({
   initialDescription,
   canPushDirectly,
   initialMode,
+  initialApplicationId,
 }: FeatureCreateDrawerProps) {
+  const isAppScoped = initialApplicationId !== undefined;
+  // App-scoped invocations seed the picker with `Spec` (the SDD intent) so
+  // the easy path matches the entry-point name, but the picker remains
+  // user-editable: launching a feature against an application should feel
+  // like launching one against a regular repository.
+  const effectiveInitialMode: BuildMode | undefined =
+    isAppScoped && !initialMode ? BuildModeEnum.Spec : initialMode;
   const createSound = useSoundAction('create');
   const { t } = useTranslation('web');
   // Validate repositoryPath from URL against active repos — prevents stale URL params
   // from selecting deleted repos after add/delete/re-add cycles.
-  // Trust the prop when: repos not loaded yet (undefined), empty list (no repos to check),
-  // or the path matches an active repo.
+  // Trust the prop when: app-scoped (the application is the authority on its
+  // own repo path, even if that path is not a registered Repository entity),
+  // repos not loaded yet (undefined), empty list (no repos to check), or the
+  // path matches an active repo.
   const validRepoPath = !repositoryPath
     ? ''
-    : !repositories ||
+    : isAppScoped ||
+        !repositories ||
         repositories.length === 0 ||
         repositories.some((r) => r.path === repositoryPath)
       ? repositoryPath
@@ -268,7 +310,7 @@ export function FeatureCreateDrawer({
   const defaultCiWatch = workflowDefaults?.ciWatchEnabled !== false;
   const defaultEnableEvidence = workflowDefaults?.enableEvidence ?? false;
   const defaultCommitEvidence = workflowDefaults?.commitEvidence ?? false;
-  const defaultMode = resolveInitialMode(initialMode, workflowDefaults);
+  const defaultMode = resolveInitialMode(effectiveInitialMode, workflowDefaults);
 
   const [description, setDescription] = useState(initialDescription ?? '');
 
@@ -288,7 +330,7 @@ export function FeatureCreateDrawer({
   const [commitEvidence, setCommitEvidence] = useState(defaultCommitEvidence);
   const [parentId, setParentId] = useState<string | undefined>(undefined);
   const [mode, setMode] = useState<BuildMode>(defaultMode);
-  const fast = mode === 'fast';
+  const fast = mode === BuildModeEnum.Fast;
   const [pending, setPending] = useState(false);
   const [forkAndPr, setForkAndPr] = useState(false);
   const [commitSpecs, setCommitSpecs] = useState(true);
@@ -311,7 +353,8 @@ export function FeatureCreateDrawer({
 
   // Sync state when workflowDefaults load asynchronously. Mode is only
   // re-synced from defaults when the caller did NOT pin an explicit
-  // initialMode — pinned modes win over async defaults.
+  // initialMode (or app-scoped Spec lock) — pinned modes win over async
+  // defaults.
   useEffect(() => {
     if (workflowDefaults) {
       setApprovalGates({ ...workflowDefaults.approvalGates });
@@ -320,12 +363,12 @@ export function FeatureCreateDrawer({
       setCiWatchEnabled(workflowDefaults.ciWatchEnabled !== false);
       setEnableEvidence(workflowDefaults.enableEvidence);
       setCommitEvidence(workflowDefaults.commitEvidence);
-      if (!initialMode) {
-        setMode(workflowDefaults.fast !== false ? 'fast' : 'application');
+      if (!effectiveInitialMode) {
+        setMode(workflowDefaults.fast !== false ? BuildModeEnum.Fast : BuildModeEnum.Spec);
       }
       setInjectSkills(workflowDefaults.injectSkills ?? false);
     }
-  }, [workflowDefaults, initialMode]);
+  }, [workflowDefaults, effectiveInitialMode]);
 
   // Sync localRepos when repositories prop changes
   useEffect(() => {
@@ -565,6 +608,7 @@ export function FeatureCreateDrawer({
         ...(overrideAgent ? { agentType: overrideAgent } : {}),
         ...(overrideModel ? { model: overrideModel } : {}),
         ...(parentId ? { parentId } : {}),
+        ...(initialApplicationId ? { applicationId: initialApplicationId } : {}),
         sessionId: sessionIdRef.current,
       });
       resetForm();
@@ -590,6 +634,7 @@ export function FeatureCreateDrawer({
       overrideAgent,
       overrideModel,
       parentId,
+      initialApplicationId,
       createSound,
       resetForm,
     ]
@@ -749,7 +794,35 @@ export function FeatureCreateDrawer({
             className="flex flex-col gap-4"
           >
             {/* Repository selector (only when opened from sidebar without repo context) */}
-            {showRepoSelector ? (
+            {isAppScoped ? (
+              <div
+                className="flex flex-col gap-1.5"
+                data-testid="repo-readonly-section"
+                data-locked-by-application="true"
+              >
+                <Label className="text-muted-foreground text-xs font-semibold tracking-wider">
+                  {t('createDrawer.repository')}
+                </Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p
+                      className="text-sm opacity-70"
+                      data-testid="repo-readonly-label"
+                      aria-disabled="true"
+                      aria-describedby="locked-by-application-tooltip"
+                      title={t('createDrawer.lockedByApplication')}
+                    >
+                      {repositories?.find((r) => r.path === validRepoPath)?.name ??
+                        (validRepoPath ? validRepoPath.split('/').pop() : '') ??
+                        validRepoPath}
+                    </p>
+                  </TooltipTrigger>
+                  <TooltipContent id="locked-by-application-tooltip" role="tooltip" side="bottom">
+                    {t('createDrawer.lockedByApplication')}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            ) : showRepoSelector ? (
               <div className="flex flex-col gap-1.5" data-testid="repo-selector-section">
                 <Label className="text-muted-foreground text-xs font-semibold tracking-wider">
                   {t('createDrawer.repository')}
@@ -894,6 +967,7 @@ export function FeatureCreateDrawer({
                               type="button"
                               data-testid={`build-mode-${m}`}
                               aria-pressed={isActive}
+                              aria-disabled={isSubmitting}
                               disabled={isSubmitting}
                               onClick={() => setMode(m)}
                               className={cn(
@@ -908,7 +982,7 @@ export function FeatureCreateDrawer({
                               {t(meta.labelKey)}
                             </button>
                           </TooltipTrigger>
-                          <TooltipContent side="bottom">
+                          <TooltipContent role="tooltip" side="bottom">
                             {t(`${meta.labelKey}Description`)}
                           </TooltipContent>
                         </Tooltip>

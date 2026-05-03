@@ -16,7 +16,7 @@ import { createInMemoryDatabase, tableExists } from '../../../helpers/database.h
 import { runSQLiteMigrations } from '@/infrastructure/persistence/sqlite/migrations.js';
 import { SQLiteFeatureRepository } from '@/infrastructure/repositories/sqlite-feature.repository.js';
 import type { Feature } from '@/domain/generated/output.js';
-import { SdlcLifecycle } from '@/domain/generated/output.js';
+import { SdlcLifecycle, BuildMode } from '@/domain/generated/output.js';
 
 describe('SQLiteFeatureRepository', () => {
   let db: Database.Database;
@@ -33,6 +33,7 @@ describe('SQLiteFeatureRepository', () => {
     lifecycle: SdlcLifecycle.Requirements,
     messages: [],
     relatedArtifacts: [],
+    buildMode: BuildMode.Application,
     fast: false,
     push: false,
     openPr: false,
@@ -642,6 +643,76 @@ describe('SQLiteFeatureRepository', () => {
       const found = await repository.findById('feat-1');
 
       expect(found?.injectedSkills).toEqual(['tsp-model', 'shadcn-ui']);
+    });
+  });
+
+  describe('applicationId + buildMode persistence', () => {
+    it('should persist applicationId and buildMode=Spec via create/findById', async () => {
+      const feature = createTestFeature({
+        applicationId: '1c1f6f3e-3a89-4b48-90fa-9ae0c0e43d11',
+        buildMode: BuildMode.Spec,
+      });
+
+      await repository.create(feature);
+      const found = await repository.findById('feat-1');
+
+      expect(found?.applicationId).toBe('1c1f6f3e-3a89-4b48-90fa-9ae0c0e43d11');
+      expect(found?.buildMode).toBe(BuildMode.Spec);
+    });
+
+    it('should write application_id and build_mode columns on create', async () => {
+      const feature = createTestFeature({
+        applicationId: 'app-uuid-1',
+        buildMode: BuildMode.Spec,
+      });
+
+      await repository.create(feature);
+
+      const row = db.prepare('SELECT * FROM features WHERE id = ?').get('feat-1') as Record<
+        string,
+        unknown
+      >;
+      expect(row.application_id).toBe('app-uuid-1');
+      expect(row.build_mode).toBe('spec');
+    });
+
+    it('should default applicationId to null and buildMode to Application when absent', async () => {
+      const feature = createTestFeature();
+
+      await repository.create(feature);
+      const found = await repository.findById('feat-1');
+
+      expect(found?.applicationId).toBeUndefined();
+      expect(found?.buildMode).toBe(BuildMode.Application);
+    });
+
+    it('should keep legacy fast column in sync with buildMode=Fast', async () => {
+      const feature = createTestFeature({ buildMode: BuildMode.Fast });
+
+      await repository.create(feature);
+
+      const row = db.prepare('SELECT * FROM features WHERE id = ?').get('feat-1') as Record<
+        string,
+        unknown
+      >;
+      expect(row.build_mode).toBe('fast');
+      expect(row.fast).toBe(1);
+    });
+
+    it('should persist applicationId + buildMode via update', async () => {
+      await repository.create(createTestFeature());
+
+      await repository.update(
+        createTestFeature({
+          applicationId: 'app-uuid-2',
+          buildMode: BuildMode.Spec,
+          updatedAt: new Date(),
+        })
+      );
+
+      const found = await repository.findById('feat-1');
+      expect(found?.applicationId).toBe('app-uuid-2');
+      expect(found?.buildMode).toBe(BuildMode.Spec);
     });
   });
 });

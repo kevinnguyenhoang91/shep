@@ -15,7 +15,21 @@
  */
 
 import type { Feature } from '../../../../domain/generated/output.js';
-import type { SdlcLifecycle, PrStatus, CiStatus } from '../../../../domain/generated/output.js';
+import {
+  BuildMode,
+  type SdlcLifecycle,
+  type PrStatus,
+  type CiStatus,
+} from '../../../../domain/generated/output.js';
+
+const BUILD_MODE_VALUES = new Set<string>(Object.values(BuildMode));
+
+function parseBuildMode(value: string | null | undefined, fast: number): BuildMode {
+  if (value && BUILD_MODE_VALUES.has(value)) {
+    return value as BuildMode;
+  }
+  return fast === 1 ? BuildMode.Fast : BuildMode.Application;
+}
 
 /**
  * Database row type matching the features table schema.
@@ -35,7 +49,11 @@ export interface FeatureRow {
   related_artifacts: string;
   agent_run_id: string | null;
   spec_path: string | null;
-  // Fast mode flag
+  // Parent application reference (nullable — most features have no app link)
+  application_id: string | null;
+  // SDLC pipeline selector ('application' | 'fast' | 'spec')
+  build_mode: string;
+  // Fast mode flag (legacy — derived from build_mode === 'fast' on write)
   fast: number;
   // Workflow configuration (flat columns)
   push: number;
@@ -101,8 +119,11 @@ export function toDatabase(feature: Feature): FeatureRow {
     related_artifacts: JSON.stringify(feature.relatedArtifacts),
     agent_run_id: feature.agentRunId ?? null,
     spec_path: feature.specPath ?? null,
-    // Fast mode flag
-    fast: feature.fast ? 1 : 0,
+    // Parent application reference
+    application_id: feature.applicationId ?? null,
+    // Persist build mode and keep the legacy fast flag in sync
+    build_mode: feature.buildMode,
+    fast: feature.buildMode === BuildMode.Fast ? 1 : 0,
     // Flatten workflow flags to individual columns
     push: feature.push ? 1 : 0,
     open_pr: feature.openPr ? 1 : 0,
@@ -173,6 +194,10 @@ export function fromDatabase(row: FeatureRow): Feature {
     ...(row.plan != null && { plan: JSON.parse(row.plan) }),
     ...(row.agent_run_id != null && { agentRunId: row.agent_run_id }),
     ...(row.spec_path != null && { specPath: row.spec_path }),
+    ...(row.application_id != null && { applicationId: row.application_id }),
+    // Build mode — read from the dedicated column, fall back to the
+    // legacy fast flag for rows that predate the column.
+    buildMode: parseBuildMode(row.build_mode, row.fast),
     // Fast mode flag
     fast: row.fast === 1,
     // Assemble workflow flags from flat columns

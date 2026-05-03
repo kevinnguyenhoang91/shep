@@ -391,6 +391,9 @@
     "showLess": "Afficher moins",
     "showMore": "Afficher {{count}} de plus"
   },
+  "applicationNode": {
+    "newFeature": "Nouvelle fonctionnalité"
+  },
   "repositoryNode": {
     "removeRepository": "Supprimer le dépôt",
     "removeConfirmTitle": "Supprimer le dépôt ?",
@@ -422,7 +425,10 @@
     "localFolder": "Dossier local",
     "adoptBranch": "Adopter une branche",
     "fromGithub": "Depuis GitHub",
-    "newApplication": "Nouvelle application"
+    "newApplication": "Nouvelle application",
+    "newSddFeature": "Nouvelle fonctionnalité SDD",
+    "newSddForApp": "Nouvelle fonctionnalité SDD pour {{appName}}",
+    "openInControlCenterSdd": "Ouvrir dans Control Center (mode SDD)"
   },
   "chat": {
     "shepChat": "Shep Chat",
@@ -495,6 +501,7 @@
     "modeFastDescription": "Ignorer les phases SDLC et implémenter directement depuis votre prompt.",
     "modeSpec": "Spec",
     "modeSpecDescription": "Flux piloté par spec avec étapes explicites PRD et plan.",
+    "lockedByApplication": "Verrouillé par le contexte de l'application — ouvrez depuis un autre point d'entrée pour modifier.",
     "fileDropZone": "Zone de dépôt de fichiers",
     "prd": "PRD",
     "prdDescription": "Auto-approuver la transition des exigences vers la planification.",

@@ -391,6 +391,9 @@
     "showLess": "Показать меньше",
     "showMore": "Показать ещё {{count}}"
   },
+  "applicationNode": {
+    "newFeature": "Новая функция"
+  },
   "repositoryNode": {
     "removeRepository": "Удалить репозиторий",
     "removeConfirmTitle": "Удалить репозиторий?",
@@ -422,7 +425,10 @@
     "localFolder": "Локальная папка",
     "adoptBranch": "Принять ветку",
     "fromGithub": "Из GitHub",
-    "newApplication": "Новое приложение"
+    "newApplication": "Новое приложение",
+    "newSddFeature": "Новая SDD-функция",
+    "newSddForApp": "Новая SDD-функция для {{appName}}",
+    "openInControlCenterSdd": "Открыть в Control Center (режим SDD)"
   },
   "chat": {
     "shepChat": "Shep Чат",
@@ -495,6 +501,7 @@
     "modeFastDescription": "Пропустить фазы SDLC и реализовать напрямую из промпта.",
     "modeSpec": "Spec",
     "modeSpecDescription": "Spec-управляемый поток с явными шагами PRD и плана.",
+    "lockedByApplication": "Заблокировано контекстом приложения — откройте из другой точки входа, чтобы изменить.",
     "fileDropZone": "Зона перетаскивания файлов",
     "prd": "PRD",
     "prdDescription": "Автоодобрение перехода требований к планированию.",

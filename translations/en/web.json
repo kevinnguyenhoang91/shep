@@ -391,6 +391,9 @@
     "showLess": "Show less",
     "showMore": "Show {{count}} more"
   },
+  "applicationNode": {
+    "newFeature": "New feature"
+  },
   "repositoryNode": {
     "removeRepository": "Remove repository",
     "removeConfirmTitle": "Remove repository?",
@@ -422,7 +425,10 @@
     "localFolder": "Local Folder",
     "adoptBranch": "Adopt Branch",
     "fromGithub": "From GitHub",
-    "newApplication": "New Application"
+    "newApplication": "New Application",
+    "newSddFeature": "New SDD feature",
+    "newSddForApp": "New SDD feature for {{appName}}",
+    "openInControlCenterSdd": "Open in Control Center (SDD mode)"
   },
   "chat": {
     "shepChat": "Shep Chat",
@@ -499,6 +505,7 @@
     "modeFastDescription": "Skip SDLC phases and implement directly from your prompt.",
     "modeSpec": "Spec",
     "modeSpecDescription": "Spec-driven workflow with explicit PRD + plan steps.",
+    "lockedByApplication": "Locked by application context — open from a different entry point to change.",
     "fileDropZone": "File drop zone",
     "prd": "PRD",
     "prdDescription": "Auto-approve requirements move to planning.",
