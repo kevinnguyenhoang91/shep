@@ -79,4 +79,11 @@ export class InMemorySupervisorDecisionRepository implements ISupervisorDecision
     result.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
     return filters.limit !== undefined ? result.slice(0, filters.limit) : result;
   }
+
+  async listRecent(limit: number): Promise<SupervisorDecision[]> {
+    return [...this.decisions.values()]
+      .map((row) => ({ ...row }))
+      .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
+      .slice(0, Math.max(0, limit));
+  }
 }

@@ -89,6 +89,12 @@ import { ConfigureSupervisorUseCase } from '../../../application/use-cases/agent
 import { EnableSupervisorUseCase } from '../../../application/use-cases/agents/enable-supervisor.use-case.js';
 import { DisableSupervisorUseCase } from '../../../application/use-cases/agents/disable-supervisor.use-case.js';
 import { GetSupervisorPolicyUseCase } from '../../../application/use-cases/agents/get-supervisor-policy.use-case.js';
+import { ListSupervisorPoliciesUseCase } from '../../../application/use-cases/agents/list-supervisor-policies.use-case.js';
+import { ListRecentSupervisorDecisionsUseCase } from '../../../application/use-cases/agents/list-recent-supervisor-decisions.use-case.js';
+import { ListAgentPromptsUseCase } from '../../../application/use-cases/agents/list-agent-prompts.use-case.js';
+import { UpsertAgentPromptOverrideUseCase } from '../../../application/use-cases/agents/upsert-agent-prompt-override.use-case.js';
+import { DeleteAgentPromptOverrideUseCase } from '../../../application/use-cases/agents/delete-agent-prompt-override.use-case.js';
+import { RunAgentPromptPlaygroundUseCase } from '../../../application/use-cases/agents/run-agent-prompt-playground.use-case.js';
 import { EvaluateSupervisorDecisionUseCase } from '../../../application/use-cases/agents/evaluate-supervisor-decision.use-case.js';
 import { AgentQuestionSupervisorRouter } from '../../../application/use-cases/agents/agent-question-supervisor-router.js';
 import { EscalateToUserUseCase } from '../../../application/use-cases/agents/escalate-to-user.use-case.js';
@@ -194,6 +200,12 @@ export function registerUseCases(container: DependencyContainer): void {
   container.registerSingleton(EnableSupervisorUseCase);
   container.registerSingleton(DisableSupervisorUseCase);
   container.registerSingleton(GetSupervisorPolicyUseCase);
+  container.registerSingleton(ListSupervisorPoliciesUseCase);
+  container.registerSingleton(ListRecentSupervisorDecisionsUseCase);
+  container.registerSingleton(ListAgentPromptsUseCase);
+  container.registerSingleton(UpsertAgentPromptOverrideUseCase);
+  container.registerSingleton(DeleteAgentPromptOverrideUseCase);
+  container.registerSingleton(RunAgentPromptPlaygroundUseCase);
   container.registerSingleton(EvaluateSupervisorDecisionUseCase);
   container.registerSingleton(AgentQuestionSupervisorRouter);
   container.registerSingleton(EscalateToUserUseCase);
@@ -414,5 +426,23 @@ export function registerUseCases(container: DependencyContainer): void {
   });
   container.register('GetSupervisorPolicyUseCase', {
     useFactory: (c) => c.resolve(GetSupervisorPolicyUseCase),
+  });
+  container.register('ListSupervisorPoliciesUseCase', {
+    useFactory: (c) => c.resolve(ListSupervisorPoliciesUseCase),
+  });
+  container.register('ListRecentSupervisorDecisionsUseCase', {
+    useFactory: (c) => c.resolve(ListRecentSupervisorDecisionsUseCase),
+  });
+  container.register('ListAgentPromptsUseCase', {
+    useFactory: (c) => c.resolve(ListAgentPromptsUseCase),
+  });
+  container.register('UpsertAgentPromptOverrideUseCase', {
+    useFactory: (c) => c.resolve(UpsertAgentPromptOverrideUseCase),
+  });
+  container.register('DeleteAgentPromptOverrideUseCase', {
+    useFactory: (c) => c.resolve(DeleteAgentPromptOverrideUseCase),
+  });
+  container.register('RunAgentPromptPlaygroundUseCase', {
+    useFactory: (c) => c.resolve(RunAgentPromptPlaygroundUseCase),
   });
 }

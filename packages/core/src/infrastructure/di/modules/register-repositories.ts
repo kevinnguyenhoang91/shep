@@ -82,6 +82,10 @@ import type { ISupervisorPolicyRepository } from '../../../application/ports/out
 import { SQLiteSupervisorPolicyRepository } from '../../repositories/sqlite-supervisor-policy.repository.js';
 import type { ISupervisorDecisionRepository } from '../../../application/ports/output/repositories/supervisor-decision-repository.interface.js';
 import { SQLiteSupervisorDecisionRepository } from '../../repositories/sqlite-supervisor-decision.repository.js';
+import type { IAgentPromptOverrideRepository } from '../../../application/ports/output/repositories/agent-prompt-override-repository.interface.js';
+import { SQLiteAgentPromptOverrideRepository } from '../../repositories/sqlite-agent-prompt-override.repository.js';
+import type { IAgentPromptResolver } from '../../../application/ports/output/agents/agent-prompt-resolver.interface.js';
+import { SQLiteAgentPromptResolver } from '../../services/agents/prompt-resolver/sqlite-agent-prompt-resolver.service.js';
 
 /**
  * Register all SQLite-backed repositories.
@@ -249,5 +253,15 @@ export function registerRepositories(container: DependencyContainer): void {
   container.register<ISupervisorDecisionRepository>('ISupervisorDecisionRepository', {
     useFactory: (c) =>
       new SQLiteSupervisorDecisionRepository(c.resolve<Database.Database>('Database')),
+  });
+  container.register<IAgentPromptOverrideRepository>('IAgentPromptOverrideRepository', {
+    useFactory: (c) =>
+      new SQLiteAgentPromptOverrideRepository(c.resolve<Database.Database>('Database')),
+  });
+  container.register<IAgentPromptResolver>('IAgentPromptResolver', {
+    useFactory: (c) =>
+      new SQLiteAgentPromptResolver(
+        c.resolve<IAgentPromptOverrideRepository>('IAgentPromptOverrideRepository')
+      ),
   });
 }

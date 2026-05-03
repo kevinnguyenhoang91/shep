@@ -105,4 +105,15 @@ export class InMemorySupervisorPolicyRepository implements ISupervisorPolicyRepo
     }
     return result;
   }
+
+  async listAll(): Promise<SupervisorPolicy[]> {
+    return [...this.policies.values()]
+      .map((row) => ({ ...row }))
+      .sort((a, b) => {
+        if (a.scopeType !== b.scopeType) return a.scopeType.localeCompare(b.scopeType);
+        const idCompare = (a.scopeId ?? '').localeCompare(b.scopeId ?? '');
+        if (idCompare !== 0) return idCompare;
+        return (a.featureId ?? '').localeCompare(b.featureId ?? '');
+      });
+  }
 }

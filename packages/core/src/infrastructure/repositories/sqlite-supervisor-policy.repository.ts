@@ -120,4 +120,16 @@ export class SQLiteSupervisorPolicyRepository implements ISupervisorPolicyReposi
       .all(scopeType, scopeId ?? null) as SupervisorPolicyRow[];
     return rows.map(fromDatabase);
   }
+
+  async listAll(): Promise<SupervisorPolicy[]> {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM supervisor_policies
+         ORDER BY scope_type ASC,
+                  scope_id IS NULL DESC, scope_id ASC,
+                  feature_id IS NULL DESC, feature_id ASC`
+      )
+      .all() as SupervisorPolicyRow[];
+    return rows.map(fromDatabase);
+  }
 }

@@ -50,4 +50,13 @@ export interface ISupervisorDecisionRepository {
     featureId: string | undefined,
     filters?: SupervisorDecisionListFilters
   ): Promise<SupervisorDecision[]>;
+
+  /**
+   * List the most recent decisions across every scope, newest first.
+   *
+   * Powers the top-level /supervisor dashboard (FR-32). The audit log
+   * still owns long-term retention; this is a convenience for the
+   * "what just happened?" view.
+   */
+  listRecent(limit: number): Promise<SupervisorDecision[]>;
 }

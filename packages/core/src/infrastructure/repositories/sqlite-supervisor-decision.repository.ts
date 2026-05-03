@@ -93,4 +93,12 @@ export class SQLiteSupervisorDecisionRepository implements ISupervisorDecisionRe
     const rows = this.db.prepare(sql).all(...params) as SupervisorDecisionRow[];
     return rows.map(fromDatabase);
   }
+
+  async listRecent(limit: number): Promise<SupervisorDecision[]> {
+    const safeLimit = Math.max(0, Math.floor(limit));
+    const rows = this.db
+      .prepare('SELECT * FROM supervisor_decisions ORDER BY created_at DESC LIMIT ?')
+      .all(safeLimit) as SupervisorDecisionRow[];
+    return rows.map(fromDatabase);
+  }
 }

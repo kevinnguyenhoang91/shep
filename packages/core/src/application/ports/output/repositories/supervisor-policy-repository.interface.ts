@@ -53,4 +53,13 @@ export interface ISupervisorPolicyRepository {
 
   /** List all policies for a scope (both scope-level and feature-scoped). */
   listByScope(scopeType: string, scopeId?: string): Promise<SupervisorPolicy[]>;
+
+  /**
+   * List every persisted policy across all scope kinds.
+   *
+   * Powers the top-level /supervisor dashboard (FR-31). Implementations
+   * SHOULD return rows ordered by `(scopeType, scopeId NULLS FIRST, featureId NULLS FIRST)`
+   * so the dashboard renders deterministically.
+   */
+  listAll(): Promise<SupervisorPolicy[]>;
 }
