@@ -1,0 +1,171 @@
+# Feature Specification (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: "realtime-chat"
+number: 95
+branch: "feat/095-realtime-chat"
+oneLiner: "Realtime online chat surface in the web UI for live message exchange between participants in a feature workspace"
+userQuery: |
+  Online chat
+summary: |
+  Add a realtime chat capability to the web UI so participants viewing the same feature
+  workspace can exchange messages live. Builds on the existing SSE streaming infrastructure
+  used by agent events and reuses the existing ChatTab component shell, but introduces a
+  new domain (ChatThread, ChatMessage), persistence, use cases, and a dedicated
+  pub/sub-style dispatcher so messages are pushed to all connected clients in near-real-time.
+phase: "Analysis"
+sizeEstimate: "L"
+
+# Relationships
+relatedFeatures: []
+
+technologies:
+  - "TypeScript (strict mode)"
+  - "Next.js 14 App Router (src/presentation/web)"
+  - "React Server / Client Components"
+  - "Server-Sent Events (SSE) — pattern already established in /api/agent-events"
+  - "EventSource (browser API) for client subscription"
+  - "tsyringe (DI container)"
+  - "TypeSpec (tsp/) — authoring source for domain models"
+  - "SQLite via better-sqlite3 + migrations under packages/core/src/infrastructure/persistence/sqlite"
+  - "Vitest (unit + integration tests)"
+  - "Playwright (e2e)"
+  - "Storybook (mandatory colocated *.stories.tsx for any new web component)"
+  - "Tailwind CSS + shadcn/ui (existing chat composer / message bubble primitives)"
+  - "EventChannel<T> async producer-consumer pattern (packages/core/src/infrastructure/services/agents/streaming)"
+
+relatedLinks:
+  - title: "Clean Architecture guide"
+    url: "./docs/architecture/clean-architecture.md"
+  - title: "Repository pattern + DI"
+    url: "./docs/architecture/repository-pattern.md"
+  - title: "Web UI architecture"
+    url: "./docs/ui/architecture.md"
+  - title: "TypeSpec authoring guide"
+    url: "./docs/development/typespec-guide.md"
+  - title: "TDD guide"
+    url: "./docs/development/tdd-guide.md"
+  - title: "MDN — Server-Sent Events"
+    url: "https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events"
+
+# Open questions (must be resolved before implementation)
+openQuestions:
+  - "Identity model: Shep is currently single-user (no User entity). Does 'online chat' mean (a) a single human <-> agent transcript surface, (b) named participants in one feature workspace via a lightweight display-name cookie, or (c) full multi-user auth? This drives whether we need a new Identity port or just a senderName field."
+  - "Scope of a chat thread: per-feature, per-repo, global, or polymorphic featureId like InteractiveSession? Recommend mirroring the InteractiveSession scoping convention for consistency."
+  - "Transport: stick with SSE (one-way server->client + POST for sends) like /api/agent-events, or introduce WebSockets? SSE keeps the stack consistent and avoids new infra."
+  - "Cross-process fan-out: do we ever have more than one Next.js process serving the web UI? If yes, the in-process EventChannel dispatcher needs a SQLite-polling or external pub/sub backplane. Single-process today, so in-process is fine for v1."
+  - "Message retention: keep all messages forever, cap per-thread, or TTL? Affects schema indexes and a possible cleanup job."
+  - "Agent participation: are AI agents first-class chat participants (sender = 'agent:<type>') or out of scope for v1?"
+  - "Read receipts / typing indicators / presence: in scope for v1 or future enhancement?"
+
+# Markdown content (the actual spec)
+content: |
+  ## Problem Statement
+
+  The web UI currently exposes a "chat" surface (`src/presentation/web/components/features/chat/`)
+  that renders agent run output and interactive-session transcripts — it is not a true chat
+  channel. There is no way for a human participant viewing a feature workspace to send a
+  freeform message and have it appear immediately on another connected client. All
+  realtime data flow today is one-way: server-pushed agent events over SSE
+  (`/api/agent-events`).
+
+  This feature introduces a true realtime chat: a persistent thread of messages scoped to
+  a workspace, with sends going through a use case, persisting to SQLite, and being
+  fanned out over SSE to every subscribed client so messages appear within ~1s without
+  a page refresh.
+
+  ## Codebase Analysis
+
+  ### Project Structure
+
+  Monorepo (pnpm workspaces) with strict Clean Architecture:
+
+  - `packages/core/src/`
+    - `domain/` — entities + generated TypeSpec output (`domain/generated/output.ts`); no external deps
+    - `application/` — use cases + output port interfaces (`application/ports/output/`)
+    - `infrastructure/` — adapters: persistence (SQLite), DI (`infrastructure/di/`), agent services, streaming primitives (`services/agents/streaming/EventChannel`)
+  - `src/presentation/`
+    - `web/` — Next.js 14 App Router; routes under `app/`, API handlers under `app/api/`, components under `components/features/<area>/`
+    - `cli/`, `tui/` — sibling presentation layers; not affected by this feature
+  - `tsp/` — TypeSpec source of truth for domain models; `pnpm tsp:compile` regenerates `domain/generated/output.ts`
+  - `specs/NNN-feature-name/` — spec-driven workflow YAML (this file)
+
+  ### Architecture Patterns
+
+  - Dependencies point inward: presentation → application → domain; infrastructure plugs into application via output ports.
+  - Use cases are the ONLY entry point from any presentation layer (`code-quality.md`). Web routes do `resolve<TheUseCase>()` and call `.execute(input)`.
+  - Ports defined in `application/ports/output/`; concrete adapters live in `infrastructure/` and are bound in `infrastructure/di/container.ts` (tsyringe).
+  - Streaming today: `EventChannel<T>` async queue + a Next.js route that `ReadableStream`-wraps the channel and emits SSE frames with periodic heartbeats (see `src/presentation/web/app/api/agent-events/route.ts`).
+  - TDD is mandatory — RED test files first under `packages/core/src/application/use-cases/__tests__/` and `packages/core/src/infrastructure/persistence/__tests__/`.
+
+  ### Relevant Technologies
+
+  - **Next.js 14 App Router** — route handler + RSC + client components.
+  - **SSE over fetch ReadableStream** — already battle-tested in `/api/agent-events`; the pattern handles `AbortSignal`, heartbeats, `text/event-stream` framing.
+  - **better-sqlite3** — synchronous SQLite driver; migrations in `packages/core/src/infrastructure/persistence/sqlite/migrations/`.
+  - **tsyringe** — string-token DI; ports registered in `infrastructure/di/`.
+  - **TypeSpec** — authoring layer for domain models in `tsp/`; codegen produces `output.ts`.
+  - **assistant-ui + shadcn/ui** — existing chat composer / message bubble components reusable for rendering.
+  - **EventChannel<T>** — generic async producer/consumer used by agent streaming; ideal substrate for an in-process chat dispatcher.
+
+  ## Affected Areas
+
+  | Area | Impact | Reasoning |
+  | ---- | ------ | --------- |
+  | `tsp/chat/` (new) | High | Need `ChatThread` + `ChatMessage` TypeSpec models with id, threadId, senderName/senderKind, body, createdAt; regenerated into `domain/generated/output.ts`. |
+  | `packages/core/src/domain/` | Medium | New domain types surface from TypeSpec codegen; possible domain helpers (e.g. message validation). |
+  | `packages/core/src/application/ports/output/` | High | New ports: `IChatMessageRepository`, `IChatEventDispatcher` (publish/subscribe abstraction). Possibly reuse `IClock`, `ILogger`. |
+  | `packages/core/src/application/use-cases/chat/` (new) | High | `SendChatMessageUseCase`, `ListChatMessagesUseCase`, `SubscribeToChatThreadUseCase` (or a streaming-friendly equivalent that returns an async iterable / port handle). |
+  | `packages/core/src/infrastructure/persistence/sqlite/migrations/` | High | New migration creating `chat_threads` and `chat_messages` tables with index on `(thread_id, created_at)`. |
+  | `packages/core/src/infrastructure/persistence/sqlite/` (mappers + repo) | High | `ChatMessageRepository` adapter implementing the port. |
+  | `packages/core/src/infrastructure/services/chat/` (new) | High | `InProcessChatEventDispatcher` built on `EventChannel<T>` for fan-out. |
+  | `packages/core/src/infrastructure/di/` | Medium | Register repo + dispatcher + use cases under their string tokens. |
+  | `src/presentation/web/app/api/chat/messages/route.ts` (new) | High | `POST` to send a message, `GET` for paginated history. Calls use cases via `resolve()`. |
+  | `src/presentation/web/app/api/chat/stream/route.ts` (new) | High | SSE endpoint mirroring `/api/agent-events` shape; subscribes to dispatcher and emits `chat-message` events. |
+  | `src/presentation/web/components/features/chat/` | Medium | Extend existing `ChatTab` (or add `RealtimeChatPanel`) — wire `EventSource` subscription + composer `POST`. New colocated `*.stories.tsx` MANDATORY. |
+  | `src/presentation/web/app/(dashboard)/chat/` | Low | Possibly a new tab/panel surface; existing chat route may host the new panel. |
+  | `tests/` (unit, integration, e2e) | High | TDD: RED tests for use cases + repo + dispatcher; integration test for the SSE round-trip; Playwright e2e for two browser contexts seeing each other's messages. |
+  | `docs/` | Low | Note the new SSE endpoint + chat domain in `docs/api/domain-models.md` and `docs/ui/architecture.md`. |
+  | `LESSONS.md` | Low | Capture any lesson uncovered (e.g. SSE flush quirks under Next.js dev). |
+
+  ## Dependencies
+
+  Existing infrastructure this feature plugs into (no new third-party libraries expected for v1):
+
+  - **SSE pattern** from `src/presentation/web/app/api/agent-events/route.ts` — copy the heartbeat + abort-signal + `text/event-stream` framing.
+  - **`EventChannel<T>`** from `packages/core/src/infrastructure/services/agents/streaming/` — substrate for the in-process dispatcher.
+  - **SQLite migration runner** + mapper conventions already used by `InteractiveSession` and `WorkflowStep` repos.
+  - **tsyringe DI container** in `packages/core/src/infrastructure/di/`.
+  - **`resolve<T>()` helper** in `src/presentation/web/lib/server-container.ts`.
+  - **TypeSpec codegen pipeline** (`pnpm tsp:compile`).
+  - **Existing chat UI primitives** in `src/presentation/web/components/features/chat/` (composer, message bubble, message list).
+  - **No User/Auth subsystem exists** — see open question on identity.
+
+  External: none required for v1. Future scaling (multi-process) would warrant a Redis or LISTEN/NOTIFY backplane; explicitly out of scope here.
+
+  ## Size Estimate
+
+  **L** — Multi-day effort that crosses every layer of clean architecture and adds two new
+  surfaces (REST send/list + SSE stream) plus a new in-process pub/sub abstraction.
+
+  Concrete reasons it is L not M:
+  - New TypeSpec models + codegen + a SQLite migration + repository + mapper.
+  - Two new use cases (send, list) plus a streaming subscription mechanism that must respect
+    the dependency rule (no leaking SSE concerns into application layer — likely an
+    `IChatEventDispatcher` port returning an async iterable / unsubscribe handle).
+  - Two new Next.js API routes, one of which is a long-lived SSE stream that must handle
+    abort, heartbeats, and not leak channel subscriptions on disconnect.
+  - Web UI rewire: `EventSource` lifecycle (connect on mount, close on unmount, reconnect on
+    error), optimistic send, dedupe of own echoed message.
+  - Mandatory Storybook stories for any new component (Default / Loading / Error).
+  - Identity question is unresolved and may require a small Identity port + cookie-backed
+    adapter — that alone could push toward L on its own.
+  - TDD ladder: RED tests at every layer (repo, use case, dispatcher, route, e2e two-client
+    round trip).
+
+  Could de-scope to M by deferring the identity work (hardcode senderName = "you") and
+  shipping a single-thread "global chat" v1 — to be decided in research.
+
+  ---
+
+  _Generated by feature agent — proceed with research_
