@@ -1,3 +1,23 @@
+## [1.196.1](https://github.com/shep-ai/shep/compare/v1.196.0...v1.196.1) (2026-05-02)
+
+
+### Bug Fixes
+
+* **agents:** auto-trust workspace in gemini-cli headless executor ([#594](https://github.com/shep-ai/shep/issues/594)) ([b15b80f](https://github.com/shep-ai/shep/commit/b15b80f20cc83c3c440c2fccf42d39b9b7adea1b))
+
+# [1.196.0](https://github.com/shep-ai/shep/compare/v1.195.1...v1.196.0) (2026-05-02)
+
+
+### Bug Fixes
+
+* **ci:** exclude .next/node_modules and fix eslint pages dir ([#593](https://github.com/shep-ai/shep/issues/593)) ([0b8e17a](https://github.com/shep-ai/shep/commit/0b8e17a06e54389e558bae8dfe110f2bfadd8b78))
+
+
+### Features
+
+* **web:** gemini-cli fixes, model catalog refactor, and configurable default home page ([#592](https://github.com/shep-ai/shep/issues/592)) ([9679c04](https://github.com/shep-ai/shep/commit/9679c041c8714acb311bb5484c93d2d624fa096f))
+* **web:** resolve agent and model from settings for application creation ([fe93673](https://github.com/shep-ai/shep/commit/fe93673da8e07db20297a8d2d005b26a0d5c0874))
+
 ## [1.195.1](https://github.com/shep-ai/shep/compare/v1.195.0...v1.195.1) (2026-04-29)
 
 
