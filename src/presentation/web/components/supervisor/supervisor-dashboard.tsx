@@ -209,12 +209,30 @@ function ScopeGroup({ kind, policies, names, ...rest }: ScopeGroupProps) {
 
 function EmptyPoliciesState() {
   return (
-    <div className="bg-muted/30 flex flex-col items-start gap-2 rounded-lg border border-dashed p-6">
+    <div className="bg-muted/30 flex flex-col items-start gap-3 rounded-lg border border-dashed p-6">
       <p className="text-sm font-medium">No supervisor policies configured</p>
       <p className="text-muted-foreground text-sm">
         Configure a supervisor at the global, application, repository, or feature level. The cascade
         picks the most specific match (feature &gt; repo &gt; app &gt; global) at run time.
       </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          href={'/' as Route}
+          className="border-border hover:bg-muted inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium"
+          data-testid="empty-policies-cta-app"
+        >
+          <Layers className="size-3" />
+          Pick an application
+        </Link>
+        <Link
+          href={'/agents' as Route}
+          className="border-border hover:bg-muted inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium"
+          data-testid="empty-policies-cta-agents"
+        >
+          <ArrowRight className="size-3" />
+          Edit agent prompts instead
+        </Link>
+      </div>
     </div>
   );
 }

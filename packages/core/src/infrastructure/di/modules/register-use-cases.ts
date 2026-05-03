@@ -95,6 +95,9 @@ import { ListAgentPromptsUseCase } from '../../../application/use-cases/agents/l
 import { UpsertAgentPromptOverrideUseCase } from '../../../application/use-cases/agents/upsert-agent-prompt-override.use-case.js';
 import { DeleteAgentPromptOverrideUseCase } from '../../../application/use-cases/agents/delete-agent-prompt-override.use-case.js';
 import { RunAgentPromptPlaygroundUseCase } from '../../../application/use-cases/agents/run-agent-prompt-playground.use-case.js';
+import { GetAgentGraphUseCase } from '../../../application/use-cases/agents/get-agent-graph.use-case.js';
+import { UpsertAgentGraphOverrideUseCase } from '../../../application/use-cases/agents/upsert-agent-graph-override.use-case.js';
+import { DeleteAgentGraphOverrideUseCase } from '../../../application/use-cases/agents/delete-agent-graph-override.use-case.js';
 import { EvaluateSupervisorDecisionUseCase } from '../../../application/use-cases/agents/evaluate-supervisor-decision.use-case.js';
 import { AgentQuestionSupervisorRouter } from '../../../application/use-cases/agents/agent-question-supervisor-router.js';
 import { EscalateToUserUseCase } from '../../../application/use-cases/agents/escalate-to-user.use-case.js';
@@ -206,6 +209,9 @@ export function registerUseCases(container: DependencyContainer): void {
   container.registerSingleton(UpsertAgentPromptOverrideUseCase);
   container.registerSingleton(DeleteAgentPromptOverrideUseCase);
   container.registerSingleton(RunAgentPromptPlaygroundUseCase);
+  container.registerSingleton(GetAgentGraphUseCase);
+  container.registerSingleton(UpsertAgentGraphOverrideUseCase);
+  container.registerSingleton(DeleteAgentGraphOverrideUseCase);
   container.registerSingleton(EvaluateSupervisorDecisionUseCase);
   container.registerSingleton(AgentQuestionSupervisorRouter);
   container.registerSingleton(EscalateToUserUseCase);
@@ -444,5 +450,14 @@ export function registerUseCases(container: DependencyContainer): void {
   });
   container.register('RunAgentPromptPlaygroundUseCase', {
     useFactory: (c) => c.resolve(RunAgentPromptPlaygroundUseCase),
+  });
+  container.register('GetAgentGraphUseCase', {
+    useFactory: (c) => c.resolve(GetAgentGraphUseCase),
+  });
+  container.register('UpsertAgentGraphOverrideUseCase', {
+    useFactory: (c) => c.resolve(UpsertAgentGraphOverrideUseCase),
+  });
+  container.register('DeleteAgentGraphOverrideUseCase', {
+    useFactory: (c) => c.resolve(DeleteAgentGraphOverrideUseCase),
   });
 }

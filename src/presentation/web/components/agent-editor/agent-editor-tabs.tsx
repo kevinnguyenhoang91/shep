@@ -10,9 +10,17 @@ export interface AgentEditorTabsProps {
   agentType: string;
   prompts: PromptEditorEntry[];
   graph: AgentGraphDescriptor | null;
+  bundledGraph?: AgentGraphDescriptor | null;
+  hasGraphOverride?: boolean;
 }
 
-export function AgentEditorTabs({ agentType, prompts, graph }: AgentEditorTabsProps) {
+export function AgentEditorTabs({
+  agentType,
+  prompts,
+  graph,
+  bundledGraph,
+  hasGraphOverride,
+}: AgentEditorTabsProps) {
   const [selectedPromptId, setSelectedPromptId] = useState<string>(
     prompts[0]?.promptId ?? 'evaluator.system'
   );
@@ -31,7 +39,11 @@ export function AgentEditorTabs({ agentType, prompts, graph }: AgentEditorTabsPr
       </TabsContent>
 
       <TabsContent value="graph" className="mt-4">
-        <AgentGraphView graph={graph} />
+        <AgentGraphView
+          graph={graph}
+          bundled={bundledGraph ?? null}
+          hasOverride={hasGraphOverride ?? false}
+        />
       </TabsContent>
 
       <TabsContent value="playground" className="mt-4 flex flex-col gap-3">

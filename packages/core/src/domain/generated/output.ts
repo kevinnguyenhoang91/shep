@@ -3955,6 +3955,32 @@ export type AgentPromptOverride = BaseEntity & {
 };
 
 /**
+ * User-supplied override for a built-in agent LangGraph descriptor
+ */
+export type AgentGraphOverride = BaseEntity & {
+  /**
+   * Agent type the descriptor belongs to (e.g. 'feature-agent')
+   */
+  agentType: string;
+  /**
+   * JSON-encoded array of node descriptors ({id,label,description?})
+   */
+  nodesJson: string;
+  /**
+   * JSON-encoded array of edge descriptors ({from,to,label?})
+   */
+  edgesJson: string;
+  /**
+   * Monotonic version counter, bumped on every upsert
+   */
+  version: number;
+  /**
+   * Author of the override
+   */
+  createdBy: string;
+};
+
+/**
  * A selectable option within a PRD questionnaire question
  */
 export type PrdOption = {

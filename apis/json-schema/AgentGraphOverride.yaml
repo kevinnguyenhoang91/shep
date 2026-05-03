@@ -1,0 +1,30 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: AgentGraphOverride.yaml
+type: object
+properties:
+  agentType:
+    type: string
+    description: Agent type the descriptor belongs to (e.g. 'feature-agent')
+  nodesJson:
+    type: string
+    description: JSON-encoded array of node descriptors ({id,label,description?})
+  edgesJson:
+    type: string
+    description: JSON-encoded array of edge descriptors ({from,to,label?})
+  version:
+    type: integer
+    minimum: -2147483648
+    maximum: 2147483647
+    description: Monotonic version counter, bumped on every upsert
+  createdBy:
+    type: string
+    description: Author of the override
+required:
+  - agentType
+  - nodesJson
+  - edgesJson
+  - version
+  - createdBy
+allOf:
+  - $ref: BaseEntity.yaml
+description: User-supplied override for a built-in agent LangGraph descriptor

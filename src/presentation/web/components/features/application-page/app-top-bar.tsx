@@ -25,6 +25,7 @@ import type { CloudDeployActionApi } from '@/hooks/use-cloud-deploy-action';
 import type { DeployActionState } from '@/hooks/use-deploy-action';
 
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useFeatureFlags } from '@/hooks/feature-flags-context';
 import { AppOverflowMenu } from './app-overflow-menu';
@@ -122,6 +123,22 @@ export function AppTopBar({
         // building stub instead of the old iframe.
         isBuilding={!application.setupComplete || agentRunning}
       />
+
+      {collaboration ? (
+        <>
+          <Divider />
+          <Button asChild variant="ghost" size="sm" className="h-8 gap-1.5 px-2">
+            <Link
+              href={`/application/${application.id}/supervisor`}
+              data-testid="top-bar-supervisor"
+              title="Configure supervisor for this application"
+            >
+              <ShieldCheck className="size-3.5" />
+              <span className="hidden text-xs lg:inline">Supervisor</span>
+            </Link>
+          </Button>
+        </>
+      ) : null}
 
       {/* ── Group 5: overflow ─────────────────────────────── */}
       <AppOverflowMenu>

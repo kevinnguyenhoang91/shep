@@ -25,6 +25,7 @@
 import { Annotation, StateGraph, START, END, type BaseCheckpointSaver } from '@langchain/langgraph';
 
 import type { IAgentExecutor } from '../../../../application/ports/output/agents/agent-executor.interface.js';
+import type { IAgentPromptResolver } from '../../../../application/ports/output/agents/agent-prompt-resolver.interface.js';
 import type {
   ISupervisorAgent,
   SupervisorDecisionResult,
@@ -36,8 +37,15 @@ import {
   buildEvaluatorPrompt,
   resolveEvaluatorModelId,
   SUPERVISOR_EVALUATOR_PROMPT_VERSION,
+  SUPERVISOR_EVALUATOR_SYSTEM_HEADER,
   SUPERVISOR_TIMEOUT_DECISION,
 } from './evaluator-prompt.js';
+
+/** Stable slot key for the supervisor evaluator system header. */
+const EVALUATOR_PROMPT_SLOT = {
+  agentType: 'supervisor-agent',
+  promptId: 'evaluator.system',
+} as const;
 
 /** Internal graph state. */
 const SupervisorGraphAnnotation = Annotation.Root({
@@ -55,6 +63,14 @@ type SupervisorGraphState = typeof SupervisorGraphAnnotation.State;
 
 export interface SupervisorGraphDeps {
   executor: IAgentExecutor;
+  /**
+   * Optional prompt resolver — when present, the evaluator system header is
+   * resolved through it so user-saved overrides of the
+   * `supervisor-agent/evaluator.system` slot take effect (FR-36). When
+   * absent (e.g. in unit tests), the bundled
+   * {@link SUPERVISOR_EVALUATOR_SYSTEM_HEADER} is used.
+   */
+  promptResolver?: IAgentPromptResolver;
   /** Override the soft timeout for the evaluator call (used by tests). */
   evaluatorTimeoutMs?: number;
   /** Fallback model id when the policy doesn't pin one. */
@@ -115,9 +131,18 @@ function parseEvaluatorResponse(raw: string): { verdict: SupervisorVerdict; rati
   };
 }
 
-function ingestEventNode(): (state: SupervisorGraphState) => Partial<SupervisorGraphState> {
-  return (state) => {
-    const prompt = buildEvaluatorPrompt(state.input.event, state.input.policy);
+function ingestEventNode(
+  deps: SupervisorGraphDeps
+): (state: SupervisorGraphState) => Promise<Partial<SupervisorGraphState>> {
+  return async (state) => {
+    const header = deps.promptResolver
+      ? await deps.promptResolver.resolve(
+          EVALUATOR_PROMPT_SLOT.agentType,
+          EVALUATOR_PROMPT_SLOT.promptId,
+          SUPERVISOR_EVALUATOR_SYSTEM_HEADER
+        )
+      : SUPERVISOR_EVALUATOR_SYSTEM_HEADER;
+    const prompt = buildEvaluatorPrompt(state.input.event, state.input.policy, header);
     return { prompt };
   };
 }
@@ -184,7 +209,7 @@ export function createSupervisorGraph(
   checkpointer?: BaseCheckpointSaver
 ) {
   const graph = new StateGraph(SupervisorGraphAnnotation)
-    .addNode('ingest-event', ingestEventNode())
+    .addNode('ingest-event', ingestEventNode(deps))
     .addNode('evaluate', evaluateNode(deps))
     .addNode('emit-decision', emitDecisionNode())
     .addEdge(START, 'ingest-event')

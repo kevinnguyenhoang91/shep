@@ -142,4 +142,55 @@ describe('createSupervisorAgent (LangGraph workflow)', () => {
       'upstream model unavailable'
     );
   });
+
+  it('uses promptResolver override for the evaluator system header when supplied (FR-36)', async () => {
+    const seenPrompts: string[] = [];
+    const executor: IAgentExecutor = {
+      agentType: AgentType.ClaudeCode,
+      async execute(prompt: string): Promise<AgentExecutionResult> {
+        seenPrompts.push(prompt);
+        return { result: 'verdict: advise\nfine' };
+      },
+      executeStream(): AsyncIterable<never> {
+        throw new Error('not used');
+      },
+      supportsFeature(feature: AgentFeature): boolean {
+        return feature !== AgentFeature.streaming;
+      },
+    };
+    const customHeader = 'CUSTOM EVALUATOR HEADER FOR TEST';
+    const promptResolver = {
+      async resolve(agentType: string, promptId: string, _fallback: string): Promise<string> {
+        if (agentType === 'supervisor-agent' && promptId === 'evaluator.system') {
+          return customHeader;
+        }
+        return _fallback;
+      },
+    };
+    const agent = createSupervisorAgent({ executor, promptResolver });
+    await agent.evaluate({ event: gateEvent(), policy: makePolicy() });
+    expect(seenPrompts).toHaveLength(1);
+    expect(seenPrompts[0]).toContain(customHeader);
+    expect(seenPrompts[0]).not.toContain('You are a delegated supervisor agent');
+  });
+
+  it('falls back to bundled header when no resolver is supplied', async () => {
+    const seenPrompts: string[] = [];
+    const executor: IAgentExecutor = {
+      agentType: AgentType.ClaudeCode,
+      async execute(prompt: string): Promise<AgentExecutionResult> {
+        seenPrompts.push(prompt);
+        return { result: 'verdict: advise\nfine' };
+      },
+      executeStream(): AsyncIterable<never> {
+        throw new Error('not used');
+      },
+      supportsFeature(feature: AgentFeature): boolean {
+        return feature !== AgentFeature.streaming;
+      },
+    };
+    const agent = createSupervisorAgent({ executor });
+    await agent.evaluate({ event: gateEvent(), policy: makePolicy() });
+    expect(seenPrompts[0]).toContain('You are a delegated supervisor agent');
+  });
 });

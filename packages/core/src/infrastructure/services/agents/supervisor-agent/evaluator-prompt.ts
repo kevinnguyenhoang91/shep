@@ -23,8 +23,12 @@ import type {
 /** Current evaluator prompt version — bump on every prompt change. */
 export const SUPERVISOR_EVALUATOR_PROMPT_VERSION = 'sup-eval-v1';
 
-/** Header reused for every event kind. */
-const SYSTEM_HEADER = `You are a delegated supervisor agent for an autonomous SDLC platform.
+/**
+ * Header reused for every event kind. Exported so the runtime can pass it
+ * to {@link IAgentPromptResolver.resolve} as the bundled fallback when an
+ * override exists (FR-36).
+ */
+export const SUPERVISOR_EVALUATOR_SYSTEM_HEADER = `You are a delegated supervisor agent for an autonomous SDLC platform.
 Your sole job is to evaluate one event and return one of the following verdicts:
   - "${SupervisorVerdict.approve}"
   - "${SupervisorVerdict.reject}"
@@ -93,9 +97,18 @@ function eventBody(event: SupervisorEvent): string {
   }
 }
 
-/** Build the full evaluator prompt for one event. */
-export function buildEvaluatorPrompt(event: SupervisorEvent, policy: SupervisorPolicy): string {
-  return [SYSTEM_HEADER, '', policySummary(policy), '', eventBody(event)].join('\n');
+/**
+ * Build the full evaluator prompt for one event. The optional `header`
+ * parameter is used by {@link buildEvaluatorPromptResolved} so a runtime
+ * override of the `supervisor-agent/evaluator.system` slot replaces the
+ * bundled header. When omitted, the bundled header is used unchanged.
+ */
+export function buildEvaluatorPrompt(
+  event: SupervisorEvent,
+  policy: SupervisorPolicy,
+  header: string = SUPERVISOR_EVALUATOR_SYSTEM_HEADER
+): string {
+  return [header, '', policySummary(policy), '', eventBody(event)].join('\n');
 }
 
 /** Resolve the model id used by the evaluator for audit snapshotting. */

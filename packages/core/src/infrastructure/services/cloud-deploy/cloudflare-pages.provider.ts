@@ -43,7 +43,10 @@ const CLOUDFLARE_API_BASE = 'https://api.cloudflare.com/client/v4';
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
-export type FetchFunction = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+export type FetchFunction = (
+  input: string | URL | Request,
+  init?: RequestInit
+) => Promise<Response>;
 
 interface CloudflareEnvelope<T> {
   success: boolean;

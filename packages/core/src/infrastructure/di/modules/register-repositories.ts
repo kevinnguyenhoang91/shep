@@ -86,6 +86,8 @@ import type { IAgentPromptOverrideRepository } from '../../../application/ports/
 import { SQLiteAgentPromptOverrideRepository } from '../../repositories/sqlite-agent-prompt-override.repository.js';
 import type { IAgentPromptResolver } from '../../../application/ports/output/agents/agent-prompt-resolver.interface.js';
 import { SQLiteAgentPromptResolver } from '../../services/agents/prompt-resolver/sqlite-agent-prompt-resolver.service.js';
+import type { IAgentGraphOverrideRepository } from '../../../application/ports/output/repositories/agent-graph-override-repository.interface.js';
+import { SQLiteAgentGraphOverrideRepository } from '../../repositories/sqlite-agent-graph-override.repository.js';
 
 /**
  * Register all SQLite-backed repositories.
@@ -263,5 +265,9 @@ export function registerRepositories(container: DependencyContainer): void {
       new SQLiteAgentPromptResolver(
         c.resolve<IAgentPromptOverrideRepository>('IAgentPromptOverrideRepository')
       ),
+  });
+  container.register<IAgentGraphOverrideRepository>('IAgentGraphOverrideRepository', {
+    useFactory: (c) =>
+      new SQLiteAgentGraphOverrideRepository(c.resolve<Database.Database>('Database')),
   });
 }
