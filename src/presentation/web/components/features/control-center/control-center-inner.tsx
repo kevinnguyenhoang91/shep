@@ -527,7 +527,35 @@ export function ControlCenterInner({ initialNodes, initialEdges }: ControlCenter
     () =>
       initialNodes
         .filter((n) => n.type === 'applicationNode')
-        .map((n) => ({ id: n.data.id as string, name: n.data.name as string })),
+        .map((n) => ({
+          id: n.data.id as string,
+          name: n.data.name as string,
+          kind: 'app' as const,
+        })),
+    [initialNodes]
+  );
+
+  const collaborationRepos = useMemo(
+    () =>
+      initialNodes
+        .filter((n) => n.type === 'repositoryNode')
+        .map((n) => ({
+          id: (n.data.id ?? n.id) as string,
+          name: n.data.name as string,
+          kind: 'repo' as const,
+        })),
+    [initialNodes]
+  );
+
+  const collaborationFeatures = useMemo(
+    () =>
+      initialNodes
+        .filter((n) => n.type === 'featureNode')
+        .map((n) => ({
+          id: (n.data.featureId ?? n.id) as string,
+          name: n.data.name as string,
+          kind: 'feature' as const,
+        })),
     [initialNodes]
   );
 
@@ -587,6 +615,8 @@ export function ControlCenterInner({ initialNodes, initialEdges }: ControlCenter
         <div className="pointer-events-none absolute inset-x-0 top-14 z-10 flex justify-end px-4">
           <CollaborationOnboarding
             apps={collaborationApps}
+            repos={collaborationRepos}
+            features={collaborationFeatures}
             className="pointer-events-auto w-full max-w-md"
           />
         </div>
