@@ -394,6 +394,10 @@ jobs:
           pattern: electron-*
           merge-multiple: true
 
+      - name: Capture pre-release version
+        id: pre
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
       - name: Run semantic-release
         id: semantic
         env:
@@ -401,6 +405,33 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         run: npx semantic-release
+
+      # ===========================================================================
+      # Mirror publish to @shep.bot scope (additive, fully backward compatible)
+      #
+      # semantic-release bumps package.json's version in-place when it publishes;
+      # if the version is unchanged, no release happened and we skip the mirror.
+      # continue-on-error keeps the canonical @shepai/cli release authoritative
+      # — a failed mirror publish is reported but does not fail the release job.
+      # ===========================================================================
+      - name: Mirror publish to @shep.bot scope
+        continue-on-error: true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_SHEPBOT }}
+          PRE_VERSION: ${{ steps.pre.outputs.version }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "::warning::NPM_TOKEN_SHEPBOT secret not set — skipping @shep.bot mirror publish"
+            exit 0
+          fi
+          POST_VERSION=$(node -p "require('./package.json').version")
+          if [ "${POST_VERSION}" = "${PRE_VERSION}" ]; then
+            echo "No version bump (pre=${PRE_VERSION} post=${POST_VERSION}) — semantic-release did not publish. Skipping mirror."
+            exit 0
+          fi
+          echo "Mirror-publishing @shep.bot/cli@${POST_VERSION} (was ${PRE_VERSION})"
+          npm pkg set name='@shep.bot/cli'
+          npm publish --access public
 
   # ===========================================================================
   # Dev Release (PRs only, after ALL jobs pass)
@@ -473,3 +504,83 @@ jobs:
 
             ---
             <sub>Published from commit ${{ github.event.pull_request.head.sha }} | [View CI](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})</sub>
+
+  # ===========================================================================
+  # Dev Release Mirror — @shep.bot scope (PRs only, parallel to dev-release)
+  # Independent job so a misconfigured/missing NPM_TOKEN_SHEPBOT cannot block
+  # PRs while the new org's publishing stabilizes. continue-on-error keeps it
+  # additive: failure here is reported but does not fail the PR check.
+  # ===========================================================================
+  dev-release-shepbot:
+    name: Dev Release (shep.bot mirror)
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - typecheck
+      - test-unit
+      - test-e2e-cli
+      - test-e2e-tui
+      - test-e2e-web
+      - storybook-build
+      - build-electron
+      - security-gitleaks
+      - security-semgrep
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute dev version
+        id: devver
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          SHORT_SHA=$(git rev-parse --short=7 HEAD)
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          DEV_VERSION="${BASE_VERSION}-pr${PR_NUMBER}.${SHORT_SHA}"
+          echo "version=$DEV_VERSION" >> $GITHUB_OUTPUT
+          echo "Dev version (shep.bot): $DEV_VERSION"
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:release
+
+      - name: Publish npm dev release to @shep.bot scope
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_SHEPBOT }}
+          DEV_VERSION: ${{ steps.devver.outputs.version }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "::warning::NPM_TOKEN_SHEPBOT secret not set — skipping @shep.bot mirror publish"
+            exit 0
+          fi
+          npm version "$DEV_VERSION" --no-git-tag-version
+          npm pkg set name='@shep.bot/cli'
+          npm publish --tag dev --access public
+
+      - name: Post PR comment with @shep.bot dev version
+        uses: peter-evans/create-or-update-comment@v5
+        env:
+          DEV_VERSION: ${{ steps.devver.outputs.version }}
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-tag: dev-release-shepbot
+          body: |
+            ## Dev Release Published — @shep.bot mirror
+
+            | Artifact | Version | Install |
+            |----------|---------|---------|
+            | **npm** | `${{ steps.devver.outputs.version }}` | `npm install -g @shep.bot/cli@${{ steps.devver.outputs.version }}` |
+
+            ---
+            <sub>Mirror publish from commit ${{ github.event.pull_request.head.sha }} | [View CI](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})</sub>
