@@ -1219,9 +1219,273 @@ tasks:
         - "Extract feature-bootstrap helper if reused"
     estimatedEffort: "3h"
 
-totalEstimate: "~85h (≈ 11 working days for one developer)"
+  # =====================================================================
+  # PHASE 10 — Supervisor dashboard, agent editor, AI SDK playground
+  # (Iteration-3 follow-up requested in PR review)
+  # =====================================================================
+  - id: "task-48"
+    phaseId: "phase-10"
+    title: "Add ListSupervisorPolicies + ListRecentSupervisorDecisions use cases"
+    description: |
+      Two read-side use cases over the existing
+      ISupervisorPolicyRepository and ISupervisorDecisionRepository.
+      ListSupervisorPolicies returns every policy across all scope kinds
+      (global/app/repo/feature) in one call. ListRecentSupervisorDecisions
+      takes a limit (default 20) and returns decisions ordered by
+      createdAt desc. Both honour NFR-7 scope isolation — they do not
+      bypass the repo-level scope predicates.
+    state: "Todo"
+    dependencies: []
+    acceptanceCriteria:
+      - "Use cases compile and pass unit tests with in-memory repos"
+      - "Repository interfaces gain listAll() / listRecent() methods (or use existing ones)"
+      - "DI container wires both use cases under the existing collaboration registration"
+    tdd:
+      red:
+        - "Author *.use-case.test.ts files for both, asserting (a) returns rows from in-memory adapters, (b) honors limit, (c) returns [] when none configured"
+      green:
+        - "Implement minimal use case bodies and any missing repo methods"
+      refactor:
+        - "Extract any shared scope-grouping helper into application/shared/"
+    estimatedEffort: "2h"
+
+  - id: "task-49"
+    phaseId: "phase-10"
+    title: "Build /supervisor dashboard route + presentation"
+    description: |
+      Server component at src/presentation/web/app/supervisor/page.tsx
+      resolves both new use cases via DI, renders SupervisorDashboard
+      component. Dashboard shows two sections — Policies (grouped by
+      scope kind, with deep-link to per-scope config page) and Recent
+      Decisions (verdict, scope, rationale excerpt, "Why?" affordance
+      that opens the existing SupervisorDecisionWhyDrawer).
+      Gated by featureFlags.collaboration; returns notFound() when off.
+      Storybook story mandatory (Default + Empty + Many states).
+    state: "Todo"
+    dependencies:
+      - "task-48"
+    acceptanceCriteria:
+      - "GET /supervisor returns 200 when flag is on, 404 when off"
+      - "Dashboard renders policies grouped by scope and recent decisions"
+      - "Each policy row links to the correct /application/[id]/supervisor or /supervisor/repo/[id] or /supervisor/feature/[id] page"
+      - "supervisor-dashboard.stories.tsx covers Default + Empty + Many"
+    tdd:
+      red:
+        - "Author component test covering empty and populated states"
+      green:
+        - "Implement page.tsx + dashboard component"
+      refactor:
+        - "Extract per-scope row + per-decision row into small focused components"
+    estimatedEffort: "3h"
+
+  - id: "task-50"
+    phaseId: "phase-10"
+    title: "Define AgentPromptOverride TypeSpec model + migration 098"
+    description: |
+      tsp/agents/agent-prompt-override.tsp defines the entity (id,
+      agentType, promptId, body, version, createdBy, createdAt, updatedAt)
+      with a unique constraint on (agentType, promptId). Migration 098
+      creates agent_prompt_overrides table with the same fields and the
+      unique index. Run pnpm tsp:compile.
+    state: "Todo"
+    dependencies: []
+    acceptanceCriteria:
+      - "TypeSpec compiles cleanly; AgentPromptOverride appears in generated/output.ts"
+      - "Migration 098 idempotent (existence checks)"
+      - "Repository test asserts the unique constraint blocks duplicates"
+    tdd:
+      red:
+        - "Skip TDD for tsp/migration; correctness verified by codegen + integration test in task-51"
+      green:
+        - "Author the .tsp file, run codegen, write the migration"
+      refactor:
+        - "Verify enums match research naming conventions (snake_case ids in DB, camelCase in domain)"
+    estimatedEffort: "1.5h"
+
+  - id: "task-51"
+    phaseId: "phase-10"
+    title: "Implement IAgentPromptOverrideRepository (SQLite + in-memory) + IAgentPromptResolver port"
+    description: |
+      New port IAgentPromptOverrideRepository with findActive(agentType,
+      promptId), upsert(override), delete(agentType, promptId), listAll().
+      SQLite adapter persists rows; in-memory adapter for tests. New port
+      IAgentPromptResolver with resolve(agentType, promptId, fallback)
+      returns the active override body or the fallback.
+      SqliteAgentPromptResolver implements it via the override repo.
+    state: "Todo"
+    dependencies:
+      - "task-50"
+    acceptanceCriteria:
+      - "Repository unit tests pass against both SQLite and in-memory adapters"
+      - "Resolver returns override body when present, fallback otherwise"
+      - "DI container registers all three under register-collaboration.ts"
+    tdd:
+      red:
+        - "Author repository + resolver tests describing find/upsert/delete behaviour and fallback"
+      green:
+        - "Implement adapters + resolver"
+      refactor:
+        - "Inline trivial helpers; keep file < 200 lines each"
+    estimatedEffort: "3h"
+
+  - id: "task-52"
+    phaseId: "phase-10"
+    title: "Build builtin prompt registry + List/Upsert/Delete prompt-override use cases"
+    description: |
+      builtin-prompt-registry.ts statically imports the existing prompt
+      strings from
+      packages/core/src/infrastructure/services/agents/*/nodes/prompts/
+      and exposes get(agentType, promptId) → string and listFor(agentType)
+      → { promptId, body }[]. Three use cases:
+        - ListAgentPromptsUseCase(agentType): returns built-in entries
+          merged with active overrides.
+        - UpsertAgentPromptOverrideUseCase(agentType, promptId, body)
+        - DeleteAgentPromptOverrideUseCase(agentType, promptId)
+      Use cases enforce that promptId exists in the registry — refuse
+      arbitrary IDs.
+    state: "Todo"
+    dependencies:
+      - "task-51"
+    acceptanceCriteria:
+      - "Registry returns at least the feature-agent and supervisor-agent prompts"
+      - "ListAgentPrompts merges built-in + override, marks overrides with hasOverride=true"
+      - "Upsert/Delete reject unknown promptId"
+      - "All three use cases unit-tested with in-memory repo"
+    tdd:
+      red:
+        - "Author *.use-case.test.ts asserting merge behaviour, unknown-promptId rejection, and round-trip"
+      green:
+        - "Implement registry + three use cases"
+      refactor:
+        - "Move registry import map out of the use case if it grows"
+    estimatedEffort: "3h"
+
+  - id: "task-53"
+    phaseId: "phase-10"
+    title: "Wire IAgentPromptResolver into existing prompt call sites"
+    description: |
+      Identify every place that imports a prompt string from
+      packages/core/src/infrastructure/services/agents/*/nodes/prompts/
+      and route the read through IAgentPromptResolver.resolve(agentType,
+      promptId, BUNDLED). Keeps the bundled string as the fallback
+      argument so removing an override is byte-identical to today
+      (NFR-16).
+    state: "Todo"
+    dependencies:
+      - "task-52"
+    acceptanceCriteria:
+      - "Existing feature-agent + supervisor-agent prompt sites resolve via the port"
+      - "Unit test for the affected node confirms override is honoured when present, bundled when absent"
+      - "No new singleton — resolver is injected through tsyringe"
+    tdd:
+      red:
+        - "Author a small test using a stub resolver to assert the node renders the override body"
+      green:
+        - "Edit the call sites to inject + await the resolver"
+      refactor:
+        - "Cache resolver result per node invocation if the prompt is consulted more than once"
+    estimatedEffort: "2.5h"
+
+  - id: "task-54"
+    phaseId: "phase-10"
+    title: "Add @ai-sdk/react + ai dependencies; build playground use case + API route"
+    description: |
+      Add `ai` (Vercel AI SDK) and `@ai-sdk/react` to the web workspace.
+      Implement RunAgentPromptPlaygroundUseCase that takes
+      { agentType, promptId, promptBody?, messages } and returns an async
+      iterable of stream chunks via IAgentExecutorProvider. The use case
+      MUST NOT touch agent_runs / agent_messages (NFR-18). New web API
+      route at src/presentation/web/app/api/agents/playground/route.ts
+      adapts the iterable to the AI SDK stream protocol.
+    state: "Todo"
+    dependencies:
+      - "task-52"
+    acceptanceCriteria:
+      - "pnpm install succeeds with new deps; lockfile committed"
+      - "Use case unit-tested with a stub executor returning a deterministic stream"
+      - "API route returns text/event-stream and is gated by featureFlags.collaboration"
+      - "No imports of agent provider SDKs in presentation"
+    tdd:
+      red:
+        - "Author run-agent-prompt-playground.use-case.test.ts asserting (a) stub stream is forwarded chunk-by-chunk, (b) custom promptBody overrides resolved prompt, (c) empty messages array rejects"
+      green:
+        - "Implement use case + route"
+      refactor:
+        - "Extract stream-protocol adapter helper if route grows"
+    estimatedEffort: "4h"
+
+  - id: "task-55"
+    phaseId: "phase-10"
+    title: "Build /agents list + /agents/[agentType] tabbed editor (Prompts | Graph | Playground)"
+    description: |
+      /agents lists every registered agent type with name + summary +
+      override count. /agents/[agentType] is a tabbed editor:
+        - Prompts: textarea per promptId, save/reset buttons wired to
+          UpsertAgentPromptOverride / DeleteAgentPromptOverride server
+          actions; renders a unified diff against bundled.
+        - Graph: read-only @xyflow/react graph using the existing
+          layoutWithDagre helper; nodes describe LangGraph nodes,
+          edges describe transitions. v1 uses a static descriptor per
+          agent type (pulled from a small graph-descriptor map).
+        - Playground: chat surface using @ai-sdk/react useChat() targeted
+          at /api/agents/playground, sending { agentType, promptId,
+          promptBody (when editing) }.
+      Storybook stories mandatory for every component (CLAUDE.md).
+    state: "Todo"
+    dependencies:
+      - "task-54"
+    acceptanceCriteria:
+      - "GET /agents returns 200 (flag on) and lists agent types"
+      - "GET /agents/[agentType] renders the three tabs"
+      - "Saving a prompt invokes the server action and updates the override"
+      - "Removing an override returns the editor to the bundled body"
+      - "Playground streams text from a stub executor in tests"
+      - "All five new components have colocated .stories.tsx with at least Default + Loading + Error"
+    tdd:
+      red:
+        - "Author component tests for prompt-editor (save, reset, diff), agent-list (renders, link), agent-graph-view (nodes render), agent-playground (stub useChat fixture)"
+      green:
+        - "Implement pages + components + actions"
+      refactor:
+        - "Extract a shared <CodeDiff/> if reused with research artifact viewer"
+    estimatedEffort: "8h"
+
+  - id: "task-56"
+    phaseId: "phase-10"
+    title: "Validate, ship Storybook coverage, and add e2e for the agent editor round-trip"
+    description: |
+      Run pnpm validate + pnpm test:unit + pnpm build:storybook locally.
+      Add a Playwright e2e at tests/e2e/web/agent-editor.spec.ts that:
+      navigates to /agents, opens the feature-agent, edits a prompt,
+      saves, reloads, asserts the override persists, deletes the
+      override, asserts bundled comes back. Add a small e2e for
+      /supervisor dashboard happy path.
+    state: "Todo"
+    dependencies:
+      - "task-49"
+      - "task-55"
+    acceptanceCriteria:
+      - "pnpm validate green"
+      - "pnpm test:unit green (no regressions)"
+      - "pnpm build:storybook green"
+      - "Both new e2e specs pass locally"
+    tdd:
+      red:
+        - "Author the e2e specs (will fail until pages and actions exist)"
+      green:
+        - "Run end-to-end, fix any wiring gaps"
+      refactor:
+        - "Extract page-object only if duplicated with supervisor-config.spec.ts"
+    estimatedEffort: "3h"
+
+totalEstimate: "~115h (≈ 14 working days for one developer)"
 
 openQuestions: []
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Iteration 3 task addendum — supervisor dashboard, agent editor, AI SDK
+# Tasks 48–56 land under phase-10. See spec.yaml `extension` block for FR refs.
+# ─────────────────────────────────────────────────────────────────────────────
 
 content: |
   ## Summary

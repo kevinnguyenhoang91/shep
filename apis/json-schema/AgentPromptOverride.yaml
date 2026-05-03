@@ -1,0 +1,30 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: AgentPromptOverride.yaml
+type: object
+properties:
+  agentType:
+    type: string
+    description: Agent type the prompt belongs to (e.g. 'feature-agent')
+  promptId:
+    type: string
+    description: Stable prompt identifier within the agent (e.g. 'implement')
+  body:
+    type: string
+    description: Override prompt body
+  version:
+    type: integer
+    minimum: -2147483648
+    maximum: 2147483647
+    description: Monotonic version counter, bumped on every upsert
+  createdBy:
+    type: string
+    description: Author of the override
+required:
+  - agentType
+  - promptId
+  - body
+  - version
+  - createdBy
+allOf:
+  - $ref: BaseEntity.yaml
+description: User-supplied override for a built-in agent prompt

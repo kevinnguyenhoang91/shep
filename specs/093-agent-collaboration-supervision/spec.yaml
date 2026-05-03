@@ -219,3 +219,156 @@ rejectionFeedback:
     message: "Supervisor agent should be not only for application but also for regular  features/repos"
     phase: "merge"
     timestamp: "2026-05-03T08:46:10.509Z"
+  - iteration: 3
+    message: "Add a top-level /supervisor dashboard, an agent editor for prompts, a graph viewer, and a Vercel AI SDK playground"
+    phase: "merge"
+    timestamp: "2026-05-03T17:45:00.000Z"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Iteration 3 addendum — supervisor dashboard, agent editor, AI SDK playground
+# ─────────────────────────────────────────────────────────────────────────────
+extension:
+  iteration: 3
+  title: "Supervisor dashboard + agent editor + Vercel AI SDK playground"
+  summary: |
+    The first 9 phases shipped the configuration surfaces (per-app, per-repo,
+    per-feature, global), the supervisor evaluator, the question pipeline,
+    and the messaging fabric. They missed three product needs surfaced
+    immediately after merge:
+
+      a) A first-class top-level `/supervisor` dashboard so users can see
+         every configured policy, recent decisions, and pending escalations
+         in one place — without drilling through the canvas to find the
+         right scope.
+      b) The ability to edit agents from the UI — read and override their
+         prompts, and visualize the LangGraph state machine each agent runs.
+         Today prompts are TS files; users have no way to tweak them without
+         editing the codebase.
+      c) A live playground for those edits — try the modified prompt against
+         a real model, with chat-style streaming, before saving. The Vercel
+         AI SDK UI (`ai/react` + `ai/elements`) is the recommended way to
+         build this surface (already proven for chat in many products) and
+         keeps Shep's agent-agnostic guarantee because the SDK is provider-
+         abstracted.
+
+  newFunctionalRequirements:
+    - id: "FR-31"
+      area: "supervisor-dashboard"
+      text: |
+        The system MUST expose a top-level `/supervisor` page that lists
+        every configured SupervisorPolicy across all scopes (global, app,
+        repo, feature) with: scope kind icon, scope name (resolved via the
+        owning entity), enabled toggle, autonomy level, last-decision
+        timestamp, and a deep-link to the matching configuration page
+        (`/application/[id]/supervisor`, `/supervisor/repo/[id]`,
+        `/supervisor/feature/[id]`).
+    - id: "FR-32"
+      area: "supervisor-dashboard"
+      text: |
+        The dashboard MUST show the most recent N (default 20) supervisor
+        decisions across all scopes with verdict, scope, agent, rationale
+        excerpt, and a "Why?" affordance that opens the existing
+        SupervisorDecisionWhyDrawer.
+    - id: "FR-33"
+      area: "supervisor-dashboard"
+      text: |
+        The application layer MUST expose a `ListSupervisorPoliciesUseCase`
+        (returns all policies grouped by scope) and a
+        `ListRecentSupervisorDecisionsUseCase` (returns last N decisions).
+        Both MUST honour the existing scope-isolation invariant
+        (NFR-7) — the dashboard cannot bypass per-scope auth.
+    - id: "FR-34"
+      area: "agent-editor"
+      text: |
+        The system MUST provide a domain entity `AgentPromptOverride`
+        defined in TypeSpec with fields: `id`, `agentType` (enum reusing
+        the existing AgentType when available, free-form otherwise),
+        `promptId` (string identifying which prompt within the agent —
+        e.g. "implement", "research", "evaluator"), `body` (string),
+        `version` (monotonic int), `createdBy` ('user'), `createdAt`,
+        `updatedAt`. At most one active override per (agentType, promptId).
+    - id: "FR-35"
+      area: "agent-editor"
+      text: |
+        Application layer MUST expose
+        `ListAgentPromptsUseCase` (returns built-in prompts + active
+        overrides for an agent type) and
+        `UpsertAgentPromptOverrideUseCase` /
+        `DeleteAgentPromptOverrideUseCase`. Built-in prompt defaults are
+        sourced from the existing TS prompt modules under
+        `packages/core/src/infrastructure/services/agents/*/nodes/prompts/`
+        via a small registry — NOT hardcoded in the UI.
+    - id: "FR-36"
+      area: "agent-editor"
+      text: |
+        The runtime MUST consult the override registry before falling back
+        to the bundled prompt: when an active override exists for
+        (agentType, promptId), the worker uses the override; otherwise it
+        uses the bundled string. This single lookup runs through a port
+        (`IAgentPromptResolver`) so callers stay agent-agnostic.
+    - id: "FR-37"
+      area: "agent-editor"
+      text: |
+        The web UI MUST expose an `/agents` page listing every registered
+        agent type. Selecting an agent opens a tabbed editor: **Prompts**
+        (read + edit + diff against bundled), **Graph** (read-only LangGraph
+        visualization rendered with the existing `@xyflow/react` setup),
+        **Playground** (Vercel AI SDK UI chat surface).
+    - id: "FR-38"
+      area: "agent-editor"
+      text: |
+        The Graph tab MUST render each agent's LangGraph node/edge structure
+        as a directed graph (re-using the existing `layoutWithDagre` helper
+        and the canvas `@xyflow/react` provider). Graph edits are
+        OUT OF SCOPE for v1 — read-only is enough to satisfy the user's
+        "play with their graph" ask. Editing the graph itself becomes a
+        separate spec when prompted.
+    - id: "FR-39"
+      area: "ai-sdk-playground"
+      text: |
+        The Playground tab MUST stream chat completions against the same
+        executor resolved by `IAgentExecutorProvider` so the user is
+        testing the same model the agent will use. The UI MUST use the
+        Vercel AI SDK React hooks (`useChat`) and `ai-elements/*` chat
+        primitives. A new web API route at `/api/agents/playground` MUST
+        implement the streaming protocol and accept `{ agentType, promptId,
+        promptBody?, messages }` so the user can test an unsaved override.
+    - id: "FR-40"
+      area: "ai-sdk-playground"
+      text: |
+        The playground request MUST go through a single new use case
+        `RunAgentPromptPlaygroundUseCase` that returns an async iterable
+        of `StreamChunk`-compatible events. Presentation just adapts those
+        to the AI SDK stream protocol — no LLM SDK is imported in the
+        presentation layer.
+
+  newNonFunctionalRequirements:
+    - id: "NFR-16"
+      area: "agent-editor"
+      text: |
+        Built-in prompt strings MUST remain checked-in source files. The
+        override mechanism is additive — removing the override row
+        restores byte-identical original behaviour. No user-supplied
+        content is ever silently merged with bundled prompts.
+    - id: "NFR-17"
+      area: "agent-editor"
+      text: |
+        `IAgentPromptResolver` MUST be in-process and synchronous (returns
+        a Promise of resolved string) so the change is invisible to every
+        existing prompt call site beyond a single await.
+    - id: "NFR-18"
+      area: "ai-sdk-playground"
+      text: |
+        Playground completions MUST NOT touch the same agent_runs /
+        agent_messages tables that real runs use. The use case operates
+        on an isolated in-memory transcript — it must be impossible for a
+        playground turn to be confused for a real agent decision in the
+        audit log.
+
+  newSuccessCriteria:
+    - "User can land on /supervisor and see every policy + recent decisions in one screen, with one-click drill-down to the matching configuration page."
+    - "User can open /agents, pick an agent type, and read its current prompts (built-in or active override)."
+    - "User can edit a prompt, save it as an override, and the next agent run uses the override (verified with a small fake agent in tests)."
+    - "User can open the Playground tab, send a message, and see streamed responses from the configured executor in real time."
+    - "Removing an override restores byte-identical bundled behaviour (round-trip test)."
+    - "Agent graph tab renders a directed graph of the LangGraph nodes for at least the feature-agent and supervisor-agent without crashing."

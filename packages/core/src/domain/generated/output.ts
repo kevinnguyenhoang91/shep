@@ -3929,6 +3929,32 @@ export type SupervisorDecision = BaseEntity & {
 };
 
 /**
+ * User-supplied override for a built-in agent prompt
+ */
+export type AgentPromptOverride = BaseEntity & {
+  /**
+   * Agent type the prompt belongs to (e.g. 'feature-agent')
+   */
+  agentType: string;
+  /**
+   * Stable prompt identifier within the agent (e.g. 'implement')
+   */
+  promptId: string;
+  /**
+   * Override prompt body
+   */
+  body: string;
+  /**
+   * Monotonic version counter, bumped on every upsert
+   */
+  version: number;
+  /**
+   * Author of the override
+   */
+  createdBy: string;
+};
+
+/**
  * A selectable option within a PRD questionnaire question
  */
 export type PrdOption = {

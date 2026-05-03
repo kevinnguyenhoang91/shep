@@ -145,6 +145,37 @@ phases:
       override in settings UI. The flag flip itself ships behind a
       separate small PR after validation.
     parallel: false
+  - id: "phase-10"
+    name: "Supervisor dashboard, agent editor, and AI SDK playground"
+    description: |
+      Iteration-3 follow-up requested in PR review. Three additive surfaces
+      that share infrastructure:
+
+        a) `/supervisor` — top-level dashboard listing every configured
+           policy (across global / app / repo / feature scopes) and the
+           most recent supervisor decisions. Adds two read-side use cases
+           (ListSupervisorPoliciesUseCase, ListRecentSupervisorDecisionsUseCase)
+           and one new web route. No new tables.
+
+        b) `/agents` — agent editor. Introduces the AgentPromptOverride
+           entity (TypeSpec + migration + repository), a port + resolver
+           (`IAgentPromptResolver`) consulted by every prompt call site,
+           and three use cases (List/Upsert/Delete). The editor is a
+           tabbed UI: Prompts (read + edit + diff), Graph (read-only
+           LangGraph visualization via the existing @xyflow/react setup),
+           Playground (Vercel AI SDK chat).
+
+        c) Playground — `RunAgentPromptPlaygroundUseCase` returns an async
+           iterable of stream chunks; a thin /api/agents/playground route
+           adapts them to the AI SDK stream protocol so `useChat` works
+           out of the box. The playground operates on an isolated
+           transcript — it must NOT touch agent_runs / agent_messages
+           tables (NFR-18).
+
+      Phase ships under the same `collaboration` feature flag so the new
+      surfaces are hidden until the flag flips. Storybook stories are
+      mandatory for every new web component (CLAUDE.md).
+    parallel: false
 
 # File change tracking
 filesToCreate:
@@ -244,6 +275,45 @@ filesToCreate:
   - "tests/e2e/supervisor-config.spec.ts"
   - "tests/e2e/agent-question-roundtrip.spec.ts"
   - "docs/architecture/supervision.md"
+
+  # Phase 10 — supervisor dashboard, agent editor, AI SDK playground
+  - "tsp/agents/agent-prompt-override.tsp"
+  - "packages/core/src/application/ports/output/agents/agent-prompt-resolver.port.ts"
+  - "packages/core/src/application/ports/output/repositories/agent-prompt-override-repository.port.ts"
+  - "packages/core/src/application/use-cases/agents/list-supervisor-policies.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/list-supervisor-policies.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/list-recent-supervisor-decisions.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/list-recent-supervisor-decisions.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/list-agent-prompts.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/list-agent-prompts.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/upsert-agent-prompt-override.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/upsert-agent-prompt-override.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/delete-agent-prompt-override.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/delete-agent-prompt-override.use-case.test.ts"
+  - "packages/core/src/application/use-cases/agents/run-agent-prompt-playground.use-case.ts"
+  - "packages/core/src/application/use-cases/agents/run-agent-prompt-playground.use-case.test.ts"
+  - "packages/core/src/infrastructure/persistence/sqlite/migrations/098-create-agent-prompt-overrides.ts"
+  - "packages/core/src/infrastructure/repositories/sqlite-agent-prompt-override.repository.ts"
+  - "packages/core/src/infrastructure/services/agents/prompt-resolver/sqlite-agent-prompt-resolver.service.ts"
+  - "packages/core/src/infrastructure/services/agents/prompt-resolver/builtin-prompt-registry.ts"
+  - "packages/core/src/infrastructure/adapters/in-memory/in-memory-agent-prompt-override.repository.ts"
+  - "src/presentation/web/app/supervisor/page.tsx"
+  - "src/presentation/web/app/agents/page.tsx"
+  - "src/presentation/web/app/agents/[agentType]/page.tsx"
+  - "src/presentation/web/app/api/agents/playground/route.ts"
+  - "src/presentation/web/components/supervisor/supervisor-dashboard.tsx"
+  - "src/presentation/web/components/supervisor/supervisor-dashboard.stories.tsx"
+  - "src/presentation/web/components/agent-editor/agent-list.tsx"
+  - "src/presentation/web/components/agent-editor/agent-list.stories.tsx"
+  - "src/presentation/web/components/agent-editor/agent-editor-tabs.tsx"
+  - "src/presentation/web/components/agent-editor/agent-editor-tabs.stories.tsx"
+  - "src/presentation/web/components/agent-editor/prompt-editor.tsx"
+  - "src/presentation/web/components/agent-editor/prompt-editor.stories.tsx"
+  - "src/presentation/web/components/agent-editor/agent-graph-view.tsx"
+  - "src/presentation/web/components/agent-editor/agent-graph-view.stories.tsx"
+  - "src/presentation/web/components/agent-editor/agent-playground.tsx"
+  - "src/presentation/web/components/agent-editor/agent-playground.stories.tsx"
+  - "src/presentation/web/app/actions/agent-prompts.ts"
 
 filesToModify:
   - "tsp/domain/entities/settings.tsp"
