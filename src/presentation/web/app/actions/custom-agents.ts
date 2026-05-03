@@ -4,6 +4,7 @@ import { resolve } from '@/lib/server-container';
 import type { CreateCustomAgentUseCase } from '@shepai/core/application/use-cases/agents/create-custom-agent.use-case';
 import type { DeleteCustomAgentUseCase } from '@shepai/core/application/use-cases/agents/delete-custom-agent.use-case';
 import { revalidatePath } from 'next/cache';
+import { requireFeatureFlag } from '@/lib/feature-flags';
 
 export interface CreateCustomAgentInput {
   agentType: string;
@@ -23,6 +24,7 @@ export async function createCustomAgent(
   input: CreateCustomAgentInput
 ): Promise<CreateCustomAgentResult> {
   try {
+    requireFeatureFlag('collaboration');
     const useCase = resolve<CreateCustomAgentUseCase>('CreateCustomAgentUseCase');
     const seedPrompt =
       input.initialPromptId?.trim() && input.initialPromptBody?.length
@@ -54,6 +56,7 @@ export async function deleteCustomAgent(input: {
   agentType: string;
 }): Promise<DeleteCustomAgentResult> {
   try {
+    requireFeatureFlag('collaboration');
     const useCase = resolve<DeleteCustomAgentUseCase>('DeleteCustomAgentUseCase');
     await useCase.execute(input);
     revalidatePath('/agents');

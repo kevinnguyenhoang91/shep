@@ -5,6 +5,7 @@ import type { ConfigureSupervisorUseCase } from '@shepai/core/application/use-ca
 import type { GetSupervisorPolicyUseCase } from '@shepai/core/application/use-cases/agents/get-supervisor-policy.use-case';
 import type { EnableSupervisorUseCase } from '@shepai/core/application/use-cases/agents/enable-supervisor.use-case';
 import type { DisableSupervisorUseCase } from '@shepai/core/application/use-cases/agents/disable-supervisor.use-case';
+import { requireFeatureFlag } from '@/lib/feature-flags';
 import type {
   SupervisorAutonomy,
   SupervisorPolicy,
@@ -31,6 +32,7 @@ export async function configureSupervisor(
   input: ConfigureSupervisorActionInput
 ): Promise<ConfigureSupervisorActionResult> {
   try {
+    requireFeatureFlag('collaboration');
     const useCase = resolve<ConfigureSupervisorUseCase>('ConfigureSupervisorUseCase');
     const policy = await useCase.execute({
       ...input,
@@ -49,6 +51,7 @@ export async function getSupervisorPolicy(input: {
   featureId?: string;
 }): Promise<{ ok: true; policy: SupervisorPolicy | null } | { ok: false; error: string }> {
   try {
+    requireFeatureFlag('collaboration');
     const useCase = resolve<GetSupervisorPolicyUseCase>('GetSupervisorPolicyUseCase');
     const policy = await useCase.execute(input);
     return { ok: true, policy };
@@ -64,6 +67,7 @@ export async function enableSupervisor(input: {
   featureId?: string;
 }): Promise<ConfigureSupervisorActionResult> {
   try {
+    requireFeatureFlag('collaboration');
     const useCase = resolve<EnableSupervisorUseCase>('EnableSupervisorUseCase');
     const policy = await useCase.execute(input);
     return { ok: true, policy };
@@ -79,6 +83,7 @@ export async function disableSupervisor(input: {
   featureId?: string;
 }): Promise<ConfigureSupervisorActionResult> {
   try {
+    requireFeatureFlag('collaboration');
     const useCase = resolve<DisableSupervisorUseCase>('DisableSupervisorUseCase');
     const policy = await useCase.execute(input);
     return { ok: true, policy };

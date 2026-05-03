@@ -5,6 +5,7 @@ import type { ListAgentQuestionsUseCase } from '@shepai/core/application/use-cas
 import type { AnswerAgentQuestionUseCase } from '@shepai/core/application/use-cases/agents/answer-agent-question.use-case';
 import type { CancelAgentQuestionUseCase } from '@shepai/core/application/use-cases/agents/cancel-agent-question.use-case';
 import type { AgentQuestion, AgentQuestionStatus } from '@shepai/core/domain/generated/output';
+import { requireFeatureFlag } from '@/lib/feature-flags';
 
 export interface ListAgentQuestionsActionInput {
   appId: string;
@@ -21,6 +22,7 @@ export async function listAgentQuestions(
     return { ok: false, error: 'appId is required' };
   }
   try {
+    requireFeatureFlag('collaboration');
     const useCase = resolve<ListAgentQuestionsUseCase>('ListAgentQuestionsUseCase');
     const questions = await useCase.execute(input);
     return { ok: true, questions };
@@ -41,6 +43,7 @@ export async function answerAgentQuestion(
   input: AnswerAgentQuestionActionInput
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    requireFeatureFlag('collaboration');
     const useCase = resolve<AnswerAgentQuestionUseCase>('AnswerAgentQuestionUseCase');
     const result = await useCase.execute(input);
     if (!result.enabled) {
@@ -64,6 +67,7 @@ export async function cancelAgentQuestion(
   input: CancelAgentQuestionActionInput
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    requireFeatureFlag('collaboration');
     const useCase = resolve<CancelAgentQuestionUseCase>('CancelAgentQuestionUseCase');
     const result = await useCase.execute(input);
     if (!result.enabled) {

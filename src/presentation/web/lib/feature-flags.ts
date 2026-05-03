@@ -54,6 +54,30 @@ export function getFeatureFlags(): FeatureFlagsState {
 }
 
 /**
+ * Error thrown by {@link requireFeatureFlag} when a flag is disabled.
+ * Server actions catch this and translate it into `{ ok: false, error }`
+ * so callers see a clear "feature off" message instead of a 500.
+ */
+export class FeatureFlagDisabledError extends Error {
+  constructor(public readonly flag: keyof FeatureFlagsState) {
+    super(`Feature flag "${flag}" is disabled`);
+    this.name = 'FeatureFlagDisabledError';
+  }
+}
+
+/**
+ * Throws {@link FeatureFlagDisabledError} when the named flag is off.
+ * Use at the top of every server action / API route handler that should
+ * be reachable only when its feature is enabled — even hidden surfaces
+ * still expose POST endpoints anyone with the URL can hit.
+ */
+export function requireFeatureFlag(flag: keyof FeatureFlagsState): void {
+  if (!getFeatureFlags()[flag]) {
+    throw new FeatureFlagDisabledError(flag);
+  }
+}
+
+/**
  * @deprecated Use getFeatureFlags() instead for DB-primary resolution.
  * Kept for backward compatibility during migration.
  */

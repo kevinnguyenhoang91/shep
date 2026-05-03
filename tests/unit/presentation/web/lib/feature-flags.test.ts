@@ -10,9 +10,8 @@ vi.mock('@shepai/core/infrastructure/services/settings.service', () => ({
   getSettings: () => mockGetSettings(),
 }));
 
-const { getFeatureFlags, featureFlags } = await import(
-  '../../../../../src/presentation/web/lib/feature-flags.js'
-);
+const { getFeatureFlags, featureFlags, requireFeatureFlag, FeatureFlagDisabledError } =
+  await import('../../../../../src/presentation/web/lib/feature-flags.js');
 
 describe('getFeatureFlags', () => {
   beforeEach(() => {
@@ -173,5 +172,57 @@ describe('featureFlags (backward-compatible const)', () => {
     });
 
     expect(featureFlags.reactFileManager).toBe(true);
+  });
+});
+
+describe('requireFeatureFlag', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.NEXT_PUBLIC_FLAG_COLLABORATION;
+  });
+
+  it('returns silently when the flag is enabled', () => {
+    mockHasSettings.mockReturnValue(true);
+    mockGetSettings.mockReturnValue({
+      featureFlags: {
+        envDeploy: false,
+        debug: false,
+        reactFileManager: false,
+        projects: false,
+        codeReview: false,
+        collaboration: true,
+      },
+    });
+
+    expect(() => requireFeatureFlag('collaboration')).not.toThrow();
+  });
+
+  it('throws FeatureFlagDisabledError when the flag is off', () => {
+    mockHasSettings.mockReturnValue(true);
+    mockGetSettings.mockReturnValue({
+      featureFlags: {
+        envDeploy: false,
+        debug: false,
+        reactFileManager: false,
+        projects: false,
+        codeReview: false,
+        collaboration: false,
+      },
+    });
+
+    let caught: unknown = null;
+    try {
+      requireFeatureFlag('collaboration');
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FeatureFlagDisabledError);
+    expect((caught as InstanceType<typeof FeatureFlagDisabledError>).flag).toBe('collaboration');
+    expect((caught as Error).message).toContain('collaboration');
+  });
+
+  it('throws when settings is not initialized and no env var is set', () => {
+    mockHasSettings.mockReturnValue(false);
+    expect(() => requireFeatureFlag('collaboration')).toThrow(FeatureFlagDisabledError);
   });
 });
