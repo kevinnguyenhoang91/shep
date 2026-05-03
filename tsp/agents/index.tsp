@@ -98,3 +98,4 @@ import "./agent-message.tsp";
 import "./agent-question.tsp";
 import "./supervisor-policy.tsp";
 import "./supervisor-decision.tsp";
+import "./agent-prompt-override.tsp";
