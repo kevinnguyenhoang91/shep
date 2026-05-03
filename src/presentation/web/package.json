@@ -60,6 +60,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@ai-sdk/react": "^3.0.176",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/dagre": "^0.7.53",
     "@types/js-yaml": "^4.0.9",
@@ -67,6 +68,7 @@
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
     "@types/tabulator-tables": "^6.3.1",
+    "ai": "^6.0.174",
     "autoprefixer": "^10.4.24",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
