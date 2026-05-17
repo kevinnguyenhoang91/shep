@@ -760,8 +760,7 @@ describe('FeatureDrawerTabs', () => {
       expect(screen.getByText('Authentication strategy?')).toBeInTheDocument();
     });
 
-    it('shows empty-state message when tech data is unavailable and not loading', async () => {
-      const user = userEvent.setup();
+    it('hides tech-decisions tab when techData is null and not loading', () => {
       renderTabs({
         featureNode: {
           ...defaultFeatureNode,
@@ -772,9 +771,47 @@ describe('FeatureDrawerTabs', () => {
         isTechLoading: false,
       });
 
-      await user.click(screen.getByRole('tab', { name: 'Tech Decisions' }));
+      expect(screen.queryByRole('tab', { name: 'Tech Decisions' })).not.toBeInTheDocument();
+    });
 
-      expect(screen.getByText(/no technical decisions available/i)).toBeInTheDocument();
+    it('hides product-decisions tab when productData is undefined (fetch completed, no data)', () => {
+      renderTabs({
+        featureNode: {
+          ...defaultFeatureNode,
+          lifecycle: 'implementation',
+          state: 'running',
+        },
+        productData: undefined,
+      });
+
+      expect(screen.queryByRole('tab', { name: 'Product' })).not.toBeInTheDocument();
+    });
+
+    it('shows tech-decisions tab while isTechLoading is true even though techData is null', () => {
+      renderTabs({
+        featureNode: {
+          ...defaultFeatureNode,
+          lifecycle: 'implementation',
+          state: 'running',
+        },
+        techData: null,
+        isTechLoading: true,
+      });
+
+      expect(screen.getByRole('tab', { name: 'Tech Decisions' })).toBeInTheDocument();
+    });
+
+    it('shows product-decisions tab while productData is null (loading)', () => {
+      renderTabs({
+        featureNode: {
+          ...defaultFeatureNode,
+          lifecycle: 'implementation',
+          state: 'running',
+        },
+        productData: null,
+      });
+
+      expect(screen.getByRole('tab', { name: 'Product' })).toBeInTheDocument();
     });
   });
 

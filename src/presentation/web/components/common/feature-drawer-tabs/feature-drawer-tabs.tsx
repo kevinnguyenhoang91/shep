@@ -83,7 +83,9 @@ const ALL_TABS: TabDef[] = [
 /** Compute which tabs are visible based on feature lifecycle + state. */
 function computeVisibleTabs(
   node: FeatureNodeData,
-  interactiveAgentEnabled = true
+  interactiveAgentEnabled = true,
+  hasTechContent = false,
+  hasProductContent = false
 ): FeatureTabKey[] {
   const tabs: FeatureTabKey[] = ['overview', 'activity'];
 
@@ -102,13 +104,16 @@ function computeVisibleTabs(
   // a PR is open in review, and after the feature is merged in maintain.
   // Fast-mode features skip the spec phases entirely, so these tabs would
   // always be empty — hide them.
+  // Tabs are also hidden when there is no content (loading not started or
+  // fetch completed with no data), so users never see an empty state.
   if (
     !node.fastMode &&
     (node.lifecycle === 'implementation' ||
       node.lifecycle === 'review' ||
       node.lifecycle === 'maintain')
   ) {
-    tabs.push('tech-decisions', 'product-decisions');
+    if (hasTechContent) tabs.push('tech-decisions');
+    if (hasProductContent) tabs.push('product-decisions');
   }
   if (node.lifecycle === 'review' && (node.state === 'action-required' || node.state === 'error')) {
     tabs.push('merge-review');
@@ -253,8 +258,14 @@ export function FeatureDrawerTabs({
   const pathname = usePathname();
 
   const visibleTabs = useMemo(
-    () => computeVisibleTabs(featureNode, interactiveAgentEnabled),
-    [featureNode, interactiveAgentEnabled]
+    () =>
+      computeVisibleTabs(
+        featureNode,
+        interactiveAgentEnabled,
+        Boolean(isTechLoading) || Boolean(techData),
+        productData !== undefined
+      ),
+    [featureNode, interactiveAgentEnabled, isTechLoading, techData, productData]
   );
   const visibleTabDefs = useMemo(
     () =>
