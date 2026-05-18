@@ -1,13 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { FeatureTreePageClient } from '@/app/features/feature-tree-page-client';
 import type { FeatureTreeRow } from '@/components/features/feature-tree-table/feature-tree-table';
 import type { InventoryCreateData } from '@/app/features/get-feature-tree-data';
+import { NotificationEventType } from '@shepai/core/domain/generated/output';
 
 // ── Mocks ────────────────────────────────────────────────────
 
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();
+let mockAgentEventsContext: { events: { eventType: NotificationEventType }[] } | null = null;
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -63,6 +65,10 @@ vi.mock('@/app/actions/add-repository', () => ({
 
 vi.mock('@/hooks/feature-flags-context', () => ({
   useFeatureFlags: () => ({}),
+}));
+
+vi.mock('@/hooks/agent-events-provider', () => ({
+  useOptionalAgentEventsContext: () => mockAgentEventsContext,
 }));
 
 vi.mock('@/hooks/fab-layout-context', () => ({
@@ -235,5 +241,91 @@ describe('FeatureTreePageClient — Archive Dialog Integration', () => {
     );
     // The archive dialog should not be visible initially
     expect(screen.queryByText('Archive feature?')).not.toBeInTheDocument();
+  });
+});
+
+describe('FeatureTreePageClient — SSE event-driven refresh', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    mockAgentEventsContext = { events: [] };
+  });
+
+  const renderPage = () =>
+    render(
+      <FeatureTreePageClient rows={defaultFeatures} repos={[]} createData={defaultCreateData} />
+    );
+
+  afterEach(() => {
+    vi.useRealTimers();
+    mockAgentEventsContext = null;
+  });
+
+  it('refreshes for AgentStarted events', () => {
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.AgentStarted }] };
+    renderPage();
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes for WaitingApproval events', () => {
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.WaitingApproval }] };
+    renderPage();
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes for AgentCompleted events', () => {
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.AgentCompleted }] };
+    renderPage();
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes for AgentFailed events', () => {
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.AgentFailed }] };
+    renderPage();
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes for MergeReviewReady events', () => {
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.MergeReviewReady }] };
+    renderPage();
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes for PrMerged events', () => {
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.PrMerged }] };
+    renderPage();
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes for PrClosed events', () => {
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.PrClosed }] };
+    renderPage();
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refresh for non-lifecycle events', () => {
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.PhaseCompleted }] };
+    renderPage();
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it('coalesces rapid lifecycle bursts into one refresh', () => {
+    mockAgentEventsContext = {
+      events: [
+        { eventType: NotificationEventType.AgentStarted },
+        { eventType: NotificationEventType.WaitingApproval },
+      ],
+    };
+    renderPage();
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 });

@@ -158,6 +158,9 @@ export class WebServerService implements IWebServerService {
       });
 
       server.on('error', reject);
+      server.on('upgrade', (req, socket, head) => {
+        app.getUpgradeHandler()(req, socket, head);
+      });
 
       server.listen(port, bindHost, () => {
         this.server = server;

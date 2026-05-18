@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -63,6 +63,7 @@ import {
 } from '@/components/ui/select';
 import { DeploymentStatusProvider } from '@/hooks/deployment-status-provider';
 import type { DeploymentStatusEntry } from '@shepai/core/application/ports/output/services/deployment-service.interface';
+import { NotificationEventType } from '@shepai/core/domain/generated/output';
 import { archiveFeature } from '@/app/actions/archive-feature';
 import { unarchiveFeature } from '@/app/actions/unarchive-feature';
 import { deleteFeature } from '@/app/actions/delete-feature';
@@ -80,6 +81,7 @@ import type { FeatureStatus } from '@/components/common/feature-status-config';
 import type { InventoryCreateData } from './get-feature-tree-data';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useFabLayout } from '@/hooks/fab-layout-context';
+import { useOptionalAgentEventsContext } from '@/hooks/agent-events-provider';
 
 export interface FeatureTreePageClientProps {
   /** Combined feature + application rows shown in the inventory table. */
@@ -122,6 +124,16 @@ const GROUP_BY_OPTIONS: { value: string; label: string }[] = [
   { value: 'lifecycle', label: 'Lifecycle' },
 ];
 
+const REFRESH_ON_EVENT_TYPES = new Set<NotificationEventType>([
+  NotificationEventType.AgentStarted,
+  NotificationEventType.WaitingApproval,
+  NotificationEventType.AgentCompleted,
+  NotificationEventType.AgentFailed,
+  NotificationEventType.MergeReviewReady,
+  NotificationEventType.PrMerged,
+  NotificationEventType.PrClosed,
+]);
+
 /** Item sort fields change based on groupBy — exclude the grouped field. */
 export function getItemSortOptions(groupBy: GroupByField | null) {
   const all = [
@@ -162,6 +174,10 @@ export function FeatureTreePageClient({
   const features = useMemo(() => rows.filter((r) => !r._isApplication), [rows]);
   const router = useRouter();
   const { t } = useTranslation('web');
+  const eventsCtx = useOptionalAgentEventsContext();
+  const sseEvents = eventsCtx?.events;
+  const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const processedSseCountRef = useRef(0);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -216,6 +232,35 @@ export function FeatureTreePageClient({
     setTableContainer(container);
     setRenderTick((t) => t + 1);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (refreshDebounceRef.current) {
+        clearTimeout(refreshDebounceRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const events = sseEvents ?? [];
+
+    if (processedSseCountRef.current > events.length) {
+      processedSseCountRef.current = 0;
+    }
+    if (events.length <= processedSseCountRef.current) return;
+    const newEvents = events.slice(processedSseCountRef.current);
+    processedSseCountRef.current = events.length;
+
+    for (const event of newEvents) {
+      if (!REFRESH_ON_EVENT_TYPES.has(event.eventType)) continue;
+      if (refreshDebounceRef.current) {
+        clearTimeout(refreshDebounceRef.current);
+      }
+      refreshDebounceRef.current = setTimeout(() => {
+        router.refresh();
+      }, 500);
+    }
+  }, [router, sseEvents]);
 
   // ── Create actions ────────────────────────────────────────────
 

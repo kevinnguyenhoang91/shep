@@ -26,10 +26,12 @@ import {
 
 function createMockDeps() {
   const mockHandle = vi.fn();
+  const mockUpgradeHandler = vi.fn();
   const mockApp = {
     prepare: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
     getRequestHandler: vi.fn().mockReturnValue(mockHandle),
+    getUpgradeHandler: vi.fn().mockReturnValue(mockUpgradeHandler),
   };
 
   const mockServer = {
@@ -56,7 +58,7 @@ function createMockDeps() {
     createHttpServer: vi.fn().mockReturnValue(mockServer) as any,
   };
 
-  return { deps, mockApp, mockServer, mockHandle };
+  return { deps, mockApp, mockServer, mockHandle, mockUpgradeHandler };
 }
 
 describe('WebServerService', () => {
@@ -106,6 +108,36 @@ describe('WebServerService', () => {
       await service.start(4050, '/path/to/web');
 
       expect(mocks.mockServer.listen).toHaveBeenCalledWith(4050, 'localhost', expect.any(Function));
+    });
+  });
+
+  describe('HTTP upgrade forwarding (HMR WebSocket regression)', () => {
+    it('registers an HTTP upgrade listener during start()', async () => {
+      await service.start(4050, '/path/to/web');
+
+      expect(mocks.mockServer.on).toHaveBeenCalledWith('upgrade', expect.any(Function));
+    });
+
+    it('forwards upgrade req/socket/head to Next upgrade handler', async () => {
+      await service.start(4050, '/path/to/web');
+
+      const upgradeListenerCall = mocks.mockServer.on.mock.calls.find(
+        ([eventName]) => eventName === 'upgrade'
+      );
+      expect(upgradeListenerCall).toBeDefined();
+      const upgradeListener = upgradeListenerCall![1] as (
+        req: unknown,
+        socket: unknown,
+        head: Buffer
+      ) => void;
+
+      const req = { url: '/_next/webpack-hmr' };
+      const socket = { destroy: vi.fn() };
+      const head = Buffer.from('hmr');
+      upgradeListener(req, socket, head);
+
+      expect(mocks.mockApp.getUpgradeHandler).toHaveBeenCalled();
+      expect(mocks.mockUpgradeHandler).toHaveBeenCalledWith(req, socket, head);
     });
   });
 
