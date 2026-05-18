@@ -204,10 +204,13 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-const mockUseArtifactFetch = vi.fn(() => false);
+const mockUseArtifactFetch = vi.fn(
+  (_featureId: string | null, ..._rest: unknown[]): boolean => false
+);
 
 vi.mock('@/components/common/control-center-drawer/use-artifact-fetch', () => ({
-  useArtifactFetch: (...args: unknown[]) => mockUseArtifactFetch(...args),
+  useArtifactFetch: (featureId: string | null, ...rest: unknown[]) =>
+    mockUseArtifactFetch(featureId, ...rest),
 }));
 
 vi.mock('@/components/common/control-center-drawer/use-drawer-sync', () => ({
@@ -316,21 +319,30 @@ describe('FeatureDrawerClient', () => {
         // Find tech artifact calls (getResearchArtifact and getFeatureArtifact
         // are the fetchers passed to calls 1 and 2).
         const techCall = calls[1]; // second useArtifactFetch call = tech decisions
+        const productCall = calls[2]; // third useArtifactFetch call = tech product
         expect(techCall[0]).toBe('feat-1'); // featureId must not be null
+        expect(productCall[0]).toBe('feat-1'); // product featureId must not be null
       }
     );
 
-    it('does not fetch tech/product artifacts for fast-mode features', () => {
-      mockUseArtifactFetch.mockReturnValue(false);
+    it.each([
+      ['implementation', 'running'],
+      ['review', 'action-required'],
+      ['maintain', 'done'],
+    ] as const)(
+      'does not fetch tech/product artifacts for fast-mode features when lifecycle=%s',
+      (lifecycle, state) => {
+        mockUseArtifactFetch.mockReturnValue(false);
 
-      render(
-        <FeatureDrawerClient view={createView({ lifecycle: 'implementation', fastMode: true })} />
-      );
+        render(<FeatureDrawerClient view={createView({ lifecycle, state, fastMode: true })} />);
 
-      const calls = mockUseArtifactFetch.mock.calls;
-      const techCall = calls[1];
-      expect(techCall[0]).toBeNull(); // fast-mode: featureId must be null → no fetch
-    });
+        const calls = mockUseArtifactFetch.mock.calls;
+        const techCall = calls[1];
+        const productCall = calls[2];
+        expect(techCall[0]).toBeNull(); // fast-mode: featureId must be null → no fetch
+        expect(productCall[0]).toBeNull(); // fast-mode: product featureId must be null → no fetch
+      }
+    );
 
     it('does not fetch tech/product artifacts for early phases (requirements/research)', () => {
       for (const lifecycle of ['requirements', 'research'] as const) {
@@ -343,7 +355,9 @@ describe('FeatureDrawerClient', () => {
 
         const calls = mockUseArtifactFetch.mock.calls;
         const techCall = calls[1];
+        const productCall = calls[2];
         expect(techCall[0]).toBeNull(); // early phase: featureId must be null → no fetch
+        expect(productCall[0]).toBeNull(); // early phase: product featureId must be null → no fetch
         unmount();
       }
     });
