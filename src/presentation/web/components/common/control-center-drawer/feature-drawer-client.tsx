@@ -281,7 +281,10 @@ export function FeatureDrawerClient({
   // the user can visualize the locked-in decisions while the agent runs, not
   // only when waiting on an approval. The action bar still shows only on
   // 'action-required' (handled inside FeatureDrawerTabs).
-  const techFeatureId = featureNode?.lifecycle === 'implementation' ? featureNode.featureId : null;
+  const techFeatureId =
+    featureNode?.lifecycle === 'implementation' && !featureNode.fastMode && featureNode.specPath
+      ? featureNode.featureId
+      : null;
   const isLoadingTech = useArtifactFetch(
     techFeatureId,
     getResearchArtifact,
