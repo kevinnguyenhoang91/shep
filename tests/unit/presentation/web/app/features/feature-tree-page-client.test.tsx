@@ -261,70 +261,104 @@ describe('FeatureTreePageClient — SSE event-driven refresh', () => {
     mockAgentEventsContext = null;
   });
 
-  it('refreshes for AgentStarted events', () => {
+  it('does not replay lifecycle backlog on initial mount', () => {
     mockAgentEventsContext = { events: [{ eventType: NotificationEventType.AgentStarted }] };
-    renderPage();
-    vi.advanceTimersByTime(500);
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('refreshes for WaitingApproval events', () => {
-    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.WaitingApproval }] };
-    renderPage();
-    vi.advanceTimersByTime(500);
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('refreshes for AgentCompleted events', () => {
-    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.AgentCompleted }] };
-    renderPage();
-    vi.advanceTimersByTime(500);
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('refreshes for AgentFailed events', () => {
-    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.AgentFailed }] };
-    renderPage();
-    vi.advanceTimersByTime(500);
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('refreshes for MergeReviewReady events', () => {
-    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.MergeReviewReady }] };
-    renderPage();
-    vi.advanceTimersByTime(500);
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('refreshes for PrMerged events', () => {
-    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.PrMerged }] };
-    renderPage();
-    vi.advanceTimersByTime(500);
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('refreshes for PrClosed events', () => {
-    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.PrClosed }] };
-    renderPage();
-    vi.advanceTimersByTime(500);
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not refresh for non-lifecycle events', () => {
-    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.PhaseCompleted }] };
     renderPage();
     vi.advanceTimersByTime(500);
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 
+  it('refreshes for AgentStarted events', () => {
+    const view = renderPage();
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.AgentStarted }] };
+    view.rerender(
+      <FeatureTreePageClient rows={defaultFeatures} repos={[]} createData={defaultCreateData} />
+    );
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes for WaitingApproval events', () => {
+    const view = renderPage();
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.WaitingApproval }] };
+    view.rerender(
+      <FeatureTreePageClient rows={defaultFeatures} repos={[]} createData={defaultCreateData} />
+    );
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes for AgentCompleted events', () => {
+    const view = renderPage();
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.AgentCompleted }] };
+    view.rerender(
+      <FeatureTreePageClient rows={defaultFeatures} repos={[]} createData={defaultCreateData} />
+    );
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes for AgentFailed events', () => {
+    const view = renderPage();
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.AgentFailed }] };
+    view.rerender(
+      <FeatureTreePageClient rows={defaultFeatures} repos={[]} createData={defaultCreateData} />
+    );
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes for MergeReviewReady events', () => {
+    const view = renderPage();
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.MergeReviewReady }] };
+    view.rerender(
+      <FeatureTreePageClient rows={defaultFeatures} repos={[]} createData={defaultCreateData} />
+    );
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes for PrMerged events', () => {
+    const view = renderPage();
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.PrMerged }] };
+    view.rerender(
+      <FeatureTreePageClient rows={defaultFeatures} repos={[]} createData={defaultCreateData} />
+    );
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes for PrClosed events', () => {
+    const view = renderPage();
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.PrClosed }] };
+    view.rerender(
+      <FeatureTreePageClient rows={defaultFeatures} repos={[]} createData={defaultCreateData} />
+    );
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refresh for non-lifecycle events', () => {
+    const view = renderPage();
+    mockAgentEventsContext = { events: [{ eventType: NotificationEventType.PhaseCompleted }] };
+    view.rerender(
+      <FeatureTreePageClient rows={defaultFeatures} repos={[]} createData={defaultCreateData} />
+    );
+    vi.advanceTimersByTime(500);
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
   it('coalesces rapid lifecycle bursts into one refresh', () => {
+    const view = renderPage();
     mockAgentEventsContext = {
       events: [
         { eventType: NotificationEventType.AgentStarted },
         { eventType: NotificationEventType.WaitingApproval },
       ],
     };
-    renderPage();
+    view.rerender(
+      <FeatureTreePageClient rows={defaultFeatures} repos={[]} createData={defaultCreateData} />
+    );
     vi.advanceTimersByTime(500);
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });

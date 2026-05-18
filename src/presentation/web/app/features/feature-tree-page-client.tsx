@@ -178,6 +178,7 @@ export function FeatureTreePageClient({
   const sseEvents = eventsCtx?.events;
   const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const processedSseCountRef = useRef(0);
+  const hasSseCursorRef = useRef(false);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -242,14 +243,26 @@ export function FeatureTreePageClient({
   }, []);
 
   useEffect(() => {
-    const events = sseEvents ?? [];
+    if (!sseEvents) {
+      hasSseCursorRef.current = false;
+      processedSseCountRef.current = 0;
+      return;
+    }
 
-    if (processedSseCountRef.current > events.length) {
+    if (!hasSseCursorRef.current) {
+      // Keep the cursor aligned when the SSE context first becomes available
+      // so opening/navigating to this page does not replay historical events.
+      processedSseCountRef.current = sseEvents.length;
+      hasSseCursorRef.current = true;
+      return;
+    }
+
+    if (processedSseCountRef.current > sseEvents.length) {
       processedSseCountRef.current = 0;
     }
-    if (events.length <= processedSseCountRef.current) return;
-    const newEvents = events.slice(processedSseCountRef.current);
-    processedSseCountRef.current = events.length;
+    if (sseEvents.length <= processedSseCountRef.current) return;
+    const newEvents = sseEvents.slice(processedSseCountRef.current);
+    processedSseCountRef.current = sseEvents.length;
 
     for (const event of newEvents) {
       if (!REFRESH_ON_EVENT_TYPES.has(event.eventType)) continue;
