@@ -621,6 +621,77 @@ describe('CopilotCliExecutorService', () => {
       vi.useRealTimers();
     });
 
+    it('should reject on timeout even if subprocess never emits close', async () => {
+      vi.useFakeTimers();
+      const mockProc = createMockChildProcess();
+      vi.mocked(mockSpawn).mockReturnValue(mockProc as any);
+
+      const executePromise = executor.execute('Long running', { timeout: 3000, silent: true });
+      let status: 'pending' | 'resolved' | 'rejected' = 'pending';
+      executePromise
+        .then(() => {
+          status = 'resolved';
+        })
+        .catch(() => {
+          status = 'rejected';
+        });
+
+      try {
+        await vi.advanceTimersByTimeAsync(3001);
+        await Promise.resolve();
+
+        expect(mockProc.kill).toHaveBeenCalled();
+        expect(status).toBe('rejected');
+      } finally {
+        mockProc.stdout.end();
+        mockProc.stderr.end();
+        mockProc.emit('close', null);
+        await executePromise.catch(() => undefined);
+        vi.useRealTimers();
+      }
+    });
+
+    it('should force-kill subprocess after result when it does not exit', async () => {
+      vi.useFakeTimers();
+      const mockProc = createMockChildProcess();
+      vi.mocked(mockSpawn).mockReturnValue(mockProc as any);
+
+      mockProc.kill.mockImplementation(() => {
+        process.nextTick(() => {
+          mockProc.stdout.end();
+          mockProc.stderr.end();
+          mockProc.emit('close', null);
+        });
+        return true;
+      });
+
+      const executePromise = executor.execute('Prompt', { silent: true });
+      let resultText = '';
+      let resultSessionId: string | undefined;
+      executePromise.then((result) => {
+        resultText = result.result;
+        resultSessionId = result.sessionId;
+      });
+
+      try {
+        mockProc.stdout.write(`${assistantMessage('Finished')}\n`);
+        mockProc.stdout.write(`${resultEvent('session-stuck-1')}\n`);
+
+        await vi.advanceTimersByTimeAsync(31_000);
+        await vi.runAllTimersAsync();
+
+        expect(mockProc.kill).toHaveBeenCalled();
+        expect(resultText).toBe('Finished');
+        expect(resultSessionId).toBe('session-stuck-1');
+      } finally {
+        mockProc.stdout.end();
+        mockProc.stderr.end();
+        mockProc.emit('close', null);
+        await executePromise.catch(() => undefined);
+        vi.useRealTimers();
+      }
+    });
+
     it('should handle exit code 0 with empty response gracefully', async () => {
       const mockProc = createMockChildProcess();
       vi.mocked(mockSpawn).mockReturnValue(mockProc as any);
@@ -816,6 +887,50 @@ describe('CopilotCliExecutorService', () => {
       expect(events.some((e) => e.type === 'error' && /timed out/i.test(e.content))).toBe(true);
 
       vi.useRealTimers();
+    });
+
+    it('should finish stream after result even if subprocess never exits', async () => {
+      vi.useFakeTimers();
+      const mockProc = createMockChildProcess();
+      vi.mocked(mockSpawn).mockReturnValue(mockProc as any);
+
+      mockProc.kill.mockImplementation(() => {
+        process.nextTick(() => {
+          mockProc.stdout.end();
+          mockProc.stderr.end();
+          mockProc.emit('close', null);
+        });
+        return true;
+      });
+
+      const events: { type: string; content: string }[] = [];
+      let completed = false;
+      const collectPromise = (async () => {
+        for await (const event of executor.executeStream('Prompt', { silent: true })) {
+          events.push({ type: event.type, content: event.content });
+        }
+        completed = true;
+      })();
+
+      try {
+        mockProc.stdout.write(`${assistantMessage('Done')}\n`);
+        mockProc.stdout.write(`${resultEvent('stream-stuck-1')}\n`);
+
+        await vi.advanceTimersByTimeAsync(31_000);
+        await vi.runAllTimersAsync();
+
+        expect(mockProc.kill).toHaveBeenCalled();
+        expect(completed).toBe(true);
+        expect(events.some((event) => event.type === 'result' && event.content === 'Done')).toBe(
+          true
+        );
+      } finally {
+        mockProc.stdout.end();
+        mockProc.stderr.end();
+        mockProc.emit('close', null);
+        await collectPromise;
+        vi.useRealTimers();
+      }
     });
 
     it('should handle non-JSON lines as raw progress in stream mode', async () => {

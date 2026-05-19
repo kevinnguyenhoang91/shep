@@ -29,6 +29,7 @@ import type {
 import type { SpawnFunction } from '../types.js';
 import { getCurrentPhase, getLogPrefix } from '../../feature-agent/log-context.js';
 import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -61,6 +62,13 @@ const MAX_PROMPT_ARG_CHARS = 12_000;
 
 /** Prefix for temporary prompt files used by large prompt indirection mode. */
 const PROMPT_FILE_PREFIX = 'shep-copilot-prompt-';
+
+/**
+ * Maximum grace period after receiving a final result event before forcing
+ * process termination. Prevents hangs when the CLI emits result but leaves
+ * child processes running.
+ */
+const RESULT_TO_CLOSE_GRACE_MS = 30_000;
 
 /**
  * Legacy model aliases that appeared in older settings payloads.
@@ -152,16 +160,31 @@ export class CopilotCliExecutorService implements IAgentExecutor {
       let stderr = '';
       let timedOut = false;
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      let postResultKillTimer: ReturnType<typeof setTimeout> | undefined;
+      let settled = false;
 
       // State accumulated from JSONL events
       let resultText = '';
       let sessionId: string | undefined;
       let usage: AgentExecutionUsage | undefined;
 
+      const resolveOnce = (result: AgentExecutionResult) => {
+        if (settled) return;
+        settled = true;
+        resolve(result);
+      };
+
+      const rejectOnce = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      };
+
       if (options?.timeout) {
         timeoutId = setTimeout(() => {
           timedOut = true;
-          proc.kill();
+          this.terminateProcess(proc);
+          rejectOnce(new Error('Agent execution timed out'));
         }, options.timeout);
       }
 
@@ -175,6 +198,13 @@ export class CopilotCliExecutorService implements IAgentExecutor {
           } else if (type === 'result') {
             if (parsed.sessionId) sessionId = parsed.sessionId as string;
             if (parsed.usage) usage = this.extractUsage(parsed.usage as Record<string, unknown>);
+
+            postResultKillTimer ??= setTimeout(() => {
+              this.log(
+                `Subprocess did not exit within ${RESULT_TO_CLOSE_GRACE_MS / 1000}s of result event — sending force kill`
+              );
+              this.terminateProcess(proc, true);
+            }, RESULT_TO_CLOSE_GRACE_MS);
           }
         } catch {
           // Malformed JSON line — skip gracefully
@@ -200,8 +230,10 @@ export class CopilotCliExecutorService implements IAgentExecutor {
       proc.on('error', (error: Error & { code?: string }) => {
         this.log(`Process error event: ${error.message}`);
         if (timeoutId) clearTimeout(timeoutId);
+        if (postResultKillTimer) clearTimeout(postResultKillTimer);
+        if (timedOut) return;
         if (error.code === 'ENOENT') {
-          reject(
+          rejectOnce(
             new Error(
               'GitHub Copilot CLI ("copilot") not found. ' +
                 'Install via: npm install -g @githubnext/github-copilot-cli, ' +
@@ -209,7 +241,7 @@ export class CopilotCliExecutorService implements IAgentExecutor {
             )
           );
         } else {
-          reject(error);
+          rejectOnce(error);
         }
       });
 
@@ -219,9 +251,9 @@ export class CopilotCliExecutorService implements IAgentExecutor {
 
         this.log(`Process closed with code ${code}, result=${resultText.length} chars`);
         if (timeoutId) clearTimeout(timeoutId);
+        if (postResultKillTimer) clearTimeout(postResultKillTimer);
 
         if (timedOut) {
-          reject(new Error('Agent execution timed out'));
           return;
         }
 
@@ -229,20 +261,20 @@ export class CopilotCliExecutorService implements IAgentExecutor {
           // Check for auth-specific error patterns to provide actionable guidance
           const authError = this.detectAuthError(stderr);
           if (authError) {
-            reject(new Error(authError));
+            rejectOnce(new Error(authError));
             return;
           }
           const message = stderr.trim()
             ? `Process exited with code ${code}: ${stderr.trim()}`
             : `Process exited with code ${code}`;
-          reject(new Error(message));
+          rejectOnce(new Error(message));
           return;
         }
 
         const result: AgentExecutionResult = { result: resultText };
         if (sessionId) result.sessionId = sessionId;
         if (usage) result.usage = usage;
-        resolve(result);
+        resolveOnce(result);
       });
     });
 
@@ -292,6 +324,10 @@ export class CopilotCliExecutorService implements IAgentExecutor {
     let stderr = '';
     let timedOut = false;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let postResultKillTimer: ReturnType<typeof setTimeout> | undefined;
+    let gotResultEvent = false;
+    let forcedCloseAfterResult = false;
+    let streamEnded = false;
 
     // Accumulated final response text (from assistant.message events)
     let resultText = '';
@@ -308,6 +344,12 @@ export class CopilotCliExecutorService implements IAgentExecutor {
       }
     }
 
+    function endStream() {
+      if (streamEnded) return;
+      streamEnded = true;
+      enqueue(null);
+    }
+
     function waitForItem(): Promise<void> {
       if (queue.length > 0) return Promise.resolve();
       return new Promise<void>((r) => {
@@ -318,9 +360,10 @@ export class CopilotCliExecutorService implements IAgentExecutor {
     if (options?.timeout) {
       timeoutId = setTimeout(() => {
         timedOut = true;
-        proc.kill();
+        if (postResultKillTimer) clearTimeout(postResultKillTimer);
+        this.terminateProcess(proc);
         enqueue({ type: 'error', content: 'Agent execution timed out', timestamp: new Date() });
-        enqueue(null);
+        endStream();
       }, options.timeout);
     }
 
@@ -346,11 +389,20 @@ export class CopilotCliExecutorService implements IAgentExecutor {
 
         if (type === 'result') {
           // Final event — yield result with accumulated text
+          gotResultEvent = true;
           enqueue({
             type: 'result',
             content: resultText,
             timestamp: new Date(),
           });
+          postResultKillTimer ??= setTimeout(() => {
+            forcedCloseAfterResult = true;
+            this.log(
+              `Subprocess did not exit within ${RESULT_TO_CLOSE_GRACE_MS / 1000}s of result event — sending force kill`
+            );
+            this.terminateProcess(proc, true);
+            endStream();
+          }, RESULT_TO_CLOSE_GRACE_MS);
           return;
         }
 
@@ -387,19 +439,21 @@ export class CopilotCliExecutorService implements IAgentExecutor {
 
     proc.on('error', (err: Error) => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (postResultKillTimer) clearTimeout(postResultKillTimer);
+      if (timedOut) return;
       spawnError = err;
-      enqueue(null);
+      endStream();
     });
 
     proc.on('close', (code: number | null) => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (postResultKillTimer) clearTimeout(postResultKillTimer);
       if (timedOut) return; // already handled by timeout callback
 
       if (lineBuffer.trim()) {
         processStreamLine(lineBuffer.trim());
       }
-
-      if (code !== 0 && code !== null) {
+      if (code !== 0 && code !== null && !(forcedCloseAfterResult && gotResultEvent)) {
         const authError = this.detectAuthError(stderr);
         const msg =
           authError ??
@@ -408,7 +462,7 @@ export class CopilotCliExecutorService implements IAgentExecutor {
             : `Process exited with code ${code}`);
         enqueue({ type: 'error', content: msg, timestamp: new Date() });
       }
-      enqueue(null);
+      endStream();
     });
 
     try {
@@ -540,6 +594,27 @@ export class CopilotCliExecutorService implements IAgentExecutor {
     spawnOpts.env = cleanEnv;
 
     return spawnOpts;
+  }
+
+  private terminateProcess(proc: ReturnType<SpawnFunction>, force = false): void {
+    if (process.platform === 'win32' && proc.pid) {
+      try {
+        execFileSync('taskkill', ['/F', '/T', '/PID', String(proc.pid)], { stdio: 'ignore' });
+        return;
+      } catch {
+        // Fall through to Node kill below.
+      }
+    }
+
+    try {
+      if (force) {
+        proc.kill('SIGKILL');
+      } else {
+        proc.kill();
+      }
+    } catch {
+      // Ignore process termination errors.
+    }
   }
 
   /**
