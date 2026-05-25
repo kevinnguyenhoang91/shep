@@ -73,6 +73,9 @@ FROM node:22-alpine AS runtime
 # Upgrade base packages to pick up security patches (e.g. zlib CVE-2026-22184)
 RUN apk upgrade --no-cache
 
+# Install tools
+RUN apk add --no-cache git curl wget bash
+
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 shep
@@ -80,16 +83,16 @@ RUN addgroup --system --gid 1001 nodejs \
 WORKDIR /app
 
 # Copy production dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps --chown=shep:nodejs /app/node_modules ./node_modules
 
 # Copy built output from builder stage
-COPY --from=builder /app/dist ./dist
+COPY --from=builder --chown=shep:nodejs /app/dist ./dist
 
 # Copy the production web bundle used by `shep ui`
-COPY --from=builder /app/web ./web
+COPY --from=builder --chown=shep:nodejs /app/web ./web
 
 # Copy package.json (required by VersionService to read version at runtime)
-COPY package.json ./
+COPY --chown=shep:nodejs package.json ./
 
 # Switch to non-root user
 USER shep
