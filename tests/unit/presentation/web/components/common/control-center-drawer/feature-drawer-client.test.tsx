@@ -259,6 +259,7 @@ describe('FeatureDrawerClient', () => {
     mockStartFeature.mockResolvedValue({});
     mockStopFeature.mockResolvedValue({ stopped: true });
     mockUpdateFeaturePinnedConfig.mockResolvedValue({ ok: true });
+    mockUseArtifactFetch.mockReturnValue(false);
   });
 
   it('blocks continuation actions while the pinned config save is in flight and patches local node data after success', async () => {
@@ -310,7 +311,15 @@ describe('FeatureDrawerClient', () => {
       (lifecycle, state) => {
         mockUseArtifactFetch.mockReturnValue(false);
 
-        render(<FeatureDrawerClient view={createView({ lifecycle, state })} />);
+        render(
+          <FeatureDrawerClient
+            view={createView({
+              lifecycle,
+              state,
+              specPath: lifecycle === 'implementation' ? '/tmp/repo/specs/feat-1' : undefined,
+            })}
+          />
+        );
 
         // useArtifactFetch is called for prd, tech, techProduct, and merge.
         // The tech and techProduct calls (indices 1 and 2) must receive a
@@ -388,5 +397,41 @@ describe('FeatureDrawerClient', () => {
     });
 
     expect(mockToastError).toHaveBeenCalledWith('Could not save pinned config');
+  });
+
+  it('does not fetch tech artifacts for fast-mode implementation features', () => {
+    render(
+      <FeatureDrawerClient
+        view={createView({
+          lifecycle: 'implementation',
+          state: 'running',
+          fastMode: true,
+          specPath: '/tmp/repo/specs/feat-1',
+        })}
+      />
+    );
+
+    const latestCycle = mockUseArtifactFetch.mock.calls.slice(-4);
+    expect(latestCycle).toHaveLength(4);
+    expect(latestCycle[1]?.[0]).toBeNull();
+    expect(latestCycle[2]?.[0]).toBeNull();
+  });
+
+  it('fetches tech artifacts for spec-mode implementation features with a spec path', () => {
+    render(
+      <FeatureDrawerClient
+        view={createView({
+          lifecycle: 'implementation',
+          state: 'running',
+          fastMode: false,
+          specPath: '/tmp/repo/specs/feat-1',
+        })}
+      />
+    );
+
+    const latestCycle = mockUseArtifactFetch.mock.calls.slice(-4);
+    expect(latestCycle).toHaveLength(4);
+    expect(latestCycle[1]?.[0]).toBe('feat-1');
+    expect(latestCycle[2]?.[0]).toBe('feat-1');
   });
 });

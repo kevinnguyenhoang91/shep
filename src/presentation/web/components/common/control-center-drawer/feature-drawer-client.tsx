@@ -286,7 +286,7 @@ export function FeatureDrawerClient({
   const techFeatureId =
     featureNode &&
     !featureNode.fastMode &&
-    (featureNode.lifecycle === 'implementation' ||
+    ((featureNode.lifecycle === 'implementation' && Boolean(featureNode.specPath)) ||
       featureNode.lifecycle === 'review' ||
       featureNode.lifecycle === 'maintain')
       ? featureNode.featureId
