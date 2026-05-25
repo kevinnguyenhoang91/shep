@@ -46,10 +46,10 @@ content: |
 
   ## Implementation Notes
 
-  - Add `.devcontainer/Dockerfile` derived from the repo's existing Docker setup, using `node:22-alpine` plus git, bash, curl, wget, python3, make, and g++ for native module builds.
-  - Add `.devcontainer/devcontainer.json` with a Dockerfile build definition, `/workspace` as the workspace folder, a bind mount for the repo, named volumes for `/workspace/node_modules` and `/pnpm/store`, and `postCreateCommand: pnpm install --frozen-lockfile`.
+  - Add `.devcontainer/Dockerfile` derived from the repo's existing Docker setup, using `node:22-alpine` plus git, bash, curl, wget, python3, make, and g++ for native module builds, and pre-create writable `/pnpm` paths for the non-root `node` user.
+  - Add `.devcontainer/devcontainer.json` with a Dockerfile build definition rooted in `.devcontainer/`, `/workspace` as the workspace folder, a bind mount for the repo, named volumes for `/workspace/node_modules` and `/pnpm/store`, `remoteUser: node`, `PATH` including `PNPM_HOME`, and `postCreateCommand: pnpm install --frozen-lockfile`.
   - Update the root `Dockerfile` so every stage activates `pnpm@10.33.0`, matching the `packageManager` field in `package.json`.
-  - Extend `docs/development/setup.md` with `@devcontainers/cli` install, `read-configuration`, `up`, and `exec` examples.
+  - Extend `docs/development/setup.md` with `@devcontainers/cli` install, `read-configuration`, `up`, and `exec` examples, clearly framing the devcontainer flow as an alternative to the local install path.
 
   ## Success Criteria
 

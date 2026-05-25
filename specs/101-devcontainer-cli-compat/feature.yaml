@@ -3,11 +3,11 @@ feature:
   name: "devcontainer-cli-compat"
   number: 101
   branch: "feat/101-devcontainer-cli-compat"
-  lifecycle: "implementation"
+  lifecycle: "review"
   createdAt: "2026-05-25T08:34:15Z"
 
 status:
-  phase: "in_review"
+  phase: "in-review"
   progress:
     completed: 4
     total: 4

@@ -1,0 +1,77 @@
+# Research Artifact (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: "devcontainer-cli-compat"
+summary: >
+  The devcontainer can stay intentionally small because the repo already has a
+  Dockerfile-aligned Node 22 + pnpm 10.33.0 toolchain and the contributor need
+  is focused on reliable `@devcontainers/cli` startup. The highest-value
+  decisions are to keep dependency caches in Docker volumes, run as the non-root
+  `node` user to avoid host file ownership issues, and keep the build context
+  scoped to `.devcontainer/` because the image does not need repository files at
+  build time.
+
+relatedFeatures: []
+
+technologies:
+  - "Docker"
+  - "@devcontainers/cli"
+  - "Node.js 22"
+  - "pnpm 10.33.0"
+
+relatedLinks:
+  - title: "Devcontainer setup docs"
+    url: "docs/development/setup.md"
+  - title: "feature.yaml protocol"
+    url: "docs/development/feature-yaml-protocol.md"
+  - title: "Spec validator"
+    url: "scripts/spec-validate.ts"
+
+decisions:
+  - title: "Build context"
+    chosen: "Use `.devcontainer` as the Docker build context."
+    rejected:
+      - "Use the repository root as build context even though the Dockerfile does not copy repository files."
+    rationale: >
+      The devcontainer image is built entirely from the Dockerfile and base
+      image packages, so limiting context to `.devcontainer/` keeps
+      `devcontainer up` faster and more deterministic without changing runtime
+      behavior.
+  - title: "Container user"
+    chosen: "Run the workspace as the non-root `node` user."
+    rejected:
+      - "Keep the image default root user for all development commands."
+    rationale: >
+      Running as `node` avoids common bind-mount ownership problems on the host
+      checkout while still allowing pnpm to use `/pnpm/store` after those paths
+      are created with the correct ownership in the image.
+  - title: "Dependency installation flow"
+    chosen: "Treat the devcontainer setup as an alternative to the local install path."
+    rejected:
+      - "Document the devcontainer flow as an additional step after local `pnpm install`."
+    rationale: >
+      The devcontainer already runs `pnpm install --frozen-lockfile` during
+      setup, so contributors should pick one path per checkout instead of
+      installing dependencies twice.
+
+openQuestions: []
+
+content: |
+  ## Problem Statement
+
+  The repository had a production-oriented Dockerfile but no spec-complete
+  devcontainer bundle for `@devcontainers/cli`, which left contributors without
+  a documented containerized setup path and caused the new spec directory to
+  fail the repository's YAML spec validation workflow.
+
+  ## Findings
+
+  - `scripts/spec-validate.ts` requires every YAML spec bundle to include
+    `spec.yaml`, `research.yaml`, `plan.yaml`, `tasks.yaml`, and `feature.yaml`.
+  - The existing devcontainer already matched the repo's Node and pnpm versions,
+    so the remaining work was mainly around review hardening: narrowing build
+    context, avoiding root-owned host files, and documenting the setup path more
+    clearly.
+  - Named Docker volumes remain the right choice for `node_modules` and the pnpm
+    store because they preserve containerized dependency performance without
+    polluting the host checkout.

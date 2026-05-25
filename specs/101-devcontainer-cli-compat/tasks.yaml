@@ -1,0 +1,96 @@
+# Task Breakdown (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: "devcontainer-cli-compat"
+summary: >
+  Four tasks cover the full review follow-up: harden the devcontainer build and
+  runtime settings, clarify the contributor setup docs, and complete the YAML
+  spec bundle so repository validation passes.
+
+relatedFeatures: []
+
+technologies:
+  - "Docker"
+  - "@devcontainers/cli"
+  - "Markdown"
+  - "YAML"
+
+relatedLinks:
+  - title: "Spec validator"
+    url: "scripts/spec-validate.ts"
+  - title: "feature.yaml protocol"
+    url: "docs/development/feature-yaml-protocol.md"
+
+tasks:
+  - id: "task-1"
+    phaseId: "phase-1"
+    title: "Scope the devcontainer build context to `.devcontainer`"
+    description: >
+      Update `.devcontainer/devcontainer.json` so Docker builds from the local
+      `.devcontainer` directory instead of the repository root.
+    state: "Done"
+    dependencies: []
+    acceptanceCriteria:
+      - "The build context is `.` in `.devcontainer/devcontainer.json`"
+      - "`devcontainer read-configuration --workspace-folder .` still succeeds"
+    tdd: null
+    estimatedEffort: "10min"
+  - id: "task-2"
+    phaseId: "phase-1"
+    title: "Run the devcontainer as a non-root user with pnpm on PATH"
+    description: >
+      Set `remoteUser` to `node`, ensure `/pnpm` is writable for that user in
+      the image, and expose `PNPM_HOME` on PATH so global pnpm binaries resolve.
+    state: "Done"
+    dependencies:
+      - "task-1"
+    acceptanceCriteria:
+      - "`.devcontainer/devcontainer.json` sets `remoteUser: node`"
+      - "`.devcontainer/devcontainer.json` adds `/pnpm` to PATH"
+      - "`.devcontainer/Dockerfile` prepares writable `/pnpm` paths for `node`"
+    tdd: null
+    estimatedEffort: "15min"
+  - id: "task-3"
+    phaseId: "phase-2"
+    title: "Clarify the devcontainer setup path in contributor docs"
+    description: >
+      Reword `docs/development/setup.md` so the devcontainer flow is clearly an
+      alternative to the local install path, not an extra follow-up step.
+    state: "Done"
+    dependencies: []
+    acceptanceCriteria:
+      - "The docs say contributors should choose one setup path per checkout"
+      - "The devcontainer section explains that install happens automatically"
+    tdd: null
+    estimatedEffort: "10min"
+  - id: "task-4"
+    phaseId: "phase-2"
+    title: "Complete the YAML spec bundle and align review metadata"
+    description: >
+      Add `research.yaml`, `plan.yaml`, and `tasks.yaml`, and fix
+      `feature.yaml` to use the documented review lifecycle and `in-review`
+      phase values.
+    state: "Done"
+    dependencies:
+      - "task-3"
+    acceptanceCriteria:
+      - "The spec directory contains all required YAML artifacts"
+      - "`feature.yaml` uses `lifecycle: review` and `status.phase: in-review`"
+      - "`pnpm spec:validate specs/101-devcontainer-cli-compat` passes"
+    tdd: null
+    estimatedEffort: "20min"
+
+totalEstimate: "55min"
+
+content: |
+  ## Execution Notes
+
+  The work was intentionally kept small and sequential:
+
+  1. Harden the devcontainer config.
+  2. Clarify the docs so the workflow is unambiguous.
+  3. Fill in the missing YAML planning artifacts required by the repository's
+     spec validator.
+
+  This sequence keeps the infrastructure changes isolated, then documents them,
+  then records the supporting planning metadata needed by the spec workflow.

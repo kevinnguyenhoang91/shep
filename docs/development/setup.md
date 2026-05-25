@@ -32,7 +32,14 @@ git clone https://github.com/shep-ai/shep.git
 cd cli
 ```
 
-### 2. Install Dependencies
+### 2. Choose a Dependency Setup Path
+
+Use one setup path per checkout:
+
+- **Local install** if you want to run the toolchain directly on your host.
+- **Dev Containers CLI** if you want a containerized environment with dependencies installed inside the devcontainer.
+
+#### 2a. Local Install
 
 ```bash
 pnpm install
@@ -40,9 +47,9 @@ pnpm install
 
 This installs all dependencies including dev dependencies.
 
-### 2a. Optional: Use Dev Containers CLI
+#### 2b. Dev Containers CLI
 
-If you prefer a containerized development environment, this repo includes a Dockerfile-based devcontainer that works with `@devcontainers/cli`.
+If you prefer a containerized development environment, this repo includes a Dockerfile-based devcontainer that works with `@devcontainers/cli`. This replaces the local `pnpm install` step above for that checkout because the devcontainer runs `pnpm install --frozen-lockfile` automatically during setup.
 
 ```bash
 npm install -g @devcontainers/cli
@@ -54,7 +61,6 @@ devcontainer read-configuration --workspace-folder .
 devcontainer up --workspace-folder .
 
 # Run commands inside the devcontainer
-devcontainer exec --workspace-folder . pnpm install --frozen-lockfile
 devcontainer exec --workspace-folder . pnpm build
 ```
 

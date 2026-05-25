@@ -1,0 +1,97 @@
+# Implementation Plan (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: "devcontainer-cli-compat"
+summary: >
+  Deliver the devcontainer setup in two phases: first harden the container
+  configuration so `@devcontainers/cli` builds quickly and runs as a non-root
+  user with a working pnpm environment; then align the docs and spec bundle so
+  contributors understand the setup path and the repository's YAML spec workflow
+  remains valid. The work is small, but it still follows RED-GREEN-REFACTOR
+  thinking: identify the failing validation/review cases, make the smallest
+  targeted fixes, then tighten the wording and metadata for clarity.
+
+relatedFeatures: []
+
+technologies:
+  - "Docker"
+  - "@devcontainers/cli"
+  - "Markdown"
+  - "YAML"
+
+relatedLinks:
+  - title: "Clean Architecture overview"
+    url: "docs/architecture/clean-architecture.md"
+  - title: "Spec validator"
+    url: "scripts/spec-validate.ts"
+
+phases:
+  - id: "phase-1"
+    name: "Devcontainer Hardening"
+    description: >
+      Update `.devcontainer/Dockerfile` and `.devcontainer/devcontainer.json`
+      so the image builds from the local devcontainer directory, runs as the
+      non-root `node` user, and exposes pnpm's home directory on PATH. This
+      keeps the infrastructure concern isolated inside the devcontainer assets
+      without spilling repository-specific logic into the image build.
+    parallel: false
+    taskIds:
+      - "task-1"
+      - "task-2"
+  - id: "phase-2"
+    name: "Docs & Spec Alignment"
+    description: >
+      Clarify the contributor setup path in the docs and complete the YAML spec
+      bundle with the minimal research/plan/tasks artifacts plus review-state
+      metadata fixes. The docs stay focused on contributor workflow, while the
+      spec files remain the machine-readable planning surface, preserving clean
+      boundaries between documentation and planning metadata.
+    parallel: false
+    taskIds:
+      - "task-3"
+      - "task-4"
+
+filesToCreate:
+  - "specs/101-devcontainer-cli-compat/research.yaml"
+  - "specs/101-devcontainer-cli-compat/plan.yaml"
+  - "specs/101-devcontainer-cli-compat/tasks.yaml"
+
+filesToModify:
+  - ".devcontainer/Dockerfile"
+  - ".devcontainer/devcontainer.json"
+  - "docs/development/setup.md"
+  - "specs/101-devcontainer-cli-compat/feature.yaml"
+  - "specs/101-devcontainer-cli-compat/spec.yaml"
+
+openQuestions: []
+
+content: |
+  ## Architecture Overview
+
+  The change is intentionally narrow and stays inside existing boundaries:
+
+  - **Infrastructure config** — `.devcontainer/` owns the image/runtime behavior.
+  - **Contributor documentation** — `docs/development/setup.md` explains how to
+    use the setup without changing product code.
+  - **Planning metadata** — the `specs/101-devcontainer-cli-compat/` bundle
+    satisfies the repository's YAML-driven planning and validation workflow.
+
+  This preserves Clean Architecture boundaries by keeping runtime environment
+  concerns inside infrastructure/config files, contributor workflow guidance
+  inside docs, and planning/state tracking inside the spec artifacts.
+
+  ## Delivery Strategy
+
+  1. **RED** — confirm the current review findings by checking the devcontainer
+     config and the spec validator expectations.
+  2. **GREEN** — patch the devcontainer, docs, and YAML bundle so the reported
+     failures and mismatches are resolved.
+  3. **REFACTOR** — tighten the wording in the docs/spec so the alternative setup
+     path and review-state metadata are explicit and consistent.
+
+  ## Verification
+
+  - Run `pnpm spec:validate specs/101-devcontainer-cli-compat`.
+  - Run `devcontainer read-configuration --workspace-folder .`.
+  - Run `devcontainer up --workspace-folder .` and a small `devcontainer exec`
+    smoke test to confirm the container still works after the review fixes.

@@ -2,7 +2,7 @@
   "name": "Shep CLI",
   "build": {
     "dockerfile": "Dockerfile",
-    "context": ".."
+    "context": "."
   },
   "workspaceFolder": "/workspace",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
@@ -14,10 +14,13 @@
     "source=shep-pnpm-store,target=/pnpm/store,type=volume"
   ],
   "containerEnv": {
+    "COREPACK_ENABLE_DOWNLOAD_PROMPT": "0",
     "PNPM_HOME": "/pnpm",
-    "PNPM_STORE_DIR": "/pnpm/store"
+    "PNPM_STORE_DIR": "/pnpm/store",
+    "PATH": "/pnpm:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   },
-  "postCreateCommand": "pnpm install --frozen-lockfile",
+  "remoteUser": "node",
+  "postCreateCommand": "sudo mkdir -p /workspace/node_modules /workspace/packages/core/node_modules /workspace/packages/electron/node_modules /workspace/src/presentation/web/node_modules /pnpm/store && sudo chown -R node:node /workspace/node_modules /workspace/packages/core/node_modules /workspace/packages/electron/node_modules /workspace/src/presentation/web/node_modules /pnpm /workspace/.pnpm-store && pnpm install --frozen-lockfile --force",
   "customizations": {
     "vscode": {
       "settings": {
