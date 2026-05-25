@@ -1,0 +1,59 @@
+# Feature Specification (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: devcontainer-cli-compat
+number: 101
+branch: feat/101-devcontainer-cli-compat
+oneLiner: |
+  Add a Dockerfile-based devcontainer that works with @devcontainers/cli and matches the repo's Node and pnpm toolchain.
+userQuery: |
+  Based on the Dockerfile, create devcontainer for the repo, prioritize the config that works with devcontainer CLI from @devcontainers/cli.
+summary: |
+  Create a reproducible development container based on the existing Docker setup, keep the container aligned with the repo's Node 22 and pnpm 10.33.0 toolchain, document how to use it with @devcontainers/cli, and preserve local dependency performance with named volumes.
+phase: Implementation
+sizeEstimate: S
+
+relatedFeatures:
+  []
+
+technologies:
+  - Docker
+  - Dev Containers
+  - pnpm
+
+relatedLinks:
+  []
+
+openQuestions:
+  []
+
+content: |
+  ## Problem Statement
+
+  The repository ships a production Dockerfile but does not provide a devcontainer configuration for contributors who want to use `@devcontainers/cli`. That makes local container-based setup inconsistent and forces contributors to recreate the environment by hand.
+
+  ## Goals
+
+  - Provide a Dockerfile-based `.devcontainer` configuration that works with `@devcontainers/cli`.
+  - Keep the devcontainer aligned with the repository's Node 22 and `pnpm@10.33.0` toolchain.
+  - Preserve a fast local development loop by storing `node_modules` and the pnpm store in named Docker volumes.
+  - Document the exact `@devcontainers/cli` commands needed to start the container and run commands inside it.
+
+  ## Non-Goals
+
+  - Replacing the production runtime image with the devcontainer image.
+  - Adding editor-specific behavior beyond lightweight VS Code defaults.
+
+  ## Implementation Notes
+
+  - Add `.devcontainer/Dockerfile` derived from the repo's existing Docker setup, using `node:22-alpine` plus git, bash, curl, wget, python3, make, and g++ for native module builds.
+  - Add `.devcontainer/devcontainer.json` with a Dockerfile build definition, `/workspace` as the workspace folder, a bind mount for the repo, named volumes for `/workspace/node_modules` and `/pnpm/store`, and `postCreateCommand: pnpm install --frozen-lockfile`.
+  - Update the root `Dockerfile` so every stage activates `pnpm@10.33.0`, matching the `packageManager` field in `package.json`.
+  - Extend `docs/development/setup.md` with `@devcontainers/cli` install, `read-configuration`, `up`, and `exec` examples.
+
+  ## Success Criteria
+
+  - `@devcontainers/cli read-configuration --workspace-folder .` succeeds.
+  - `@devcontainers/cli up --workspace-folder .` starts the workspace.
+  - `@devcontainers/cli exec --workspace-folder . pnpm --version` reports `10.33.0`.
+  - The repository Dockerfile and devcontainer use the same pnpm version.

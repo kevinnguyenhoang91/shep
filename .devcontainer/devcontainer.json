@@ -1,0 +1,33 @@
+{
+  "name": "Shep CLI",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "mounts": [
+    "source=shep-node-modules,target=/workspace/node_modules,type=volume",
+    "source=shep-core-node-modules,target=/workspace/packages/core/node_modules,type=volume",
+    "source=shep-electron-node-modules,target=/workspace/packages/electron/node_modules,type=volume",
+    "source=shep-web-node-modules,target=/workspace/src/presentation/web/node_modules,type=volume",
+    "source=shep-pnpm-store,target=/pnpm/store,type=volume"
+  ],
+  "containerEnv": {
+    "PNPM_HOME": "/pnpm",
+    "PNPM_STORE_DIR": "/pnpm/store"
+  },
+  "postCreateCommand": "pnpm install --frozen-lockfile",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      },
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next"
+      ]
+    }
+  }
+}

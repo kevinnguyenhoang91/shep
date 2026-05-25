@@ -15,7 +15,7 @@
 FROM node:22-alpine AS deps
 
 # Enable pnpm via corepack
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 WORKDIR /app
 
@@ -36,7 +36,7 @@ RUN pnpm install --frozen-lockfile --prod --ignore-scripts && \
 # =============================================================================
 FROM node:22-alpine AS builder
 
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 WORKDIR /app
 

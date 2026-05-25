@@ -40,6 +40,24 @@ pnpm install
 
 This installs all dependencies including dev dependencies.
 
+### 2a. Optional: Use Dev Containers CLI
+
+If you prefer a containerized development environment, this repo includes a Dockerfile-based devcontainer that works with `@devcontainers/cli`.
+
+```bash
+npm install -g @devcontainers/cli
+
+# Inspect the generated configuration
+devcontainer read-configuration --workspace-folder .
+
+# Build and start the devcontainer
+devcontainer up --workspace-folder .
+
+# Run commands inside the devcontainer
+devcontainer exec --workspace-folder . pnpm install --frozen-lockfile
+devcontainer exec --workspace-folder . pnpm build
+```
+
 ### 3. Verify Setup
 
 ```bash
