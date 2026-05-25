@@ -687,6 +687,10 @@ export type FeatureFlags = {
    * Enable agent collaboration, supervisor agent, and unified question pipeline (spec 093)
    */
   collaboration: boolean;
+  /**
+   * Enable project-bedrock memory integration UI and server actions (spec 098)
+   */
+  bedrockIntegration: boolean;
 };
 
 /**
@@ -1277,6 +1281,10 @@ export type Feature = SoftDeletableEntity & {
    * Files attached by the user when creating or messaging this feature
    */
   attachments?: Attachment[];
+  /**
+   * Whether project-bedrock memory integration is enabled for this feature worktree (defaults to false in persistence)
+   */
+  bedrockEnabled?: boolean;
 };
 
 /**
@@ -2031,6 +2039,10 @@ export type Application = SoftDeletableEntity & {
    * Timestamp of the last deployment attempt (success or failure)
    */
   lastDeployedAt?: any;
+  /**
+   * Whether project-bedrock memory integration is enabled for this application
+   */
+  bedrockEnabled: boolean;
 };
 
 /**
@@ -2057,6 +2069,10 @@ export type Repository = SoftDeletableEntity & {
    * Original upstream URL when isFork is true (normalized: lowercase, no .git suffix)
    */
   upstreamUrl?: string;
+  /**
+   * Whether project-bedrock memory integration is enabled for this repository (defaults to false in persistence)
+   */
+  bedrockEnabled?: boolean;
 };
 export enum EstimateType {
   None = 'None',
@@ -2849,6 +2865,93 @@ export type CodeReview = BaseEntity & {
    */
   errorMessage?: string;
 };
+export enum ContributorLane {
+  Docs = 'docs',
+  Agents = 'agents',
+  Ui = 'ui',
+  Cli = 'cli',
+  Infra = 'infra',
+}
+export enum ContributorLevel {
+  User = 'user',
+  Contributor = 'contributor',
+  Core = 'core',
+  Maintainer = 'maintainer',
+}
+
+/**
+ * External OSS contributor to a repository Shep is helping run
+ */
+export type Contributor = BaseEntity & {
+  /**
+   * GitHub login (e.g., 'octocat') — unique across contributors
+   */
+  githubLogin: string;
+  /**
+   * Display name — public profile name on GitHub if available
+   */
+  displayName?: string;
+  /**
+   * Avatar URL from GitHub's public profile
+   */
+  avatarUrl?: string;
+  /**
+   * Primary lane the contributor works in (set by classify-into-lane or manually)
+   */
+  lane?: ContributorLane;
+  /**
+   * Position on the contributor ladder
+   */
+  level: ContributorLevel;
+  /**
+   * ISO timestamp of the contributor's first interaction (first PR or issue)
+   */
+  firstContributionAt: any;
+  /**
+   * ISO timestamp of the contributor's most recent interaction
+   */
+  lastContributionAt: any;
+  /**
+   * Number of merged PRs authored by this contributor in this repository
+   */
+  prCount: number;
+  /**
+   * Number of accepted issues opened by this contributor in this repository
+   */
+  issueCount: number;
+};
+export enum RecognitionKind {
+  FirstPR = 'firstPR',
+  NthPR = 'nthPR',
+  FirstIssue = 'firstIssue',
+  MonthlyShoutout = 'monthlyShoutout',
+}
+
+/**
+ * Durable record that a contributor was recognized for a specific contribution
+ */
+export type RecognitionEvent = BaseEntity & {
+  /**
+   * Contributor this recognition event belongs to
+   */
+  contributorId: UUID;
+  /**
+   * Kind of recognition
+   */
+  kind: RecognitionKind;
+  /**
+   * ISO timestamp when the recognition was awarded
+   */
+  occurredAt: any;
+  /**
+   * PR number for PR-bound kinds (FirstPR, NthPR); 0 for non-PR kinds
+   */
+  prNumber: number;
+  /**
+   * Identifier of the monthly recap artifact when kind = MonthlyShoutout
+   */
+  monthRecapId?: string;
+};
 
 /**
  * Single installation suggestion for a tool
@@ -3061,6 +3164,117 @@ export type TimeEntry = BaseEntity & {
    * When the work was performed
    */
   loggedAt: any;
+};
+
+/**
+ * Health status for a single bedrock prerequisite tier
+ */
+export type BedrockTierStatus = {
+  /**
+   * Name of the tier being checked (e.g. python, pipx, bedrock)
+   */
+  tier: string;
+  /**
+   * Status of this tier: ok, missing, or error
+   */
+  status: 'ok' | 'missing' | 'error';
+  /**
+   * Optional human-readable detail (e.g. detected version)
+   */
+  detail?: string;
+  /**
+   * Optional remediation hint shown to the user when status is missing or error
+   */
+  remediation?: string;
+};
+
+/**
+ * Aggregate health report for the bedrock prerequisite chain
+ */
+export type BedrockHealth = {
+  /**
+   * Health of the Python interpreter prerequisite
+   */
+  python: BedrockTierStatus;
+  /**
+   * Health of the pipx package manager prerequisite
+   */
+  pipx: BedrockTierStatus;
+  /**
+   * Health of the bedrock binary prerequisite
+   */
+  bedrock: BedrockTierStatus;
+  /**
+   * Rolled-up overall status across all three tiers
+   */
+  overall: 'ok' | 'missing' | 'error';
+};
+export enum BedrockTargetKind {
+  Application = 'application',
+  Repository = 'repository',
+  Feature = 'feature',
+}
+
+/**
+ * Typed reference to a bedrock-capable entity (kind + id)
+ */
+export type BedrockTargetRef = {
+  /**
+   * Which kind of entity owns the bedrock memory
+   */
+  kind: BedrockTargetKind;
+  /**
+   * Identifier of the owning entity (Application.id, Repository.id, or Feature.id)
+   */
+  id: string;
+};
+
+/**
+ * One file in the bedrock memory store
+ */
+export type BedrockMemoryFile = {
+  /**
+   * Path of the file relative to the target's worktree (forward slashes)
+   */
+  path: string;
+  /**
+   * File size in bytes
+   */
+  sizeBytes: bigint;
+  /**
+   * UTC timestamp of the most recent on-disk modification
+   */
+  modifiedAt: any;
+  /**
+   * Optional short UTF-8 preview of the file contents (truncated)
+   */
+  preview?: string;
+};
+
+/**
+ * Snapshot of the on-disk bedrock memory store at a target worktree
+ */
+export type BedrockMemorySnapshot = {
+  /**
+   * Absolute path to the worktree that was probed
+   */
+  cwd: string;
+  /**
+   * Whether a `.bedrock/` directory exists at cwd
+   */
+  present: boolean;
+  /**
+   * All bedrock memory files discovered at cwd
+   */
+  files: BedrockMemoryFile[];
+  /**
+   * Total size in bytes of all bedrock memory files combined
+   */
+  totalBytes: bigint;
+  /**
+   * UTC timestamp of the most recently modified bedrock memory file (if any)
+   */
+  mostRecentlyModifiedAt?: any;
 };
 export enum AgentStatus {
   Idle = 'Idle',
@@ -4001,6 +4215,38 @@ export type CustomAgent = BaseEntity & {
    */
   createdBy: string;
 };
+export enum ContributionDifficulty {
+  GoodFirst = 'goodFirst',
+  Easy = 'easy',
+  Medium = 'medium',
+  Hard = 'hard',
+}
+
+/**
+ * Structured output produced by the contributor-onboarding custom agent
+ */
+export type ContributorOnboardingAgentOutput = {
+  /**
+   * Lane assignment — must match ContributorLane enum verbatim
+   */
+  lane: ContributorLane;
+  /**
+   * Difficulty rating — must match ContributionDifficulty enum verbatim
+   */
+  difficulty: ContributionDifficulty;
+  /**
+   * Markdown checklist of acceptance criteria; each line begins with '- [ ] '
+   */
+  acceptanceCriteria: string;
+  /**
+   * Suggested labels to apply; MUST include lane:<lane> and difficulty:<difficulty>
+   */
+  suggestedLabels: string[];
+  /**
+   * Optional welcome comment body — present only when difficulty === goodFirst
+   */
+  welcomeComment?: string;
+};
 
 /**
  * A selectable option within a PRD questionnaire question
@@ -4094,6 +4340,21 @@ export enum InteractiveSessionEventType {
   Ready = 'interactive_session_ready',
   Stopped = 'interactive_session_stopped',
   Error = 'interactive_session_error',
+}
+export enum BedrockLifecycleAction {
+  Init = 'init',
+  Sync = 'sync',
+  Ship = 'ship',
+}
+export enum RecapChannel {
+  File = 'file',
+  Discord = 'discord',
+  GithubDiscussion = 'githubDiscussion',
+}
+export enum DiagnosticStatus {
+  Ok = 'ok',
+  Warn = 'warn',
+  Fail = 'fail',
 }
 export enum AgentFeature {
   sessionResume = 'session-resume',

@@ -1,5 +1,56 @@
 # Lessons Learned
 
+## npm trusted publishing requires npm >= 11.5 on the runner
+
+`@semantic-release/npm` v13 added OIDC trusted publishing. In `lib/verify-auth.js`, when the OIDC token exchange with npmjs.com succeeds, the plugin **early-returns and does NOT write `NPM_TOKEN` to the userconfig `.npmrc`**. It then runs plain `npm publish` and relies on the **npm CLI itself** to do trusted publishing — which needs **npm >= 11.5.0**.
+
+Node 22 ships npm 10.9.x, so the Release job logged "OIDC token exchange with the npm registry succeeded" in verifyConditions and then died at publish with `npm error code ENEEDAUTH`. Two versions (`v1.205.1`, `v1.206.0`) got tagged + the release commit got pushed to main but never made it to npm, because semantic-release succeeded with the tag/push plugins before failing on `@semantic-release/npm`.
+
+Rules:
+
+1. When using `@semantic-release/npm` v13+ with `permissions: id-token: write`, the Release job MUST install npm >= 11.5 before invoking semantic-release. Add `npm install -g npm@^11.5` between setup-node and `npx semantic-release`.
+2. Keep `NPM_TOKEN` in the env as a fallback — the plugin uses it only when OIDC isn't available, but you want belt-and-suspenders in case npmjs trusted-publisher config gets removed.
+3. After a Release job failure, ALWAYS verify with `npm view <pkg> dist-tags` that the version actually landed. A "successful" re-run of a failed release is usually a no-op ("local branch main is behind the remote") and silently leaves the version missing from npm — the tag exists, the chore(release) commit exists, but the package is gone.
+4. A passing OIDC token exchange in verifyConditions only proves the package is configured as a trusted publisher on npmjs.com — it does NOT prove the runner can actually publish. Treat the runner's npm version as a separate, mandatory check.
+
+## Tool install commands must bootstrap their own package manager
+
+The `project-bedrock.json` tool definition shipped with `pipx install project-bedrock` on every platform, assuming pipx was already present. It often isn't (fresh macOS, fresh Linux dev box), and the install failed silently from the user's perspective — they saw `command not found: pipx` and reported "the tools install is broken." Two follow-on traps appeared while fixing it:
+
+1. **`python3 -m pipx` does NOT work after `brew install pipx`.** Homebrew installs pipx as a standalone binary, not as a module of the user's `python3`. Verified locally: `brew install pipx` succeeded, then `python3 -m pipx ensurepath` failed with `No module named pipx`. Always invoke the `pipx` binary directly when it's available; only fall back to `python3 -m pipx` when pipx was installed via `pip --user`.
+
+2. **Modern Linux + macOS (Sequoia + Homebrew Python) ship PEP-668 protected Python.** A plain `python3 -m pip install --user pipx` errors with `externally-managed-environment`. Always have a fallback to `--break-system-packages` for the bootstrap path, gated behind a try-without-it-first.
+
+Rules:
+
+1. Every `tools/*.json` `commands` field must bootstrap its own package manager when feasible. `pipx install X` is fine for end users with pipx; it is **not** fine inside an automated installer.
+2. After bootstrapping a tool into `~/.local/bin`, prepend that to `PATH` in the same command so the next step finds the new binary. The current shell doesn't pick up `pipx ensurepath` until next login.
+3. Test new install commands on a machine **without** the package manager preinstalled. If you only test on your dev box where the tool already exists, you'll ship the same "works on my machine" failure mode.
+
+## When you add a settings column, the repository SQL must read AND write it
+
+Migration 104 added `feature_flag_bedrock_integration` (DEFAULT 0). The mapper (`settings.mapper.ts`) handled both directions correctly. But `sqlite-settings.repository.ts` INSERT/UPDATE statements were never updated to include the new column. Result: writes silently dropped the field, the DEFAULT-0 backfill always supplied the read value, and `bedrockIntegration: false` was *coincidentally* always correct — so tests passed. The bug only surfaced when the migration default was flipped to 1 to enable-by-default: now the column read back `true` even when the caller had explicitly passed `false`.
+
+Rules:
+
+1. Adding a settings field is a four-touch change, not three: tsp/, factory, mapper, **and the INSERT + UPDATE column lists in `sqlite-settings.repository.ts`**. If any of the four is missing, persistence silently lies.
+2. Never rely on a column DEFAULT to make a feature behave correctly. Defaults are migration-fill values for existing rows, not the production write path. If the write path omits the column, the bug is masked exactly until someone changes the default — which they will, eventually.
+3. Roundtrip tests must use at least one non-default value per field (`true` AND `false`, both halves of every enum). A test that only ever asserts the DEFAULT for a field doesn't exercise the write path at all.
+
+## Required TypeSpec fields propagate to every entity fixture
+
+Adding `bedrockEnabled: boolean` to `Repository` and `Feature` in tsp/ broke ~30 unit/integration tests that construct fixtures via `Partial<Feature>` / `Partial<Repository>`. The TS error was `Property 'bedrockEnabled' is missing in type '{ ... }' but required in type 'Feature'` — even though the helper accepted Partial overrides, the literal it spread into still had to satisfy the full required type.
+
+Rules:
+
+1. New tsp fields default to **required** in the generated TS. If you add a required field to a widely-used entity (Feature, Repository, Application), expect O(20+) test fixture updates.
+2. For backwards-compat-friendly fields whose default value is the same on every existing row (e.g. `false` for a feature flag), declare them **optional** in tsp (`field?: boolean`). The mapper compares `=== 1` which already collapses `undefined` and `null` to `false`, so persistence stays deterministic.
+3. Reserve required tsp fields for invariants the domain genuinely requires (id, slug, name, etc.). Per-feature toggles are not invariants — make them optional.
+
+## Storybook needs mocks for every new `'use server'` action
+
+When a client component imports a server action, Storybook (which bundles only the client side) needs a parallel mock at `.storybook/mocks/app/actions/<filename>.ts` exporting the same symbols. Forgetting it gives a `Could not load ./.storybook/mocks/app/actions/<name>` ENOENT during `pnpm build:storybook`. Always pair every new `app/actions/<x>.action.ts` with its mock.
+
 ## Windows has no graceful kill — don't simulate one
 
 On Windows the `tree-kill` package always shells out to `taskkill /T /F`, regardless of which signal name you pass. There is no SIGTERM equivalent in the Windows kernel. So a "send SIGTERM, poll for graceful exit, then escalate to SIGKILL" pattern is theatrical on Windows: the very first call already force-killed the tree, and the polling loop is 5s of wasted budget waiting for a "graceful" exit that already happened forcefully.
@@ -532,6 +583,20 @@ The Windows runner failed `pnpm test:int` with two error patterns: `Hook timed o
 1. **Default vitest hookTimeout is 10s.** A `beforeEach` that spawns ~10 git subprocesses (`init --bare`, `clone`, `config`, `checkout`, `commit`, ...) will pass that on Linux but cut it close on Windows under load. Either bump the project-wide `hookTimeout` in `vitest.config.ts` (current setting: 20s for the `node` project) or pass an explicit timeout as the third arg: `beforeEach(async () => { ... }, 60_000)`.
 2. **`rmSync(dir, { recursive: true, force: true })` is not enough on Windows.** Always pass `maxRetries: 5, retryDelay: 100` so a transient file lock turns into a single retry instead of a whole-test failure. This applies to every cleanup helper (`destroyHarness`, `destroyDirs`, ad-hoc `finally` blocks).
 3. **`testTimeout` for the `node` project is 60s in `vitest.config.ts`.** That covers heavy real-git tests like the merge-step suite. Tests that take longer than that on Linux are bugs, not slow-machine excuses — fix the test, do not bump the timeout further.
+
+## Static Repo Polish Ships LAST — Not First — In a Multi-Phase Feature
+
+Spec 097 (ai-native-contributor-onboarding) was tempting to slice "M1: static repo files" first because they're pure markdown and ship value to real contributors immediately. We didn't. The implementation order put TypeSpec → ports → use cases → agent → workflows → web → static docs, in that sequence, inside one PR.
+
+**Why:** when CONTRIBUTING.md says "run `pnpm dev:cli doctor`" or "use `pnpm dev:cli contributors groom-issue --number 1234`", those commands need to actually exist and work. If the docs land first, every line is a promise the codebase doesn't yet keep — and contributors who try them immediately hit "command not found" on the second step of the onboarding flow. That's a worse first impression than no docs at all.
+
+**Rules for any future feature that bundles "user-facing copy" with "platform capability":**
+
+1. **Docs reference shipped capability, not future capability.** Land the use case, command, port, or workflow first. Land the doc that mentions it last. The PR can still be one bundled commit; what matters is the order inside it.
+2. **CONTRIBUTING.md, ROADMAP.md, ARCHITECTURE.md, GOOD_FIRST_ISSUES.md must cross-link.** Each should appear in the README contributor block, in CONTRIBUTING.md's nav, and in each other's "Related" section. Orphaned docs rot fastest. The contributor-onboarding pipeline expects all four to exist — the agent can be told "see GOOD_FIRST_ISSUES.md" and that file will resolve.
+3. **Issue-template fields must match the actual TypeSpec enum.** When `ContributorLane` is `docs | agents | ui | cli | infra`, every `.github/ISSUE_TEMPLATE/*.yml` lane dropdown must list those exact strings (case-sensitive). The grooming agent reads the issue body's `### Lane` section back into the enum — a "Web UI" string vs "ui" string will silently fail the parse. Same for `ContributionDifficulty` (`goodFirst | easy | medium | hard`).
+4. **`.all-contributorsrc` ships empty + valid.** An empty `contributors: []` array with the right `projectName` / `projectOwner` / `files` block lets the in-house `IAllContributorsWriter` start appending on the first merge without a special "initialize" path. Don't ship pre-seeded fake contributors; don't ship without the file.
+5. **PR template includes architecture self-checks, not just CI checkboxes.** "No `application/` or `presentation/` file imports anything from `infrastructure/`" catches the violation that lint won't catch on a fresh module. "TDD landed RED-first" reminds reviewers to ask for the test commit. These are the rules CI doesn't enforce — the template is where they live.
 4. **Always check failures across ALL OS targets before claiming a fix.** `gh run view <id> --json jobs` lists every job; a green Ubuntu does not mean a green PR. Required check is `Unit Tests (windows-latest)` AND `Unit Tests (ubuntu-latest)`.
 
 ## CSS @import in a pnpm Workspace Subpackage Must Be Hoisted to Root
@@ -577,6 +642,21 @@ Tsyringe walks every `@inject(token)` decorator on a class and resolves the **en
 2. Add the new token to `CRITICAL_INFRA_TOKENS` in `container-bootstrap.test.ts`. If the token is consumed only by background workers (feature-agent, supervisor, deployment), it MUST appear there — web routes alone do not exercise worker constructor trees.
 3. When adding any `registerSingleton(SomeWorkerHelper)` in `register-agents.ts`, mentally trace its full `@inject` graph and confirm every leaf token is registered. The tsyringe error message _names_ the missing token, but the full chain only shows up at runtime, never at build time.
 
+## Dynamic Model Catalogs Must Not Be Validated Against Static Lists
+
+OpenRouter and Together AI expose dynamic model catalogs via REST APIs. Their model lists change frequently — new models added daily, old ones retired. The factory already has `listAvailableModels()` that fetches the live catalog with a 5-minute in-process cache and a static fallback for offline cases.
+
+**What went wrong (issue 098):** `UpdateFeaturePinnedConfigUseCase` validated the user's selected model against `factory.getSupportedModels(agentType)` — the **sync** method that returns the **static hardcoded** list (`OPENROUTER_MODELS`). The web ModelPicker showed the user the live dynamic catalog (`getAllAgentModels` → `listAvailableModels`), so the user could pick `nvidia/nemotron-3-super-120b-a12b:free` from the dropdown, but submitting threw `Unsupported model "..." for agent "openrouter"`. The picker and the validator were reading from two different sources of truth.
+
+**Rule:** For any provider that exposes a remote model catalog (OpenRouter, Together AI, future SDK-backed providers), validation MUST use the same `listAvailableModels()` path the picker uses. Never call `getSupportedModels()` (static) when the user picked from a list returned by `listAvailableModels()` (dynamic). The static list is a fallback for offline rendering, not a denylist.
+
+**Pattern to check when adding a new dynamic-catalog provider:**
+
+1. The catalog service goes in `infrastructure/services/agents/common/model-catalogs/` and exposes `listModels(apiKey?)`
+2. Wire it into `AgentExecutorFactory.listAvailableModels()` — return dynamic list if non-empty, otherwise the static fallback
+3. Audit every consumer of `getSupportedModels()` to confirm it's only used for offline UI hints, NEVER for validation
+4. The web action that powers the picker (`getAllAgentModels`) and the use case that validates the choice (e.g. `UpdateFeaturePinnedConfigUseCase`) must both go through `listAvailableModels` — same source of truth
+
 ## Auto-Deploy Must Trigger on Agent-Finishes Transition, Not on `setupComplete` SSE Race
 
 The user reported that the web preview did not start automatically after the initial build finished, and did not restart after a chat iteration.
@@ -593,3 +673,29 @@ The user reported that the web preview did not start automatically after the ini
 3. **Single source of truth.** If you have two effects firing `deploy.deploy()` on the same event (e.g. `useDevServerCoordinator` AND a `onAllStepsComplete` callback), kill one — `deploymentService.start()` is NOT idempotent (see `deployment.service.ts` line 231-238: it kills any existing deployment and starts a new one), so two parallel calls can race and tear down the in-flight spawn.
 4. **Always status-guard before calling `deploy.deploy()`:** skip when `deploy.status === Ready || Booting || deploy.deployLoading`. This is the only protection against a stray double-fire that would kill an in-progress spawn.
 5. **Do NOT add "respect explicit user stop" complexity unless the user asks for it.** The simpler invariant — "after the agent finishes, the preview is up" — matches what users want 99% of the time. Manual stop is a transient user action; it does not need to persist across iterations.
+
+## DI Tokens: Register Under the Exact String the Consumer Resolves
+
+Spec 097 shipped these failure modes — all caught only by E2E `shep ui` boot, not by unit tests:
+
+1. **Concrete-name vs port-interface token mismatch.** `DesktopNotifier` was registered as `'DesktopNotifier'` but every consumer resolved `'IDesktopNotifier'`. Unit tests pass (they mock `container.resolve` and intercept by string), but production boot dies with `Attempted to resolve unregistered dependency token: "IDesktopNotifier"`.
+2. **`@injectAll('Token')` requires bare-token registrations.** Channel-suffixed tokens like `'IRecapPublisher:file'`, `'IRecapPublisher:discord'` do NOT satisfy `@injectAll('IRecapPublisher')` — tsyringe matches the EXACT token string. If you want multi-injection, register each adapter under both the suffixed AND the bare token.
+3. **Defining a port without an adapter is a boot bomb.** `IContributorActionGate` was defined in `application/ports/output/services/` but no `register-*.ts` ever wired a concrete. The use cases that `@inject` it crash at boot the first time anything resolves them.
+4. **Production deps in `devDependencies` are invisible to local dev but break `npm pack` consumers.** `@octokit/rest`, `@octokit/plugin-retry`, `@octokit/plugin-throttling` were declared as devDependencies. Local `pnpm install` saw them because pnpm installs devDeps in workspaces, but `script-runner.test.ts` (which does `npm pack` → `npm install -g` in a clean Docker container) crashed with `ERR_MODULE_NOT_FOUND: '@octokit/rest'`. **Rule:** every package imported anywhere under `packages/core/src/` or `src/presentation/` MUST be in `dependencies`, never `devDependencies`. devDependencies are only for build tooling, linters, and test-only packages.
+
+**Mandatory checks when adding any new port/adapter or library:**
+
+1. The string in `container.register(...)` must EXACTLY match the string in every `@inject(...)` and `container.resolve(...)`. Grep both sides before pushing.
+2. If any consumer uses `@injectAll('Token')`, register each adapter under the bare `'Token'` — not just under suffixed discriminator tokens.
+3. Add the new I-prefixed token to `CRITICAL_INFRA_TOKENS` in `tests/integration/infrastructure/di/container-bootstrap.test.ts` so boot is verified in unit-level CI.
+4. Any `import` from a third-party package in `packages/core/src/` or `src/` must have a matching entry in `dependencies` (not `devDependencies`). Use `grep '"<pkg>"' package.json` to confirm.
+
+## Playwright Navigation Waits Must Use `waitForURL`, Not `toHaveURL`, Against `pnpm dev:web`
+
+`expect(page).toHaveURL(...)` uses the `expect` timeout (default **5 s**). `page.waitForURL(...)` uses the navigation timeout (default **30 s**).
+
+E2E specs in `tests/e2e/web/` run against `pnpm dev:web` (Next.js dev mode, Turbopack). The **first** navigation to any route triggers on-demand compilation, during which the App Router waits for the RSC payload before updating `window.location`. The URL stays on the source page until the server response arrives — easily >5 s on a cold CI runner.
+
+Symptom: `toHaveURL` fails with `N × unexpected value "<old url>"`, then passes on retry. Reported as `1 flaky` in the Playwright summary.
+
+**Rule:** in any spec under `tests/e2e/web/`, when waiting for navigation after a click, use `await page.waitForURL(...)`, never `await expect(page).toHaveURL(...)`. Reserve `toHaveURL` for asserting the URL **after** you already know navigation completed (e.g., after a `waitForURL` or after the destination's content is visible).

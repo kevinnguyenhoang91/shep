@@ -111,6 +111,10 @@ const WEB_ROUTE_TOKENS: readonly string[] = [
   'UpgradeCliUseCase',
   'WatchApplicationFilesUseCase',
   'WriteApplicationFileUseCase',
+  // Bedrock integration (feature 098)
+  'EnableBedrockForApplicationUseCase',
+  'RunBedrockLifecycleUseCase',
+  'CheckBedrockHealthUseCase',
 ] as const;
 
 /**
@@ -159,6 +163,9 @@ const CRITICAL_INFRA_TOKENS: readonly string[] = [
   'IAgentPromptResolver',
   'ISupervisorPolicyRepository',
   'ISupervisorDecisionRepository',
+  // Contributor onboarding (feature 097)
+  'IContributorRepository',
+  'IRecognitionEventRepository',
 ] as const;
 
 describe('DI container bootstrap (integration)', () => {
