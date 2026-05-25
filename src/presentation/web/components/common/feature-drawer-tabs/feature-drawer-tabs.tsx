@@ -15,6 +15,7 @@ import {
   Package,
   GitMerge,
   MessageSquare,
+  Database,
   Play,
   Square,
   RotateCcw,
@@ -23,6 +24,9 @@ import {
 } from 'lucide-react';
 import type { NotificationEvent } from '@shepai/core/domain/generated/output';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { BedrockMemorySection } from '@/components/bedrock-memory-section';
+import { BedrockTargetKind } from '@shepai/core/domain/generated/output';
+import { useFeatureFlags } from '@/hooks/feature-flags-context';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getFeaturePhaseTimings } from '@/app/actions/get-feature-phase-timings';
 import type {
@@ -78,12 +82,14 @@ const ALL_TABS: TabDef[] = [
   { key: 'product-decisions', label: 'Product', icon: Package },
   { key: 'merge-review', label: 'Merge Review', icon: GitMerge },
   { key: 'chat', label: 'Chat', icon: MessageSquare },
+  { key: 'bedrock', label: 'Bedrock', icon: Database },
 ];
 
 /** Compute which tabs are visible based on feature lifecycle + state. */
 function computeVisibleTabs(
   node: FeatureNodeData,
-  interactiveAgentEnabled = true
+  interactiveAgentEnabled = true,
+  bedrockIntegrationEnabled = false
 ): FeatureTabKey[] {
   const tabs: FeatureTabKey[] = ['overview', 'activity'];
 
@@ -120,6 +126,11 @@ function computeVisibleTabs(
   // Chat tab is visible for ALL lifecycle phases when interactive agent is enabled
   if (interactiveAgentEnabled) {
     tabs.push('chat');
+  }
+
+  // Bedrock memory tab is gated behind the bedrockIntegration feature flag.
+  if (bedrockIntegrationEnabled) {
+    tabs.push('bedrock');
   }
 
   return tabs;
@@ -251,10 +262,11 @@ export function FeatureDrawerTabs({
   onStart,
 }: FeatureDrawerTabsProps) {
   const pathname = usePathname();
+  const { bedrockIntegration } = useFeatureFlags();
 
   const visibleTabs = useMemo(
-    () => computeVisibleTabs(featureNode, interactiveAgentEnabled),
-    [featureNode, interactiveAgentEnabled]
+    () => computeVisibleTabs(featureNode, interactiveAgentEnabled, bedrockIntegration),
+    [featureNode, interactiveAgentEnabled, bedrockIntegration]
   );
   const visibleTabDefs = useMemo(
     () =>
@@ -742,6 +754,18 @@ export function FeatureDrawerTabs({
         {visibleTabs.includes('chat') ? (
           <TabsContent value="chat" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
             <ChatTab featureId={featureId} worktreePath={featureNode.worktreePath} />
+          </TabsContent>
+        ) : null}
+
+        {/* Bedrock memory tab — visualization of the per-feature memory store */}
+        {visibleTabs.includes('bedrock') ? (
+          <TabsContent value="bedrock" className="mt-0 flex-1 overflow-y-auto p-4">
+            <BedrockMemorySection
+              targetKind={BedrockTargetKind.Feature}
+              targetId={featureId}
+              targetLabel={featureNode.name ?? featureId}
+              initialEnabled={false}
+            />
           </TabsContent>
         ) : null}
       </Tabs>

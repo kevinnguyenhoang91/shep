@@ -13,20 +13,31 @@
  *    └── identity ──────┘     └── context ┘            └─── primary ───┘    └ local ┘    └── view ─┘   └ overflow ┘
  */
 
-import { LayoutGrid, ShieldCheck } from 'lucide-react';
+import { Database, LayoutGrid, ShieldCheck } from 'lucide-react';
 import type { Application } from '@shepai/core/domain/generated/output';
-import { DeploymentState } from '@shepai/core/domain/generated/output';
+import { BedrockTargetKind, DeploymentState } from '@shepai/core/domain/generated/output';
 import type { ChatState } from '@shepai/core/application/ports/output/services/interactive-session-service.interface';
 import { featureIdForApplication } from '@shepai/core/domain/shared/feature-id';
 
 import { cn } from '@/lib/utils';
+import { BedrockMemoryToggle } from '@/components/bedrock-memory-toggle';
+import { BedrockMemorySection } from '@/components/bedrock-memory-section';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { useState } from 'react';
 import { SmartDeployCluster } from '@/components/features/application-page/smart-deploy-cluster';
 import type { CloudDeployActionApi } from '@/hooks/use-cloud-deploy-action';
 import type { DeployActionState } from '@/hooks/use-deploy-action';
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { useFeatureFlags } from '@/hooks/feature-flags-context';
 import { AppOverflowMenu } from './app-overflow-menu';
 import { AppViewTabs, type AppView } from './app-view-tabs';
@@ -68,7 +79,8 @@ export function AppTopBar({
   deploy,
   cloudDeploy,
 }: AppTopBarProps) {
-  const { collaboration } = useFeatureFlags();
+  const { collaboration, bedrockIntegration } = useFeatureFlags();
+  const [bedrockSheetOpen, setBedrockSheetOpen] = useState(false);
 
   return (
     <header
@@ -124,6 +136,45 @@ export function AppTopBar({
         isBuilding={!application.setupComplete || agentRunning}
       />
 
+      {bedrockIntegration ? (
+        <>
+          <Divider />
+          <Sheet open={bedrockSheetOpen} onOpenChange={setBedrockSheetOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 px-2"
+                data-testid="top-bar-bedrock"
+                title="Bedrock memory"
+              >
+                <Database className="size-3.5" />
+                <span className="hidden text-xs lg:inline">Bedrock</span>
+                {application.bedrockEnabled ? (
+                  <span className="ml-0.5 size-1.5 rounded-full bg-emerald-500" />
+                ) : null}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[560px] sm:max-w-[560px]">
+              <SheetHeader>
+                <SheetTitle>Bedrock memory</SheetTitle>
+                <SheetDescription>
+                  Persistent markdown project memory for AI coding agents in {application.name}.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="mt-4">
+                <BedrockMemorySection
+                  targetKind={BedrockTargetKind.Application}
+                  targetId={application.id}
+                  targetLabel={application.name}
+                  initialEnabled={application.bedrockEnabled === true}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </>
+      ) : null}
+
       {collaboration ? (
         <>
           <Divider />
@@ -155,6 +206,18 @@ export function AppTopBar({
         <div className="px-2 pb-2">
           <CopyPromptButton applicationId={application.id} />
         </div>
+        {bedrockIntegration ? (
+          <>
+            <DropdownMenuSeparator />
+            <div className="px-2 py-1.5">
+              <BedrockMemoryToggle
+                applicationId={application.id}
+                initialEnabled={application.bedrockEnabled}
+              />
+            </div>
+          </>
+        ) : null}
+        <DropdownMenuSeparator />
         {collaboration ? (
           <DropdownMenuItem asChild>
             <Link

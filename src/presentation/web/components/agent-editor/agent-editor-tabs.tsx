@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { PromptEditor, type PromptEditorEntry } from './prompt-editor';
 import { AgentGraphView, type AgentGraphDescriptor } from './agent-graph-view';
@@ -26,12 +27,14 @@ export function AgentEditorTabs({
   );
   const selectedPrompt = prompts.find((p) => p.promptId === selectedPromptId);
 
+  const { t } = useTranslation('web');
+
   return (
     <Tabs defaultValue="prompts" data-testid="agent-editor-tabs">
       <TabsList>
-        <TabsTrigger value="prompts">Prompts</TabsTrigger>
-        <TabsTrigger value="graph">Graph</TabsTrigger>
-        <TabsTrigger value="playground">Playground</TabsTrigger>
+        <TabsTrigger value="prompts">{t('agentEditor.prompts')}</TabsTrigger>
+        <TabsTrigger value="graph">{t('agentEditor.graph')}</TabsTrigger>
+        <TabsTrigger value="playground">{t('agentEditor.playground')}</TabsTrigger>
       </TabsList>
 
       <TabsContent value="prompts" className="mt-4">
@@ -50,7 +53,7 @@ export function AgentEditorTabs({
         {prompts.length > 1 ? (
           <div className="flex items-center gap-2 text-xs">
             <label htmlFor="playground-prompt-select" className="text-muted-foreground">
-              Use prompt:
+              {t('agentEditor.usePrompt')}
             </label>
             <select
               id="playground-prompt-select"
