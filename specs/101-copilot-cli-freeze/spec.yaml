@@ -1,0 +1,120 @@
+# Feature Specification (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: copilot-cli-freeze
+number: 101
+branch: feat/101-copilot-cli-freeze
+oneLiner: "Fix CopilotCliExecutorService hanging after result event by adding post-result SIGKILL grace timer"
+userQuery: >
+  Fix copilot CLI freeze
+summary: >
+  The CopilotCliExecutorService hangs indefinitely after the copilot subprocess emits its
+  final result JSONL event because it relies solely on proc.on('close') to resolve.
+  If any child process spawned by the agent keeps stdio open, the parent copilot process
+  never closes and the worker is frozen. The fix applies the same RESULT_TO_CLOSE_GRACE_MS
+  SIGKILL grace-timer pattern already implemented in ClaudeCodeExecutorService to both
+  execute() and executeStream().
+phase: Analysis
+sizeEstimate: S
+
+# Relationships
+relatedFeatures:
+  - "081-copilot-cli-agent"
+
+technologies:
+  - "TypeScript"
+  - "Node.js child_process (subprocess spawning)"
+  - "GitHub Copilot CLI (copilot --output-format json)"
+  - "JSONL (newline-delimited JSON event stream parsing)"
+  - "Vitest (unit tests)"
+
+relatedLinks:
+  - title: "ClaudeCodeExecutorService — reference implementation with RESULT_TO_CLOSE_GRACE_MS"
+    url: "packages/core/src/infrastructure/services/agents/common/executors/claude-code-executor.service.ts"
+
+# Open questions (must be resolved before implementation)
+openQuestions: []
+
+# Markdown content (the actual spec)
+content: |
+  ## Problem Statement
+
+  The `CopilotCliExecutorService` (`packages/core/src/infrastructure/services/agents/common/executors/copilot-cli-executor.service.ts`) can freeze indefinitely after the `copilot` subprocess emits its final `result` JSONL event.
+
+  Both `execute()` and `executeStream()` resolve only when the subprocess emits the `close` event. However, if any child process that the copilot agent spawned during its run (MCP servers, TypeScript language servers, background shells, or dev servers) keeps a stdio handle open, the parent `copilot` process never receives EOF and never closes. The worker then sleeps forever even though the agent has already finished and produced a result.
+
+  This is the exact same bug that was previously fixed in `ClaudeCodeExecutorService` (documented in LESSONS.md under _"Subprocess Executor Must Not Trust Natural Exit After [result]"_). That fix added a `RESULT_TO_CLOSE_GRACE_MS = 30_000` timer: once the `result` event is observed, a 30-second countdown starts and sends `SIGKILL` if the process has not already exited. The copilot executor was implemented after that lesson was documented but did not include the safeguard.
+
+  ## Codebase Analysis
+
+  ### Project Structure
+
+  The project uses Clean Architecture with four layers under `packages/core/src/`:
+  - `domain/` — TypeSpec-generated types (`AgentType`, `AgentFeature`, `AgentConfig`)
+  - `application/ports/output/agents/` — `IAgentExecutor` interface with `execute()` and `executeStream()`
+  - `infrastructure/services/agents/common/executors/` — one concrete executor service per agent type
+  - `presentation/` — CLI, TUI, Web UI layers that consume executors through the DI container
+
+  ### Architecture Patterns
+
+  - All executors implement `IAgentExecutor` and accept a `SpawnFunction` via constructor injection for testability without mocking `node:child_process` directly.
+  - Executors spawn a subprocess, parse its stdout as JSONL line-by-line, and resolve via `proc.on('close')`.
+  - `ClaudeCodeExecutorService` introduced `RESULT_TO_CLOSE_GRACE_MS` as a direct response to a real production hang (feature 92701aa8 was frozen for 3+ hours after the agent had committed and pushed). Any executor that waits for `proc.on('close')` and processes a terminal JSONL event must include this guard.
+
+  ### Root Cause (Precise)
+
+  In `CopilotCliExecutorService.execute()`, the `processLine` function handles `type === 'result'` and captures `sessionId` and `usage` but never schedules a kill timer. The promise only resolves when `proc.on('close')` fires:
+
+  ```typescript
+  // current — MISSING grace timer
+  } else if (type === 'result') {
+    if (parsed.sessionId) sessionId = parsed.sessionId as string;
+    if (parsed.usage) usage = this.extractUsage(...);
+    // no postResultKillTimer here — subprocess may never close
+  }
+  ```
+
+  Compare with `ClaudeCodeExecutorService` which does:
+
+  ```typescript
+  if (parsed.type === 'result') {
+    // ... capture data ...
+    postResultKillTimer ??= setTimeout(() => {
+      proc.kill('SIGKILL');
+    }, RESULT_TO_CLOSE_GRACE_MS);
+  }
+  ```
+
+  The same omission exists in `CopilotCliExecutorService.executeStream()`, where the `close` handler enqueues `null` to terminate the async generator. If the process never closes, the generator never returns.
+
+  ### Relevant Technologies
+
+  - **Node.js child_process spawn** — `SpawnFunction` type from `../types.js`; `proc.kill(signal)` sends OS signal to the subprocess
+  - **SIGKILL** — forces termination without waiting for graceful cleanup; used because SIGTERM is insufficient when child processes hold stdio open
+  - **JSONL** — `type: 'result'` is the terminal event from the copilot CLI's `--output-format json` mode
+
+  ## Affected Areas
+
+  | Area | Impact | Reasoning |
+  | ---- | ------ | --------- |
+  | `packages/core/src/infrastructure/services/agents/common/executors/copilot-cli-executor.service.ts` | High | Add `postResultKillTimer` constant and schedule in both `execute()` and `executeStream()`; clear it in the `close` handler |
+  | `tests/unit/infrastructure/services/agents/executors/copilot-cli-executor.test.ts` | High | Add TDD tests: grace timer fires SIGKILL when process does not self-close after `result`; timer is cleared on normal fast exit |
+
+  ## Dependencies
+
+  - No new npm dependencies required.
+  - Pattern is a direct port of `RESULT_TO_CLOSE_GRACE_MS` from `ClaudeCodeExecutorService` — already proven in production.
+  - The `SpawnFunction` type already exposes `proc.kill(signal?: string)` accepting `'SIGKILL'`.
+
+  ## Size Estimate
+
+  **S** — Single-file production change (~10 lines added in two places), plus two new test cases. No architectural changes, no TypeSpec changes, no new dependencies, no DI wiring changes needed. The entire fix is contained within `copilot-cli-executor.service.ts`.
+
+  ## Success Criteria
+
+  - [ ] SC-1: After `copilot` emits `type: 'result'`, if the process does not exit within 30 seconds, `SIGKILL` is sent.
+  - [ ] SC-2: `execute()` resolves with the captured result (not an error) when killed via the grace timer.
+  - [ ] SC-3: `executeStream()` yields the `result` event and the generator terminates when killed via the grace timer.
+  - [ ] SC-4: The grace timer is cleared when the process exits normally before it fires (no spurious kills on fast exits).
+  - [ ] SC-5: All existing unit tests for the copilot executor continue to pass.
+  - [ ] SC-6: `pnpm validate` passes with zero errors after the change.
