@@ -14,7 +14,7 @@ summary: >
   never closes and the worker is frozen. The fix applies the same RESULT_TO_CLOSE_GRACE_MS
   SIGKILL grace-timer pattern already implemented in ClaudeCodeExecutorService to both
   execute() and executeStream().
-phase: Analysis
+phase: Requirements
 sizeEstimate: S
 
 # Relationships
@@ -33,7 +33,54 @@ relatedLinks:
     url: "packages/core/src/infrastructure/services/agents/common/executors/claude-code-executor.service.ts"
 
 # Open questions (must be resolved before implementation)
-openQuestions: []
+openQuestions:
+  - question: "What grace timer duration should be used before sending SIGKILL after a result event?"
+    resolved: true
+    options:
+      - option: "30,000 ms (match reference)"
+        description: "Use the same RESULT_TO_CLOSE_GRACE_MS = 30_000 constant as ClaudeCodeExecutorService. Proven in production, immediately consistent across all executors, and requires no new decision-making."
+        selected: true
+      - option: "Configurable via constructor"
+        description: "Accept the grace timeout as a constructor parameter so tests can pass a short value and production can tune it. Adds flexibility but introduces configuration complexity for a one-line constant in a small bug fix."
+        selected: false
+    selectionRationale: "30,000 ms matches the proven production value in ClaudeCodeExecutorService. Introducing constructor configuration would be over-engineering for a fix this small (S-sized). Tests can use fake timers (vi.useFakeTimers) to control setTimeout without needing to inject the duration."
+    answer: "30,000 ms (match reference)"
+
+  - question: "Which kill signal strategy should be used when the grace timer fires?"
+    resolved: true
+    options:
+      - option: "Direct SIGKILL after grace period"
+        description: "Send SIGKILL immediately when the timer fires, with no prior SIGTERM. This is the pattern used by ClaudeCodeExecutorService. SIGKILL is unconditional and cannot be caught or ignored, ensuring the process is always terminated."
+        selected: true
+      - option: "SIGTERM then SIGKILL (two-stage)"
+        description: "Send SIGTERM first and schedule a secondary shorter timer for SIGKILL. Allows the process a chance to clean up gracefully. Adds implementation complexity and a second timer; SIGTERM is ineffective when orphaned child processes hold stdio open, making this extra complexity pointless for this bug class."
+        selected: false
+    selectionRationale: "Direct SIGKILL matches the reference implementation and is the correct choice because the freeze scenario is caused by orphaned child processes holding stdio handles — these processes ignore SIGTERM. The 30-second grace period already provides ample time for a genuine graceful exit, making a two-stage approach redundant."
+    answer: "Direct SIGKILL after grace period"
+
+  - question: "Should RESULT_TO_CLOSE_GRACE_MS be extracted to a shared constants file or remain a local constant per executor?"
+    resolved: true
+    options:
+      - option: "Local constant per executor"
+        description: "Define RESULT_TO_CLOSE_GRACE_MS = 30_000 as a module-level constant inside copilot-cli-executor.service.ts, mirroring the pattern in ClaudeCodeExecutorService. Keeps each executor self-contained with no new coupling."
+        selected: true
+      - option: "Shared constants file"
+        description: "Extract to a shared executors/constants.ts file imported by both executors. Enforces the same value across all future executors. Worthwhile only if a third executor appears; adding abstraction now for two files violates YAGNI."
+        selected: false
+    selectionRationale: "YAGNI applies here. There are only two executors that need this constant. A shared file would add a dependency edge with no real benefit at current scale. If a third executor is added in the future, extraction can happen at that point."
+    answer: "Local constant per executor"
+
+  - question: "How should execute() behave when the process is killed by the grace timer rather than exiting naturally?"
+    resolved: true
+    options:
+      - option: "Resolve with captured result"
+        description: "If a result event was already observed and data captured, resolve the promise normally with that result. The agent completed its work; the hang was a subprocess cleanup issue, not a failure of the agent run itself. Matches ClaudeCodeExecutorService behavior."
+        selected: true
+      - option: "Reject with a timeout error"
+        description: "Throw an error indicating the process had to be forcibly killed. Treats any forced kill as a failure regardless of whether a result was captured. This would surface false-positive errors to callers even when the agent work succeeded."
+        selected: false
+    selectionRationale: "The result event confirms the agent completed its task successfully. The freeze is a subprocess lifecycle issue, not an agent failure. Rejecting with an error would cause callers to treat successful agent runs as failures, which is incorrect. The reference implementation resolves with the captured result for the same reason."
+    answer: "Resolve with captured result"
 
 # Markdown content (the actual spec)
 content: |
@@ -44,6 +91,46 @@ content: |
   Both `execute()` and `executeStream()` resolve only when the subprocess emits the `close` event. However, if any child process that the copilot agent spawned during its run (MCP servers, TypeScript language servers, background shells, or dev servers) keeps a stdio handle open, the parent `copilot` process never receives EOF and never closes. The worker then sleeps forever even though the agent has already finished and produced a result.
 
   This is the exact same bug that was previously fixed in `ClaudeCodeExecutorService` (documented in LESSONS.md under _"Subprocess Executor Must Not Trust Natural Exit After [result]"_). That fix added a `RESULT_TO_CLOSE_GRACE_MS = 30_000` timer: once the `result` event is observed, a 30-second countdown starts and sends `SIGKILL` if the process has not already exited. The copilot executor was implemented after that lesson was documented but did not include the safeguard.
+
+  ## Success Criteria
+
+  - [ ] SC-1: After `copilot` emits `type: 'result'`, if the process does not exit within 30 seconds, `SIGKILL` is sent.
+  - [ ] SC-2: `execute()` resolves with the captured result (not an error) when killed via the grace timer.
+  - [ ] SC-3: `executeStream()` yields the `result` event and the generator terminates when killed via the grace timer.
+  - [ ] SC-4: The grace timer is cleared when the process exits normally before it fires (no spurious kills on fast exits).
+  - [ ] SC-5: All existing unit tests for the copilot executor continue to pass.
+  - [ ] SC-6: `pnpm validate` passes with zero errors after the change.
+
+  ## Functional Requirements
+
+  - **FR-1**: `CopilotCliExecutorService` MUST define a module-level constant `RESULT_TO_CLOSE_GRACE_MS = 30_000` with the same value as `ClaudeCodeExecutorService`.
+  - **FR-2**: In `execute()`, upon observing a JSONL line with `type === 'result'`, the implementation MUST schedule a `setTimeout` callback that calls `proc.kill('SIGKILL')` after `RESULT_TO_CLOSE_GRACE_MS` milliseconds if no timer is already scheduled (idempotent guard using `??=`).
+  - **FR-3**: In `execute()`, the `close` event handler MUST clear the grace timer via `clearTimeout` before resolving the promise, so normally-exiting processes are never spuriously killed.
+  - **FR-4**: In `executeStream()`, upon observing a JSONL line with `type === 'result'`, the implementation MUST schedule the same `setTimeout` / `proc.kill('SIGKILL')` grace timer using the same idempotent guard.
+  - **FR-5**: In `executeStream()`, the `close` event handler MUST clear the grace timer via `clearTimeout` before enqueuing the `null` sentinel that terminates the async generator.
+  - **FR-6**: When the grace timer fires and `SIGKILL` is sent, `execute()` MUST resolve with whatever result data was captured from the `result` event — it MUST NOT reject or throw.
+  - **FR-7**: When the grace timer fires and `SIGKILL` is sent, `executeStream()` MUST allow the async generator to terminate cleanly after the `close` event fires (which it will, because SIGKILL forces it).
+  - **FR-8**: The unit test suite MUST include a test verifying that `execute()` sends `SIGKILL` after the grace period when the process does not self-close after emitting `result`.
+  - **FR-9**: The unit test suite MUST include a test verifying that `executeStream()` sends `SIGKILL` after the grace period when the process does not self-close after emitting `result`.
+  - **FR-10**: The unit test suite MUST include a test verifying that the grace timer does NOT fire (is cleared) when the process exits naturally within the grace window after emitting `result`.
+
+  ## Non-Functional Requirements
+
+  - **NFR-1 — Consistency**: The implementation pattern MUST be structurally identical to `ClaudeCodeExecutorService`. A future developer reading both executors side-by-side must see the same constant name, the same `??=` guard, and the same `clearTimeout` in the `close` handler. Deviating from the established pattern increases cognitive load and maintenance risk.
+  - **NFR-2 — No new dependencies**: The fix MUST NOT introduce any new npm dependencies. All required primitives (`setTimeout`, `clearTimeout`, `proc.kill`) are available in the existing codebase.
+  - **NFR-3 — Minimal diff**: The production code change MUST be approximately 10 lines or fewer added across the two methods. Any larger change is a signal that scope has drifted beyond the bug fix.
+  - **NFR-4 — Test determinism**: Unit tests for the grace timer MUST use `vi.useFakeTimers()` to control `setTimeout` without real wall-clock delays. Tests MUST NOT sleep or use real timers.
+  - **NFR-5 — Zero regressions**: All existing tests for `CopilotCliExecutorService` MUST continue to pass after the change. The fix touches existing code paths (`close` handler) and must not break them.
+  - **NFR-6 — Type safety**: The `NodeJS.Timeout` return type of `setTimeout` MUST be used for the `postResultKillTimer` variable, consistent with the reference implementation. No `any` casts.
+
+  ## Product Questions & AI Recommendations
+
+  | # | Question | AI Recommendation | Rationale |
+  | - | -------- | ----------------- | --------- |
+  | 1 | What grace timer duration to use? | 30,000 ms (match reference) | Proven production value; fake timers make the exact number irrelevant in tests |
+  | 2 | Which kill signal strategy? | Direct SIGKILL after grace period | SIGTERM is ignored by orphaned processes holding stdio; SIGKILL is unconditional |
+  | 3 | Local or shared constant? | Local constant per executor | YAGNI — only two executors exist; shared file adds coupling with no current benefit |
+  | 4 | execute() behavior on forced kill? | Resolve with captured result | Agent work succeeded; the hang is a cleanup artifact, not an agent failure |
 
   ## Codebase Analysis
 
@@ -97,24 +184,16 @@ content: |
 
   | Area | Impact | Reasoning |
   | ---- | ------ | --------- |
-  | `packages/core/src/infrastructure/services/agents/common/executors/copilot-cli-executor.service.ts` | High | Add `postResultKillTimer` constant and schedule in both `execute()` and `executeStream()`; clear it in the `close` handler |
-  | `tests/unit/infrastructure/services/agents/executors/copilot-cli-executor.test.ts` | High | Add TDD tests: grace timer fires SIGKILL when process does not self-close after `result`; timer is cleared on normal fast exit |
+  | `packages/core/src/infrastructure/services/agents/common/executors/copilot-cli-executor.service.ts` | High | Add `RESULT_TO_CLOSE_GRACE_MS` constant and `postResultKillTimer` variable; schedule SIGKILL in both `execute()` and `executeStream()`; clear timer in both `close` handlers |
+  | `tests/unit/infrastructure/services/agents/executors/copilot-cli-executor.test.ts` | High | Add TDD tests using `vi.useFakeTimers()`: grace timer fires SIGKILL when process does not self-close after `result`; timer is cleared on normal fast exit |
 
   ## Dependencies
 
   - No new npm dependencies required.
   - Pattern is a direct port of `RESULT_TO_CLOSE_GRACE_MS` from `ClaudeCodeExecutorService` — already proven in production.
   - The `SpawnFunction` type already exposes `proc.kill(signal?: string)` accepting `'SIGKILL'`.
+  - `vi.useFakeTimers()` is already available in the Vitest test suite used by existing executor tests.
 
   ## Size Estimate
 
-  **S** — Single-file production change (~10 lines added in two places), plus two new test cases. No architectural changes, no TypeSpec changes, no new dependencies, no DI wiring changes needed. The entire fix is contained within `copilot-cli-executor.service.ts`.
-
-  ## Success Criteria
-
-  - [ ] SC-1: After `copilot` emits `type: 'result'`, if the process does not exit within 30 seconds, `SIGKILL` is sent.
-  - [ ] SC-2: `execute()` resolves with the captured result (not an error) when killed via the grace timer.
-  - [ ] SC-3: `executeStream()` yields the `result` event and the generator terminates when killed via the grace timer.
-  - [ ] SC-4: The grace timer is cleared when the process exits normally before it fires (no spurious kills on fast exits).
-  - [ ] SC-5: All existing unit tests for the copilot executor continue to pass.
-  - [ ] SC-6: `pnpm validate` passes with zero errors after the change.
+  **S** — Single-file production change (~10 lines added across two methods), plus three new test cases (execute grace timer fires, executeStream grace timer fires, timer cleared on fast exit). No architectural changes, no TypeSpec changes, no new dependencies, no DI wiring changes needed. The entire fix is contained within `copilot-cli-executor.service.ts` and its test file.
