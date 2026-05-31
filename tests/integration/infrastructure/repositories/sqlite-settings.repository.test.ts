@@ -234,6 +234,36 @@ describe('SQLiteSettingsRepository', () => {
       expect(row.created_at).toBe('2025-01-01T00:00:00.000Z');
       expect(row.updated_at).toBe('2025-01-01T00:00:00.000Z');
     });
+
+    it('should persist skill injection config fields', async () => {
+      // Arrange
+      const settings = createTestSettings();
+      settings.workflow.skillInjection = {
+        enabled: true,
+        skills: [
+          { name: 'brainstorming', type: 'local', source: '.claude/skills/brainstorming' },
+          {
+            name: 'remote-docs',
+            type: 'remote',
+            source: '@acme/skills',
+            remoteSkillName: 'docs-helper',
+          },
+        ],
+      };
+
+      // Act
+      await repository.initialize(settings);
+
+      // Assert
+      const row = db.prepare('SELECT * FROM settings WHERE id = ?').get('singleton') as Record<
+        string,
+        unknown
+      >;
+      expect(row.skill_injection_enabled).toBe(1);
+      expect(row.skill_injection_skills).toBe(
+        JSON.stringify(settings.workflow.skillInjection.skills)
+      );
+    });
   });
 
   describe('load()', () => {
@@ -510,6 +540,27 @@ describe('SQLiteSettingsRepository', () => {
       const loaded = await repository.load();
       expect(loaded?.createdAt).toEqual(originalCreatedAt);
       expect(loaded?.updatedAt).toEqual(new Date('2025-01-03T00:00:00Z'));
+    });
+
+    it('should update and reload skill injection config', async () => {
+      // Arrange
+      const settings = createTestSettings();
+      await repository.initialize(settings);
+
+      settings.workflow.skillInjection = {
+        enabled: true,
+        skills: [
+          { name: 'brainstorming', type: 'local', source: '.claude/skills/brainstorming' },
+          { name: 'remote-docs', type: 'remote', source: '@acme/skills' },
+        ],
+      };
+
+      // Act
+      await repository.update(settings);
+
+      // Assert
+      const loaded = await repository.load();
+      expect(loaded?.workflow.skillInjection).toEqual(settings.workflow.skillInjection);
     });
   });
 
