@@ -21,6 +21,7 @@ import {
   AgentAuthMethod,
   EditorType,
   Language,
+  SkillSourceType,
   TerminalType,
 } from '@/domain/generated/output.js';
 
@@ -241,10 +242,10 @@ describe('SQLiteSettingsRepository', () => {
       settings.workflow.skillInjection = {
         enabled: true,
         skills: [
-          { name: 'brainstorming', type: 'local', source: '.claude/skills/brainstorming' },
+          { name: 'brainstorming', type: SkillSourceType.Local, source: '.claude/skills/brainstorming' },
           {
             name: 'remote-docs',
-            type: 'remote',
+            type: SkillSourceType.Remote,
             source: '@acme/skills',
             remoteSkillName: 'docs-helper',
           },
@@ -261,7 +262,7 @@ describe('SQLiteSettingsRepository', () => {
       >;
       expect(row.skill_injection_enabled).toBe(1);
       expect(row.skill_injection_skills).toBe(
-        JSON.stringify(settings.workflow.skillInjection.skills)
+        JSON.stringify(settings.workflow.skillInjection!.skills)
       );
     });
   });
@@ -550,8 +551,8 @@ describe('SQLiteSettingsRepository', () => {
       settings.workflow.skillInjection = {
         enabled: true,
         skills: [
-          { name: 'brainstorming', type: 'local', source: '.claude/skills/brainstorming' },
-          { name: 'remote-docs', type: 'remote', source: '@acme/skills' },
+          { name: 'brainstorming', type: SkillSourceType.Local, source: '.claude/skills/brainstorming' },
+          { name: 'remote-docs', type: SkillSourceType.Remote, source: '@acme/skills' },
         ],
       };
 
@@ -561,6 +562,24 @@ describe('SQLiteSettingsRepository', () => {
       // Assert
       const loaded = await repository.load();
       expect(loaded?.workflow.skillInjection).toEqual(settings.workflow.skillInjection);
+    });
+
+    it('should round-trip an enabled skill injection config with an empty skills list', async () => {
+      // Arrange — start with a skill, then remove it (simulates removeInjectedSkill leaving [])
+      const settings = createTestSettings();
+      settings.workflow.skillInjection = {
+        enabled: true,
+        skills: [{ name: 'brainstorming', type: SkillSourceType.Local, source: '.claude/skills/brainstorming' }],
+      };
+      await repository.initialize(settings);
+
+      // Remove the only skill, leaving an explicit empty array
+      settings.workflow.skillInjection = { enabled: true, skills: [] };
+      await repository.update(settings);
+
+      // Assert — skills must reload as [] not the default list
+      const loaded = await repository.load();
+      expect(loaded?.workflow.skillInjection).toEqual({ enabled: true, skills: [] });
     });
   });
 

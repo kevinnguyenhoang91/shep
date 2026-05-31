@@ -263,10 +263,14 @@ export function toDatabase(settings: Settings): SettingsRow {
     fab_position_swapped: (settings.fabLayout?.swapPosition ?? false) ? 1 : 0,
 
     // Skill injection config (default: disabled, no skills)
+    // Use != null check (not .length) so an explicit empty array serialises as '[]'
+    // rather than null — this lets fromDatabase distinguish "no skills configured"
+    // from "skills explicitly cleared to an empty list".
     skill_injection_enabled: settings.workflow.skillInjection?.enabled ? 1 : 0,
-    skill_injection_skills: settings.workflow.skillInjection?.skills?.length
-      ? JSON.stringify(settings.workflow.skillInjection.skills)
-      : null,
+    skill_injection_skills:
+      settings.workflow.skillInjection?.skills != null
+        ? JSON.stringify(settings.workflow.skillInjection.skills)
+        : null,
 
     // Default home page (default: control-center)
     default_home_page: settings.defaultHomePage ?? 'control-center',
