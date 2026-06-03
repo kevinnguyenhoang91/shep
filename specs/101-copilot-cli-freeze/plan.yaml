@@ -1,0 +1,132 @@
+name: "copilot-cli-freeze"
+summary: >
+  Port the RESULT_TO_CLOSE_GRACE_MS SIGKILL grace-timer pattern from
+  ClaudeCodeExecutorService to CopilotCliExecutorService. The production
+  change is approximately 10 lines across execute() and executeStream() in
+  copilot-cli-executor.service.ts. Three new test cases using vi.useFakeTimers
+  are added to the existing test file. No architectural changes, no new
+  dependencies, no DI wiring changes required.
+
+relatedFeatures:
+  - "081-copilot-cli-agent"
+  - "claude-code-executor-hang-fix"
+
+technologies:
+  - "TypeScript"
+  - "Node.js child_process (spawn, kill, close event)"
+  - "SIGKILL (unconditional OS process termination)"
+  - "JSONL (newline-delimited JSON event stream)"
+  - "Vitest (vi.useFakeTimers for deterministic timer tests)"
+
+relatedLinks:
+  - title: "ClaudeCodeExecutorService — reference RESULT_TO_CLOSE_GRACE_MS implementation"
+    url: "packages/core/src/infrastructure/services/agents/common/executors/claude-code-executor.service.ts"
+  - title: "CopilotCliExecutorService — file to be patched"
+    url: "packages/core/src/infrastructure/services/agents/common/executors/copilot-cli-executor.service.ts"
+  - title: "Copilot executor unit tests — file to be extended"
+    url: "tests/unit/infrastructure/services/agents/executors/copilot-cli-executor.test.ts"
+
+phases:
+  - id: "phase-1"
+    name: "TDD Red — Write Failing Grace Timer Tests"
+    description: "Add 3 failing test cases to copilot-cli-executor.test.ts before touching production code. Tests assert SIGKILL on grace period expiry for execute(), SIGKILL on grace period expiry for executeStream(), and no SIGKILL when the process exits naturally before the timer fires. All three must fail before proceeding."
+    parallel: false
+  - id: "phase-2"
+    name: "TDD Green — Implement Grace Timer in Production Code"
+    description: "Add RESULT_TO_CLOSE_GRACE_MS constant and postResultKillTimer logic to copilot-cli-executor.service.ts. Implement execute() first, then executeStream(), mirroring ClaudeCodeExecutorService exactly. All new tests must pass and all existing tests must remain green."
+    parallel: false
+  - id: "phase-3"
+    name: "Validate — Confirm Zero Regressions"
+    description: "Run pnpm validate (lint + format + typecheck + tsp) to confirm zero errors. Run pnpm test:unit to confirm all tests pass. Verify NFR-1 consistency checklist: constant name, ??= guard, try/catch kill, clearTimeout, and variable type must match the reference implementation exactly."
+    parallel: false
+
+filesToCreate: []
+
+filesToModify:
+  - "packages/core/src/infrastructure/services/agents/common/executors/copilot-cli-executor.service.ts"
+  - "tests/unit/infrastructure/services/agents/executors/copilot-cli-executor.test.ts"
+
+openQuestions: []
+
+content: |
+  ## Architecture Overview
+
+  The fix lives entirely in the infrastructure layer. CopilotCliExecutorService
+  implements IAgentExecutor from the application ports layer and is injected via
+  the DI container. No domain types, ports interfaces, DI container wiring, or
+  presentation layer changes are required.
+
+  Both execute() and executeStream() share the same structural pattern:
+  (1) spawn subprocess, (2) parse stdout as JSONL line-by-line, (3) resolve or
+  terminate the async generator only when proc.on('close') fires. The root cause
+  is that step 3 relies solely on the subprocess closing naturally. If any child
+  process spawned by the copilot agent inherits its stdio handles, the parent
+  never receives EOF and never emits 'close'. The fix adds a safety net: once
+  the terminal result event is observed, a 30-second countdown begins. If the
+  process has not self-exited, SIGKILL is sent — forcing the close event and
+  unblocking the caller.
+
+  This is a direct port of the pattern already proven in ClaudeCodeExecutorService,
+  documented in LESSONS.md under "Subprocess Executor Must Not Trust Natural Exit
+  After [result]".
+
+  ## Key Design Decisions
+
+  ### Grace Timer Duration: 30,000 ms
+  RESULT_TO_CLOSE_GRACE_MS = 30_000 as a module-level constant. Matches the
+  production-validated constant in ClaudeCodeExecutorService (chosen after a real
+  production hang where a worker was frozen 3+ hours after result). Tests use
+  vi.useFakeTimers() so the exact value has zero impact on test speed. Constructor
+  injection was rejected as over-engineering for this fix size.
+
+  ### Kill Signal: Direct SIGKILL
+  proc.kill('SIGKILL') after grace period with no prior SIGTERM. The freeze is
+  caused by orphaned child processes holding stdio handles that ignore SIGTERM.
+  SIGKILL is unconditional. A try/catch around the kill call handles the race
+  where the process dies between timer fire and kill call.
+
+  ### Constant Scope: Module-Level Local Per Executor
+  Defined inside copilot-cli-executor.service.ts, not extracted to a shared file.
+  YAGNI applies: only two executors exist. A shared constants file adds coupling
+  with no current benefit. If a third executor appears, extraction is trivial.
+
+  ### Idempotent Timer Guard: ??= Operator
+  postResultKillTimer ??= setTimeout(...) ensures only one timer is scheduled
+  even if duplicate result events arrive in the JSONL stream. Matches the
+  reference implementation verbatim.
+
+  ### execute() Resolution on Forced Kill: Resolve with Captured Result
+  The result event confirms agent success. The forced kill is a subprocess
+  lifecycle artifact, not an agent failure. The close handler already resolves
+  with captured data; the grace timer merely forces that handler to run.
+
+  ### Test Strategy: vi.useFakeTimers()
+  vi.advanceTimersByTime(RESULT_TO_CLOSE_GRACE_MS + 1) fires the timer instantly
+  without real wall-clock delay. The existing timeout tests in the copilot executor
+  test file already use this exact pattern (vi.useFakeTimers / vi.advanceTimersByTime
+  / vi.useRealTimers), so the new tests follow an established convention.
+
+  ## Implementation Strategy
+
+  Ordered RED -> GREEN -> VALIDATE:
+  1. RED: Write all 3 failing grace-timer tests before touching any production code.
+     This proves the tests are meaningful and the behavior is truly absent.
+  2. GREEN for execute(): Add RESULT_TO_CLOSE_GRACE_MS + postResultKillTimer to
+     execute(). Verify execute() grace-timer tests pass.
+  3. GREEN for executeStream(): Add postResultKillTimer to executeStream(). Verify
+     all 3 grace-timer tests pass.
+  4. VALIDATE: pnpm validate and pnpm test:unit confirm zero regressions.
+
+  execute() is implemented before executeStream() because it is Promise-based
+  (simpler) versus async generator (more complex), making it easier to verify
+  the pattern before applying it to the streaming case.
+
+  ## Risk Mitigation
+
+  | Risk | Mitigation |
+  | ---- | ---------- |
+  | Spurious kill on fast-exiting processes | clearTimeout in close handler; fast-exit test verifies no spurious kill |
+  | Race: process dies between timer fire and kill call | try/catch around proc.kill silently ignores errors |
+  | Double-scheduling if result event fires twice | ??= guard ensures only one timer is ever scheduled |
+  | Regressions in existing close handler code paths | clearTimeout inserted before existing logic; all existing tests must remain green |
+  | Type safety regression | Variable typed as ReturnType<typeof setTimeout> or undefined — no any casts |

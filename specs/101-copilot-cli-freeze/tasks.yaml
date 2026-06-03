@@ -1,0 +1,131 @@
+name: "copilot-cli-freeze"
+summary: >
+  4 tasks across 3 phases. Phase 1 writes 3 failing grace-timer tests (RED).
+  Phase 2 makes them pass by implementing the timer in execute() then
+  executeStream() (GREEN). Phase 3 validates zero regressions with pnpm
+  validate and pnpm test:unit.
+
+relatedFeatures:
+  - "081-copilot-cli-agent"
+
+technologies:
+  - "TypeScript"
+  - "Vitest (vi.useFakeTimers)"
+  - "Node.js child_process (SIGKILL)"
+
+relatedLinks:
+  - title: "ClaudeCodeExecutorService — reference implementation"
+    url: "packages/core/src/infrastructure/services/agents/common/executors/claude-code-executor.service.ts"
+  - title: "CopilotCliExecutorService — file to be patched"
+    url: "packages/core/src/infrastructure/services/agents/common/executors/copilot-cli-executor.service.ts"
+  - title: "Copilot executor unit tests — file to be extended"
+    url: "tests/unit/infrastructure/services/agents/executors/copilot-cli-executor.test.ts"
+
+tasks:
+  - id: "task-1"
+    phaseId: "phase-1"
+    title: "Write failing grace-timer tests (RED)"
+    description: "Add 3 new test cases to copilot-cli-executor.test.ts before touching any production code. Uses vi.useFakeTimers() to control setTimeout deterministically without wall-clock delays, following the pattern of the existing timeout tests in the same file."
+    state: "Todo"
+    dependencies: []
+    acceptanceCriteria:
+      - "Test 'should send SIGKILL after grace period when process does not close after result event' added in describe('execute') and fails against current code"
+      - "Test 'should send SIGKILL after grace period when process does not close after result event' added in describe('executeStream') and fails against current code"
+      - "Test 'should NOT send SIGKILL when process closes naturally before grace period expires' added in describe('execute') and fails against current code"
+      - "All 3 new tests use vi.useFakeTimers() / vi.advanceTimersByTime() / vi.useRealTimers() pattern matching the existing timeout test at line 607"
+      - "All pre-existing 29 tests continue to pass"
+    tdd:
+      red:
+        - "In describe('execute'), add test using vi.useFakeTimers: emit resultEvent on stdout but do not emit close, call vi.advanceTimersByTime(30001), assert proc.kill was called with 'SIGKILL'"
+        - "In describe('executeStream'), add test using vi.useFakeTimers: emit resultEvent without emitting close, advance time by 30001ms, assert proc.kill was called with 'SIGKILL'"
+        - "In describe('execute'), add test using vi.useFakeTimers: emit resultEvent then immediately emit close with code 0, advance time by 30001ms, assert proc.kill was NOT called with 'SIGKILL'"
+      green:
+        - "Run pnpm test:unit and confirm all 3 new tests fail with assertion errors — this proves the tests are meaningful against the current implementation"
+      refactor:
+        - "Review test structure against the existing timeout test pattern (lines 607-622 for execute, 797-819 for executeStream) to ensure consistent vi.useFakeTimers/vi.useRealTimers cleanup"
+        - "Ensure the fast-exit test awaits the resolved promise before asserting no kill was called, to avoid a false-positive pass"
+    estimatedEffort: "30min"
+
+  - id: "task-2"
+    phaseId: "phase-2"
+    title: "Implement execute() grace timer (GREEN)"
+    description: "Add RESULT_TO_CLOSE_GRACE_MS module-level constant and postResultKillTimer variable to execute(). Schedule SIGKILL in the result event handler using the ??= idempotent guard, and clear the timer in the close handler. Pattern mirrors ClaudeCodeExecutorService exactly."
+    state: "Todo"
+    dependencies:
+      - "task-1"
+    acceptanceCriteria:
+      - "RESULT_TO_CLOSE_GRACE_MS = 30_000 defined as a module-level constant in copilot-cli-executor.service.ts before the class definition"
+      - "postResultKillTimer declared as ReturnType<typeof setTimeout> | undefined alongside timeoutId inside the Promise constructor in execute()"
+      - "In processLine() inside the type === 'result' branch, postResultKillTimer ??= setTimeout with try/catch proc.kill('SIGKILL') is scheduled after capturing sessionId and usage"
+      - "In proc.on('close'), clearTimeout(postResultKillTimer) called before the existing if (timeoutId) clearTimeout(timeoutId) line"
+      - "execute() grace-timer test and fast-exit no-kill test both pass"
+      - "All pre-existing execute() tests remain green"
+    tdd:
+      red:
+        - "Confirm execute() grace-timer test and fast-exit test (task-1 tests 1 and 3) are still failing before making any production changes"
+      green:
+        - "Add const RESULT_TO_CLOSE_GRACE_MS = 30_000 at module level in copilot-cli-executor.service.ts before the class definition"
+        - "Add let postResultKillTimer: ReturnType<typeof setTimeout> | undefined alongside timeoutId inside the Promise constructor in execute()"
+        - "In processLine() inside the else if (type === 'result') block after capturing sessionId and usage, add the postResultKillTimer ??= setTimeout schedule with try/catch SIGKILL"
+        - "In proc.on('close'), before the if (timeoutId) clearTimeout line, add if (postResultKillTimer) clearTimeout(postResultKillTimer)"
+        - "Run pnpm test:unit and confirm execute() grace-timer tests now pass"
+      refactor:
+        - "Compare execute() side-by-side with ClaudeCodeExecutorService.execute() (lines 92-194) to verify identical constant name, ??= guard, try/catch pattern, clearTimeout placement, and variable type"
+    estimatedEffort: "20min"
+
+  - id: "task-3"
+    phaseId: "phase-2"
+    title: "Implement executeStream() grace timer (GREEN)"
+    description: "Add postResultKillTimer to executeStream(), schedule SIGKILL in the processStreamLine result branch after the enqueue call, and clear the timer in the close handler. Mirrors the execute() implementation and ClaudeCodeExecutorService."
+    state: "Todo"
+    dependencies:
+      - "task-2"
+    acceptanceCriteria:
+      - "postResultKillTimer declared as ReturnType<typeof setTimeout> | undefined alongside timeoutId in executeStream()"
+      - "In processStreamLine() inside the type === 'result' branch, postResultKillTimer ??= setTimeout with try/catch proc.kill('SIGKILL') added after the enqueue call"
+      - "In proc.on('close') in executeStream(), clearTimeout(postResultKillTimer) called before the existing if (timeoutId) clearTimeout(timeoutId) line"
+      - "executeStream() grace-timer test passes"
+      - "All pre-existing executeStream() tests remain green"
+    tdd:
+      red:
+        - "Confirm executeStream() grace-timer test (task-1 test 2) is still failing after task-2 changes"
+      green:
+        - "Add let postResultKillTimer: ReturnType<typeof setTimeout> | undefined alongside timeoutId in executeStream()"
+        - "In processStreamLine() inside the if (type === 'result') block after the enqueue call, add the postResultKillTimer ??= setTimeout schedule with try/catch SIGKILL"
+        - "In proc.on('close') in executeStream(), before the if (timeoutId) clearTimeout line, add if (postResultKillTimer) clearTimeout(postResultKillTimer)"
+        - "Run pnpm test:unit and confirm all 3 grace-timer tests now pass"
+      refactor:
+        - "Compare executeStream() with execute() and the ClaudeCodeExecutorService reference to verify structural consistency: same constant, ??= guard, try/catch, clearTimeout, and variable type"
+    estimatedEffort: "20min"
+
+  - id: "task-4"
+    phaseId: "phase-3"
+    title: "Validate zero regressions"
+    description: "Run the full local validation suite and confirm zero errors across lint, format, typecheck, tsp, and all unit tests. Final gate before the feature is considered complete."
+    state: "Todo"
+    dependencies:
+      - "task-3"
+    acceptanceCriteria:
+      - "pnpm validate exits with code 0 (lint + format + typecheck + tsp all pass)"
+      - "pnpm test:unit exits with code 0 (all tests pass including the 3 new grace-timer tests)"
+      - "NFR-1 confirmed: same constant name RESULT_TO_CLOSE_GRACE_MS, same ??= guard, same try/catch, same clearTimeout, same ReturnType<typeof setTimeout> | undefined type in both execute() and executeStream()"
+    tdd: null
+    estimatedEffort: "10min"
+
+totalEstimate: "80min"
+openQuestions: []
+
+content: |
+  ## Summary
+
+  Work begins with 3 failing tests (phase-1) that precisely describe the missing
+  behavior before any production code changes. Writing tests first proves they are
+  meaningful — if they pass against the current code, something is wrong.
+
+  Phase-2 implements the fix method-by-method. execute() comes first because its
+  Promise-based structure is simpler than the async generator in executeStream(),
+  making it easier to verify the pattern in isolation before applying it to the
+  more complex streaming case. Each step is validated individually before moving on.
+
+  Phase-3 runs pnpm validate and pnpm test:unit as the final gate, confirming
+  zero regressions across the full test suite and static analysis pipeline.
