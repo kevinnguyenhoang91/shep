@@ -1,0 +1,21 @@
+pnpm validate Results
+======================
+Date: 2026-06-05
+Command: pnpm validate
+Result: EXIT CODE 0 — all checks passed
+
+Steps Run
+---------
+1. lint:fix    — eslint . --fix --max-warnings 0 --cache          PASSED
+2. format      — prettier (all files)                             PASSED
+3. typecheck   — tsc --noEmit                                     PASSED
+4. tsp:compile — tsp compile tsp/                                 PASSED
+
+TypeSpec compiler v0.60.1
+Compilation completed successfully.
+
+Confirms: NFR-1, NFR-2, NFR-6 satisfied:
+- RESULT_TO_CLOSE_GRACE_MS constant type-checks correctly as module-level const
+- postResultKillTimer typed as ReturnType<typeof setTimeout> | undefined — no 'any' casts
+- No new npm dependencies introduced
+- No lint warnings or errors

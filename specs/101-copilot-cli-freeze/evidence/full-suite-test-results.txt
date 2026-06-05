@@ -1,0 +1,16 @@
+Full Unit Test Suite Results
+============================
+Date: 2026-06-05
+Command: pnpm test:unit
+Result: 632 test files passed, 7624 tests passed (zero failures)
+
+Summary
+-------
+Test Files: 632 passed (632)
+Tests:      7624 passed (7624)
+Start at:   09:17:59
+Duration:   177.41s
+
+Confirms: Zero regressions introduced by the copilot-cli-freeze grace timer fix.
+All pre-existing tests continue to pass after adding RESULT_TO_CLOSE_GRACE_MS and
+postResultKillTimer to CopilotCliExecutorService.execute() and executeStream().

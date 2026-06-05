@@ -1,0 +1,75 @@
+CopilotCliExecutorService — Unit Test Results
+==============================================
+Date: 2026-06-05
+Command: pnpm exec vitest run --reporter=verbose tests/unit/infrastructure/services/agents/executors/copilot-cli-executor.test.ts
+Result: 1 test file passed, 54 tests passed
+
+All Tests (54/54 PASS)
+----------------------
+CopilotCliExecutorService > agentType
+  ✓ should have agentType of CopilotCli
+
+CopilotCliExecutorService > supportsFeature
+  ✓ should support session-resume feature
+  ✓ should support streaming feature
+  ✓ should NOT support tool-scoping feature
+  ✓ should NOT support structured-output feature
+  ✓ should NOT support system-prompt feature
+  ✓ should NOT support session-listing feature
+
+CopilotCliExecutorService > execute
+  ✓ should spawn copilot with the prompt via -p flag
+  ✓ should include all base flags in every invocation
+  ✓ should NOT pipe prompt via stdin
+  ✓ should use file indirection for very large prompts to avoid arg-length failures
+  ✓ should clean up temporary prompt file after large prompt execution
+  ✓ should spawn the copilot binary
+  ✓ should extract response text from assistant.message events
+  ✓ should extract sessionId from the result event
+  ✓ should return undefined sessionId when result event is missing sessionId
+  ✓ should extract usage from the result event
+  ✓ should return undefined usage when result event has no usage
+  ✓ should ignore assistant.message_delta events (progress only, not result)
+  ✓ should pass --model flag when model option is provided
+  ✓ should normalize legacy hyphenated Copilot model aliases
+  ✓ should normalize legacy hyphenated GPT model aliases
+  ✓ should normalize generic legacy GPT model aliases
+  ✓ should NOT include --model flag when model option is absent
+  ✓ should set cwd in spawn options when cwd is provided
+  ✓ should append --resume=<sessionId> when resumeSession is provided
+  ✓ should NOT include --resume when resumeSession is not provided
+  ✓ should throw when authConfig uses token auth method
+  ✓ should include copilot auth login instructions in token auth error
+  ✓ should NOT inject any auth env variable for session auth
+  ✓ should strip CLAUDECODE from spawn environment
+  ✓ should reject with install instructions on ENOENT error
+  ✓ should include npm install instructions in ENOENT error
+  ✓ should reject with stderr content on non-zero exit code
+  ✓ should include stderr in error message on non-zero exit
+  ✓ should surface auth error instructions when stderr contains auth message
+  ✓ should skip malformed JSON lines gracefully
+  ✓ should apply timeout and kill subprocess
+  ✓ [NEW] should send SIGKILL after grace period when process does not close after result event   <- SC-1/SC-2 grace timer (execute)
+  ✓ [NEW] should NOT send SIGKILL when process closes naturally before grace period expires       <- SC-4 grace timer cleared (execute)
+  ✓ should handle exit code 0 with empty response gracefully
+  ✓ should handle line buffering across chunk boundaries
+  ✓ should set windowsHide option on Windows
+
+CopilotCliExecutorService > executeStream
+  ✓ should yield progress events from assistant.message_delta
+  ✓ should yield a result event from the result JSONL event
+  ✓ should yield an error event on non-zero exit code
+  ✓ should yield an error event for token auth in streaming mode
+  ✓ should yield auth error event when copilot stderr contains auth message
+  ✓ should apply timeout and kill subprocess in stream mode
+  ✓ [NEW] should send SIGKILL after grace period when process does not close after result event   <- SC-1/SC-3 grace timer (executeStream)
+  ✓ should handle non-JSON lines as raw progress in stream mode
+  ✓ should include all base flags in stream mode invocation
+  ✓ should append --resume=<sessionId> in stream mode when resumeSession is provided
+  ✓ should use file indirection for very large prompts in stream mode
+
+Summary
+-------
+Test Files: 1 passed (1)
+Tests:      54 passed (54)
+Duration:   632ms

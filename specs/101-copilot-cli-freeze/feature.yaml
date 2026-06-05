@@ -1,0 +1,39 @@
+feature:
+  id: "101-copilot-cli-freeze"
+  name: "copilot-cli-freeze"
+  number: 101
+  branch: "feat/101-copilot-cli-freeze"
+  lifecycle: "research"
+  createdAt: "2026-05-26T08:50:40Z"
+status:
+  phase: "implementation-complete"
+  progress:
+    completed: 4
+    total: 4
+    percentage: 100
+  currentTask: null
+  lastUpdated: "2026-06-05T02:17:19.821Z"
+  lastUpdatedBy: "feature-agent:implement"
+  completedPhases:
+    - "analyze"
+    - "requirements"
+    - "research"
+    - "plan"
+    - "phase-1"
+    - "phase-2"
+    - "phase-3"
+validation:
+  lastRun: null
+  gatesPassed: []
+  autoFixesApplied: []
+tasks:
+  current: null
+  blocked: []
+  failed: []
+checkpoints:
+  - phase: "feature-created"
+    completedAt: "2026-05-26T08:50:40Z"
+    completedBy: "feature-agent"
+errors:
+  current: null
+  history: []
