@@ -62,6 +62,9 @@ const MAX_PROMPT_ARG_CHARS = 12_000;
 /** Prefix for temporary prompt files used by large prompt indirection mode. */
 const PROMPT_FILE_PREFIX = 'shep-copilot-prompt-';
 
+/** Grace period after a result event before sending SIGKILL if the process has not self-closed. */
+const RESULT_TO_CLOSE_GRACE_MS = 30_000;
+
 /**
  * Legacy model aliases that appeared in older settings payloads.
  * Copilot CLI expects dotted model versions (e.g. 4.5), not hyphenated (4-5).
@@ -152,6 +155,7 @@ export class CopilotCliExecutorService implements IAgentExecutor {
       let stderr = '';
       let timedOut = false;
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      let postResultKillTimer: ReturnType<typeof setTimeout> | undefined;
 
       // State accumulated from JSONL events
       let resultText = '';
@@ -175,6 +179,13 @@ export class CopilotCliExecutorService implements IAgentExecutor {
           } else if (type === 'result') {
             if (parsed.sessionId) sessionId = parsed.sessionId as string;
             if (parsed.usage) usage = this.extractUsage(parsed.usage as Record<string, unknown>);
+            postResultKillTimer ??= setTimeout(() => {
+              try {
+                proc.kill('SIGKILL');
+              } catch {
+                // process already dead
+              }
+            }, RESULT_TO_CLOSE_GRACE_MS);
           }
         } catch {
           // Malformed JSON line — skip gracefully
@@ -218,6 +229,7 @@ export class CopilotCliExecutorService implements IAgentExecutor {
         if (lineBuffer.trim()) processLine(lineBuffer.trim());
 
         this.log(`Process closed with code ${code}, result=${resultText.length} chars`);
+        if (postResultKillTimer) clearTimeout(postResultKillTimer);
         if (timeoutId) clearTimeout(timeoutId);
 
         if (timedOut) {
@@ -292,6 +304,7 @@ export class CopilotCliExecutorService implements IAgentExecutor {
     let stderr = '';
     let timedOut = false;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let postResultKillTimer: ReturnType<typeof setTimeout> | undefined;
 
     // Accumulated final response text (from assistant.message events)
     let resultText = '';
@@ -351,6 +364,13 @@ export class CopilotCliExecutorService implements IAgentExecutor {
             content: resultText,
             timestamp: new Date(),
           });
+          postResultKillTimer ??= setTimeout(() => {
+            try {
+              proc.kill('SIGKILL');
+            } catch {
+              // process already dead
+            }
+          }, RESULT_TO_CLOSE_GRACE_MS);
           return;
         }
 
@@ -392,6 +412,7 @@ export class CopilotCliExecutorService implements IAgentExecutor {
     });
 
     proc.on('close', (code: number | null) => {
+      if (postResultKillTimer) clearTimeout(postResultKillTimer);
       if (timeoutId) clearTimeout(timeoutId);
       if (timedOut) return; // already handled by timeout callback
 
