@@ -77,7 +77,10 @@ export class SQLiteSettingsRepository implements ISettingsRepository {
         interactive_agent_max_concurrent_sessions,
         auto_archive_delay_minutes,
         stage_timeout_fast_implement_ms,
-        fab_position_swapped
+        fab_position_swapped,
+        skill_injection_enabled,
+        skill_injection_skills,
+        default_home_page
       ) VALUES (
         @id, @created_at, @updated_at,
         @model_analyze, @model_requirements, @model_plan, @model_implement, @model_default,
@@ -112,7 +115,10 @@ export class SQLiteSettingsRepository implements ISettingsRepository {
         @interactive_agent_max_concurrent_sessions,
         @auto_archive_delay_minutes,
         @stage_timeout_fast_implement_ms,
-        @fab_position_swapped
+        @fab_position_swapped,
+        @skill_injection_enabled,
+        @skill_injection_skills,
+        @default_home_page
       )
     `);
 
@@ -225,7 +231,10 @@ export class SQLiteSettingsRepository implements ISettingsRepository {
         interactive_agent_max_concurrent_sessions = @interactive_agent_max_concurrent_sessions,
         auto_archive_delay_minutes = @auto_archive_delay_minutes,
         stage_timeout_fast_implement_ms = @stage_timeout_fast_implement_ms,
-        fab_position_swapped = @fab_position_swapped
+        fab_position_swapped = @fab_position_swapped,
+        skill_injection_enabled = @skill_injection_enabled,
+        skill_injection_skills = @skill_injection_skills,
+        default_home_page = @default_home_page
       WHERE id = @id
     `);
 

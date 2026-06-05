@@ -264,9 +264,10 @@ export function toDatabase(settings: Settings): SettingsRow {
 
     // Skill injection config (default: disabled, no skills)
     skill_injection_enabled: settings.workflow.skillInjection?.enabled ? 1 : 0,
-    skill_injection_skills: settings.workflow.skillInjection?.skills?.length
-      ? JSON.stringify(settings.workflow.skillInjection.skills)
-      : null,
+    skill_injection_skills:
+      settings.workflow.skillInjection !== undefined
+        ? JSON.stringify(settings.workflow.skillInjection.skills)
+        : null,
 
     // Default home page (default: control-center)
     default_home_page: settings.defaultHomePage ?? 'control-center',

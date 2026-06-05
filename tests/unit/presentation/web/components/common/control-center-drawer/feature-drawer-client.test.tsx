@@ -17,7 +17,6 @@ const mockStopFeature = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockUpdateFeaturePinnedConfig = vi.fn();
-const mockUseArtifactFetch = vi.fn((..._args: unknown[]) => false);
 
 let mockPathname = '/feature/feat-1';
 

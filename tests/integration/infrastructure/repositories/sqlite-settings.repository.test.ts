@@ -21,6 +21,7 @@ import {
   AgentAuthMethod,
   EditorType,
   Language,
+  SkillSourceType,
   TerminalType,
 } from '@/domain/generated/output.js';
 
@@ -882,6 +883,121 @@ describe('SQLiteSettingsRepository', () => {
       // Assert
       expect(loaded?.system.autoUpdate).toBe(false);
       expect(typeof loaded?.system.autoUpdate).toBe('boolean');
+    });
+  });
+
+  describe('skill injection config persistence', () => {
+    it('should persist skill_injection_enabled=true on initialize', async () => {
+      const settings = createTestSettings();
+      settings.workflow.skillInjection = { enabled: true, skills: [] };
+
+      await repository.initialize(settings);
+
+      const row = db.prepare('SELECT skill_injection_enabled FROM settings').get() as Record<
+        string,
+        unknown
+      >;
+      expect(row.skill_injection_enabled).toBe(1);
+    });
+
+    it('should persist skill_injection_skills JSON on initialize', async () => {
+      const settings = createTestSettings();
+      settings.workflow.skillInjection = {
+        enabled: true,
+        skills: [
+          {
+            name: 'arch-reviewer',
+            type: SkillSourceType.Local,
+            source: '.claude/skills/arch-reviewer',
+          },
+        ],
+      };
+
+      await repository.initialize(settings);
+
+      const row = db.prepare('SELECT skill_injection_skills FROM settings').get() as Record<
+        string,
+        unknown
+      >;
+      const parsed = JSON.parse(row.skill_injection_skills as string) as unknown[];
+      expect(parsed).toHaveLength(1);
+      expect((parsed[0] as { name: string }).name).toBe('arch-reviewer');
+    });
+
+    it('should round-trip a skill through initialize and load', async () => {
+      const settings = createTestSettings();
+      settings.workflow.skillInjection = {
+        enabled: true,
+        skills: [
+          {
+            name: 'shep-kit:implement',
+            type: SkillSourceType.Local,
+            source: '.claude/skills/shep-kit:implement',
+          },
+        ],
+      };
+
+      await repository.initialize(settings);
+      const loaded = await repository.load();
+
+      expect(loaded?.workflow.skillInjection?.enabled).toBe(true);
+      expect(loaded?.workflow.skillInjection?.skills).toHaveLength(1);
+      expect(loaded?.workflow.skillInjection?.skills[0].name).toBe('shep-kit:implement');
+    });
+
+    it('should persist updated skill injection config through update()', async () => {
+      const initial = createTestSettings();
+      await repository.initialize(initial);
+
+      const updated = {
+        ...initial,
+        updatedAt: new Date(),
+        workflow: {
+          ...initial.workflow,
+          skillInjection: {
+            enabled: true,
+            skills: [
+              {
+                name: 'shadcn-ui',
+                type: SkillSourceType.Local,
+                source: '.claude/skills/shadcn-ui',
+              },
+            ],
+          },
+        },
+      };
+
+      await repository.update(updated);
+      const loaded = await repository.load();
+
+      expect(loaded?.workflow.skillInjection?.enabled).toBe(true);
+      expect(loaded?.workflow.skillInjection?.skills).toHaveLength(1);
+      expect(loaded?.workflow.skillInjection?.skills[0].name).toBe('shadcn-ui');
+    });
+
+    it('should persist skill removal through update()', async () => {
+      const initial = createTestSettings();
+      initial.workflow.skillInjection = {
+        enabled: true,
+        skills: [
+          { name: 'shadcn-ui', type: SkillSourceType.Local, source: '.claude/skills/shadcn-ui' },
+        ],
+      };
+      await repository.initialize(initial);
+
+      const updated = {
+        ...initial,
+        updatedAt: new Date(),
+        workflow: {
+          ...initial.workflow,
+          skillInjection: { enabled: true, skills: [] },
+        },
+      };
+
+      await repository.update(updated);
+      const loaded = await repository.load();
+
+      expect(loaded?.workflow.skillInjection?.skills).toHaveLength(0);
     });
   });
 });

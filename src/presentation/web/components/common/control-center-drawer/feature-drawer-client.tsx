@@ -277,12 +277,6 @@ export function FeatureDrawerClient({
     artifactRefreshKey
   );
 
-  // Load tech / product spec artifacts for the entire implementation phase so
-  // the user can visualize the locked-in decisions while the agent runs, not
-  // only when waiting on an approval. The action bar still shows only on
-  // 'action-required' (handled inside FeatureDrawerTabs).
-  const techFeatureId =
-    featureNode?.lifecycle === 'implementation' && !featureNode.fastMode && featureNode.specPath
   // Load tech / product spec artifacts from implementation through review and
   // maintain so the user can visualize the locked-in decisions while the agent
   // runs, during PR review, and after merge. Fast-mode features skip the spec
