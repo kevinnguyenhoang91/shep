@@ -621,6 +621,52 @@ describe('CopilotCliExecutorService', () => {
       vi.useRealTimers();
     });
 
+    it('should send SIGKILL after grace period when process does not close after result event', async () => {
+      vi.useFakeTimers();
+      const mockProc = createMockChildProcess();
+      vi.mocked(mockSpawn).mockReturnValue(mockProc as any);
+
+      const executePromise = executor.execute('Test', { silent: true });
+
+      // Listener is set up synchronously inside execute(); write triggers it synchronously
+      mockProc.stdout.write(`${resultEvent('s-1')}\n`);
+
+      // Advance past the 30-second grace period — should fire the postResultKillTimer
+      vi.advanceTimersByTime(30_001);
+
+      // Emit close so the promise can resolve (in production, SIGKILL forces this)
+      mockProc.stdout.end();
+      mockProc.stderr.end();
+      mockProc.emit('close', 0);
+
+      await executePromise;
+
+      expect(mockProc.kill).toHaveBeenCalledWith('SIGKILL');
+      vi.useRealTimers();
+    });
+
+    it('should NOT send SIGKILL when process closes naturally before grace period expires', async () => {
+      vi.useFakeTimers();
+      const mockProc = createMockChildProcess();
+      vi.mocked(mockSpawn).mockReturnValue(mockProc as any);
+
+      const executePromise = executor.execute('Test', { silent: true });
+
+      // Emit result then close immediately — simulates a natural fast exit
+      mockProc.stdout.write(`${resultEvent('s-1')}\n`);
+      mockProc.stdout.end();
+      mockProc.stderr.end();
+      mockProc.emit('close', 0);
+
+      await executePromise;
+
+      // Advance past grace period — the close handler must have cleared the timer
+      vi.advanceTimersByTime(30_001);
+
+      expect(mockProc.kill).not.toHaveBeenCalledWith('SIGKILL');
+      vi.useRealTimers();
+    });
+
     it('should handle exit code 0 with empty response gracefully', async () => {
       const mockProc = createMockChildProcess();
       vi.mocked(mockSpawn).mockReturnValue(mockProc as any);
@@ -815,6 +861,38 @@ describe('CopilotCliExecutorService', () => {
       expect(mockProc.kill).toHaveBeenCalled();
       expect(events.some((e) => e.type === 'error' && /timed out/i.test(e.content))).toBe(true);
 
+      vi.useRealTimers();
+    });
+
+    it('should send SIGKILL after grace period when process does not close after result event', async () => {
+      vi.useFakeTimers();
+      const mockProc = createMockChildProcess();
+      vi.mocked(mockSpawn).mockReturnValue(mockProc as any);
+
+      const events: { type: string; content: string }[] = [];
+      const gen = executor.executeStream('Test', { silent: true });
+
+      const collectPromise = (async () => {
+        for await (const event of gen) {
+          events.push({ type: event.type, content: event.content });
+        }
+      })();
+
+      // Generator body starts synchronously on the first .next() call inside for await;
+      // proc.stdout listener is set up — emit the result event to schedule the grace timer
+      mockProc.stdout.write(`${resultEvent('s-1')}\n`);
+
+      // Advance past the 30-second grace period
+      vi.advanceTimersByTime(30_001);
+
+      // Emit close to terminate the generator (in production, SIGKILL forces this)
+      mockProc.stdout.end();
+      mockProc.stderr.end();
+      mockProc.emit('close', 0);
+
+      await collectPromise;
+
+      expect(mockProc.kill).toHaveBeenCalledWith('SIGKILL');
       vi.useRealTimers();
     });
 
