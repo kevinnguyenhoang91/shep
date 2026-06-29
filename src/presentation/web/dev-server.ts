@@ -107,7 +107,7 @@ function openBrowser(url: string): void {
 
 async function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const socket = net.createConnection({ host: 'localhost', port });
+    const socket = net.createConnection({ host: '0.0.0.0', port });
     socket.on('connect', () => {
       socket.destroy();
       resolve(false); // Port is in use
@@ -240,7 +240,7 @@ async function main() {
   }
 
   // Start Next.js dev server
-  const app = next({ dev: true, dir: import.meta.dirname, hostname: 'localhost', port });
+  const app = next({ dev: true, dir: import.meta.dirname, hostname: '0.0.0.0', port });
   const handle = app.getRequestHandler();
   await app.prepare();
 
@@ -255,8 +255,8 @@ async function main() {
 
   await new Promise<void>((resolve, reject) => {
     server.on('error', reject);
-    server.listen(port, 'localhost', () => {
-      console.log(`[dev-server] Ready at http://localhost:${port}`);
+    server.listen(port, '0.0.0.0', () => {
+      console.log(`[dev-server] Ready at http://0.0.0.0:${port}`);
       resolve();
     });
   });
@@ -265,7 +265,7 @@ async function main() {
   // BROWSER=none (matches the Create React App / Vite convention) so
   // CI, tmux panes, and headless SSH sessions don't spawn a browser.
   if (process.env.BROWSER !== 'none') {
-    openBrowser(`http://localhost:${port}`);
+    openBrowser(`http://0.0.0.0:${port}`);
   }
 
   // Graceful shutdown with timeout to avoid hanging on open connections

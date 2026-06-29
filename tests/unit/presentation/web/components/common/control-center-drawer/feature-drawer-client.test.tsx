@@ -17,6 +17,7 @@ const mockStopFeature = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockUpdateFeaturePinnedConfig = vi.fn();
+const mockUseArtifactFetch = vi.fn((..._args: unknown[]) => false);
 
 let mockPathname = '/feature/feat-1';
 
@@ -205,7 +206,8 @@ vi.mock('@/components/ui/tooltip', () => ({
 }));
 
 vi.mock('@/components/common/control-center-drawer/use-artifact-fetch', () => ({
-  useArtifactFetch: () => false,
+  useArtifactFetch: (featureId: string | null, ...rest: unknown[]) =>
+    mockUseArtifactFetch(featureId, ...rest),
 }));
 
 vi.mock('@/components/common/control-center-drawer/use-drawer-sync', () => ({
@@ -243,6 +245,7 @@ function createView(overrides: Partial<FeatureNodeData> = {}): DrawerView {
 describe('FeatureDrawerClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseArtifactFetch.mockReturnValue(false);
     mockPathname = '/feature/feat-1';
     mockApproveFeature.mockResolvedValue({ approved: true });
     mockGetFeatureArtifact.mockResolvedValue({});
@@ -253,6 +256,7 @@ describe('FeatureDrawerClient', () => {
     mockStartFeature.mockResolvedValue({});
     mockStopFeature.mockResolvedValue({ stopped: true });
     mockUpdateFeaturePinnedConfig.mockResolvedValue({ ok: true });
+    mockUseArtifactFetch.mockReturnValue(false);
   });
 
   it('blocks continuation actions while the pinned config save is in flight and patches local node data after success', async () => {
@@ -289,6 +293,74 @@ describe('FeatureDrawerClient', () => {
     expect(mockUpdateFeaturePinnedConfig).toHaveBeenCalledWith('feat-1', 'codex-cli', 'gpt-5.4');
   });
 
+  describe('tech/product artifact fetch lifecycle gating', () => {
+    /**
+     * Regression test for: Tech Decisions and Product tabs empty in review/maintain.
+     * techFeatureId must be set (non-null) for implementation, review, and maintain
+     * so that useArtifactFetch actually fires for all phases where the tabs are visible.
+     */
+    it.each([
+      ['implementation', 'running'],
+      ['review', 'action-required'],
+      ['maintain', 'done'],
+    ] as const)(
+      'fetches tech/product artifacts when lifecycle=%s (tabs are visible)',
+      (lifecycle, state) => {
+        mockUseArtifactFetch.mockReturnValue(false);
+
+        render(<FeatureDrawerClient view={createView({ lifecycle, state })} />);
+
+        // useArtifactFetch is called for prd, tech, techProduct, and merge.
+        // The tech and techProduct calls (indices 1 and 2) must receive a
+        // non-null featureId so data is actually fetched.
+        const calls = mockUseArtifactFetch.mock.calls;
+        // Find tech artifact calls (getResearchArtifact and getFeatureArtifact
+        // are the fetchers passed to calls 1 and 2).
+        const techCall = calls[1]; // second useArtifactFetch call = tech decisions
+        const productCall = calls[2]; // third useArtifactFetch call = tech product
+        expect(techCall[0]).toBe('feat-1'); // featureId must not be null
+        expect(productCall[0]).toBe('feat-1'); // product featureId must not be null
+      }
+    );
+
+    it.each([
+      ['implementation', 'running'],
+      ['review', 'action-required'],
+      ['maintain', 'done'],
+    ] as const)(
+      'does not fetch tech/product artifacts for fast-mode features when lifecycle=%s',
+      (lifecycle, state) => {
+        mockUseArtifactFetch.mockReturnValue(false);
+
+        render(<FeatureDrawerClient view={createView({ lifecycle, state, fastMode: true })} />);
+
+        const calls = mockUseArtifactFetch.mock.calls;
+        const techCall = calls[1];
+        const productCall = calls[2];
+        expect(techCall[0]).toBeNull(); // fast-mode: featureId must be null → no fetch
+        expect(productCall[0]).toBeNull(); // fast-mode: product featureId must be null → no fetch
+      }
+    );
+
+    it('does not fetch tech/product artifacts for early phases (requirements/research)', () => {
+      for (const lifecycle of ['requirements', 'research'] as const) {
+        mockUseArtifactFetch.mockClear();
+        mockUseArtifactFetch.mockReturnValue(false);
+
+        const { unmount } = render(
+          <FeatureDrawerClient view={createView({ lifecycle, state: 'running' })} />
+        );
+
+        const calls = mockUseArtifactFetch.mock.calls;
+        const techCall = calls[1];
+        const productCall = calls[2];
+        expect(techCall[0]).toBeNull(); // early phase: featureId must be null → no fetch
+        expect(productCall[0]).toBeNull(); // early phase: product featureId must be null → no fetch
+        unmount();
+      }
+    });
+  });
+
   it('rolls back to the last saved pinned config and shows the save error when persistence fails', async () => {
     const user = userEvent.setup();
     const deferred = createDeferred<{ ok: boolean; error?: string }>();
@@ -314,5 +386,41 @@ describe('FeatureDrawerClient', () => {
     });
 
     expect(mockToastError).toHaveBeenCalledWith('Could not save pinned config');
+  });
+
+  it('does not fetch tech artifacts for fast-mode implementation features', () => {
+    render(
+      <FeatureDrawerClient
+        view={createView({
+          lifecycle: 'implementation',
+          state: 'running',
+          fastMode: true,
+          specPath: '/tmp/repo/specs/feat-1',
+        })}
+      />
+    );
+
+    const latestCycle = mockUseArtifactFetch.mock.calls.slice(-4);
+    expect(latestCycle).toHaveLength(4);
+    expect(latestCycle[1]?.[0]).toBeNull();
+    expect(latestCycle[2]?.[0]).toBeNull();
+  });
+
+  it('fetches tech artifacts for spec-mode implementation features with a spec path', () => {
+    render(
+      <FeatureDrawerClient
+        view={createView({
+          lifecycle: 'implementation',
+          state: 'running',
+          fastMode: false,
+          specPath: '/tmp/repo/specs/feat-1',
+        })}
+      />
+    );
+
+    const latestCycle = mockUseArtifactFetch.mock.calls.slice(-4);
+    expect(latestCycle).toHaveLength(4);
+    expect(latestCycle[1]?.[0]).toBe('feat-1');
+    expect(latestCycle[2]?.[0]).toBe('feat-1');
   });
 });
