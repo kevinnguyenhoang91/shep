@@ -4,6 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { FeatureDrawerClient } from '@/components/common/control-center-drawer/feature-drawer-client';
 import type { DrawerView } from '@/components/common/control-center-drawer/drawer-view';
 import type { FeatureNodeData } from '@/components/common/feature-node';
+// Imported (mocked) fetcher references so artifact-fetch assertions can match on
+// the fetcher argument instead of brittle positional call indices.
+import { getResearchArtifact } from '@/app/actions/get-research-artifact';
+import { getFeatureArtifact } from '@/app/actions/get-feature-artifact';
 
 const mockApproveFeature = vi.fn();
 const mockGetFeatureArtifact = vi.fn();
@@ -256,7 +260,6 @@ describe('FeatureDrawerClient', () => {
     mockStartFeature.mockResolvedValue({});
     mockStopFeature.mockResolvedValue({ stopped: true });
     mockUpdateFeaturePinnedConfig.mockResolvedValue({ ok: true });
-    mockUseArtifactFetch.mockReturnValue(false);
   });
 
   it('blocks continuation actions while the pinned config save is in flight and patches local node data after success', async () => {
@@ -293,6 +296,16 @@ describe('FeatureDrawerClient', () => {
     expect(mockUpdateFeaturePinnedConfig).toHaveBeenCalledWith('feat-1', 'codex-cli', 'gpt-5.4');
   });
 
+  // Collect the featureIds passed to useArtifactFetch grouped by fetcher, so
+  // assertions match on the fetcher (stable) rather than positional call index.
+  function artifactFetchIds(): { techIds: unknown[]; productIds: unknown[] } {
+    const calls = mockUseArtifactFetch.mock.calls;
+    return {
+      techIds: calls.filter((c) => c[1] === getResearchArtifact).map((c) => c[0]),
+      productIds: calls.filter((c) => c[1] === getFeatureArtifact).map((c) => c[0]),
+    };
+  }
+
   describe('tech/product artifact fetch lifecycle gating', () => {
     /**
      * Regression test for: Tech Decisions and Product tabs empty in review/maintain.
@@ -310,16 +323,13 @@ describe('FeatureDrawerClient', () => {
 
         render(<FeatureDrawerClient view={createView({ lifecycle, state })} />);
 
-        // useArtifactFetch is called for prd, tech, techProduct, and merge.
-        // The tech and techProduct calls (indices 1 and 2) must receive a
-        // non-null featureId so data is actually fetched.
-        const calls = mockUseArtifactFetch.mock.calls;
-        // Find tech artifact calls (getResearchArtifact and getFeatureArtifact
-        // are the fetchers passed to calls 1 and 2).
-        const techCall = calls[1]; // second useArtifactFetch call = tech decisions
-        const productCall = calls[2]; // third useArtifactFetch call = tech product
-        expect(techCall[0]).toBe('feat-1'); // featureId must not be null
-        expect(productCall[0]).toBe('feat-1'); // product featureId must not be null
+        // Match calls by their fetcher argument (not positional index) so the
+        // assertion survives reordering/adding artifact fetches. Tech decisions
+        // use getResearchArtifact; product uses getFeatureArtifact (shared with
+        // the PRD fetch, which is null in these phases).
+        const { techIds, productIds } = artifactFetchIds();
+        expect(techIds).toContain('feat-1'); // tech featureId must not be null
+        expect(productIds).toContain('feat-1'); // product featureId must not be null
       }
     );
 
@@ -334,11 +344,10 @@ describe('FeatureDrawerClient', () => {
 
         render(<FeatureDrawerClient view={createView({ lifecycle, state, fastMode: true })} />);
 
-        const calls = mockUseArtifactFetch.mock.calls;
-        const techCall = calls[1];
-        const productCall = calls[2];
-        expect(techCall[0]).toBeNull(); // fast-mode: featureId must be null → no fetch
-        expect(productCall[0]).toBeNull(); // fast-mode: product featureId must be null → no fetch
+        const { techIds, productIds } = artifactFetchIds();
+        // fast-mode: tech/product fetches must never receive a featureId.
+        expect(techIds.every((id) => id === null)).toBe(true);
+        expect(productIds.every((id) => id === null)).toBe(true);
       }
     );
 
@@ -351,11 +360,10 @@ describe('FeatureDrawerClient', () => {
           <FeatureDrawerClient view={createView({ lifecycle, state: 'running' })} />
         );
 
-        const calls = mockUseArtifactFetch.mock.calls;
-        const techCall = calls[1];
-        const productCall = calls[2];
-        expect(techCall[0]).toBeNull(); // early phase: featureId must be null → no fetch
-        expect(productCall[0]).toBeNull(); // early phase: product featureId must be null → no fetch
+        const { techIds, productIds } = artifactFetchIds();
+        // early phase: tech/product fetches must never receive a featureId.
+        expect(techIds.every((id) => id === null)).toBe(true);
+        expect(productIds.every((id) => id === null)).toBe(true);
         unmount();
       }
     });

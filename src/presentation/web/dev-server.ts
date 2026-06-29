@@ -107,7 +107,9 @@ function openBrowser(url: string): void {
 
 async function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const socket = net.createConnection({ host: '0.0.0.0', port });
+    // Probe the loopback address, not the bind meta-address. 0.0.0.0 is a
+    // bind-only address and gives unreliable connect results across platforms.
+    const socket = net.createConnection({ host: '127.0.0.1', port });
     socket.on('connect', () => {
       socket.destroy();
       resolve(false); // Port is in use
@@ -255,8 +257,10 @@ async function main() {
 
   await new Promise<void>((resolve, reject) => {
     server.on('error', reject);
+    // Bind to 0.0.0.0 so the dev server is reachable from other hosts/containers,
+    // but advertise localhost — 0.0.0.0 is not a routable browser destination.
     server.listen(port, '0.0.0.0', () => {
-      console.log(`[dev-server] Ready at http://0.0.0.0:${port}`);
+      console.log(`[dev-server] Ready at http://localhost:${port}`);
       resolve();
     });
   });
@@ -265,7 +269,7 @@ async function main() {
   // BROWSER=none (matches the Create React App / Vite convention) so
   // CI, tmux panes, and headless SSH sessions don't spawn a browser.
   if (process.env.BROWSER !== 'none') {
-    openBrowser(`http://0.0.0.0:${port}`);
+    openBrowser(`http://localhost:${port}`);
   }
 
   // Graceful shutdown with timeout to avoid hanging on open connections
