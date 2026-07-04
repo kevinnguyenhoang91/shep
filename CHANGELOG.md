@@ -4,6 +4,41 @@
   </a>
 </p>
 
+# 🚀 Shep [v1.217.0](/compare/v1.216.0...v1.217.0) · _2026-07-04_
+
+> _Under the hood_ maintenance keeps the gears turning — no user-facing changes in this release.
+
+
+
+### ✨ Features
+
+* **agents:** add Claude Fable 5 and Sonnet 5 to model catalog ([#820](https://github.com/shep-ai/shep/issues/820)) ([3099efb](https://github.com/shep-ai/shep/commit/3099efb49b3491b1e27fffd9a3e0df5cb3ec1c50))
+
+
+## 📦 Install or update
+
+```bash
+# upgrade an existing install
+npm i -g @shepai/cli@1.217.0
+
+# or run instantly without installing
+npx @shepai/cli@latest
+```
+
+## 💬 Join the community
+
+[💬 **Discord**](https://discord.gg/ES6tdVFfur) · [📖 **Docs**](https://github.com/shep-ai/shep#readme) · [⭐ **Star on GitHub**](https://github.com/shep-ai/shep) · [🐛 **Report an issue**](https://github.com/shep-ai/shep/issues)
+
+---
+
+<sub>🤖 Released autonomously by Shep — built by parallel AI agents working in isolated git worktrees. Try it: `npx @shepai/cli`</sub>
+
+<p align="center">
+  <a href="https://github.com/shep-ai/shep">
+    <img src="https://raw.githubusercontent.com/shep-ai/shep/main/docs/screenshots/shep-card.jpg" alt="Shep — run multiple AI agents in parallel" width="720" />
+  </a>
+</p>
+
 # 🚀 Shep [v1.216.0](/compare/v1.215.2...v1.216.0) · _2026-07-01_
 
 > _Housekeeping under the hood_ — no user-facing changes, just keeping the codebase tidy.
