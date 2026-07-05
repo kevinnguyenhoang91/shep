@@ -7,6 +7,8 @@ function createService(): IDeploymentService {
   return {
     setDatabase: vi.fn(),
     recoverAll: vi.fn(),
+    setTransientState: vi.fn(),
+    appendLog: vi.fn(),
     start: vi.fn(),
     stop: vi.fn().mockResolvedValue(undefined),
     getStatus: vi.fn().mockReturnValue(null),
