@@ -4,6 +4,50 @@
   </a>
 </p>
 
+# 🚀 Shep [v1.219.0](/compare/v1.218.1...v1.219.0) · _2026-07-17_
+
+> Your organization does not have access to Claude. Please login again or contact your administrator.
+
+
+
+### ✨ Features
+
+* **web:** add package grouping toggle to skills page ([#828](https://github.com/shep-ai/shep/issues/828)) ([1ea52e8](https://github.com/shep-ai/shep/commit/1ea52e8fc4903998401e666d3e03942091a2b855))
+
+  ![grouped-on](https://raw.githubusercontent.com/shep-ai/shep/v1.219.0/specs/104-skills-grouping-toggle/evidence/app-skills-grouped-on.png)
+  ![grouped-off](https://raw.githubusercontent.com/shep-ai/shep/v1.219.0/specs/104-skills-grouping-toggle/evidence/app-skills-grouped-off.png)
+  ![package-group-detail](https://raw.githubusercontent.com/shep-ai/shep/v1.219.0/specs/104-skills-grouping-toggle/evidence/app-skills-package-group-detail.png)
+
+
+### 🐛 Bug Fixes
+
+* **release:** reject overused release note openers and retry ([#829](https://github.com/shep-ai/shep/issues/829)) ([b5cc0ec](https://github.com/shep-ai/shep/commit/b5cc0ecfba74293e634ea64a4e743aeab398601a))
+
+
+## 📦 Install or update
+
+```bash
+# upgrade an existing install
+npm i -g @shepai/cli@1.219.0
+
+# or run instantly without installing
+npx @shepai/cli@latest
+```
+
+## 💬 Join the community
+
+[💬 **Discord**](https://discord.gg/ES6tdVFfur) · [📖 **Docs**](https://github.com/shep-ai/shep#readme) · [⭐ **Star on GitHub**](https://github.com/shep-ai/shep) · [🐛 **Report an issue**](https://github.com/shep-ai/shep/issues)
+
+---
+
+<sub>🤖 Released autonomously by Shep — built by parallel AI agents working in isolated git worktrees. Try it: `npx @shepai/cli`</sub>
+
+<p align="center">
+  <a href="https://github.com/shep-ai/shep">
+    <img src="https://raw.githubusercontent.com/shep-ai/shep/main/docs/screenshots/shep-card.jpg" alt="Shep — run multiple AI agents in parallel" width="720" />
+  </a>
+</p>
+
 # 🚀 Shep [v1.218.1](/compare/v1.218.0...v1.218.1) · _2026-07-11_
 
 > _Keeping the lights on_ — internal maintenance and housekeeping to keep Shep humming.
