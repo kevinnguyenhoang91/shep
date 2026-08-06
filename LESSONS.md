@@ -1,5 +1,28 @@
 # Lessons Learned
 
+## `git stash push` ignores untracked files — never use it as a "make the tree clean" primitive
+
+`RebaseFeatureOnMainUseCase` stashed before rebasing, so a dirty worktree was supposed to be
+handled. It wasn't: `git stash push` (no `-u`) leaves untracked files in place, so a worktree
+holding only new files stayed dirty, `hasUncommittedChanges` (which reads `git status --porcelain`,
+and DOES report `??` entries) still returned true, and the rebase aborted with "Cannot rebase:
+working directory has uncommitted changes" — the exact error the stash was added to prevent. The
+stash/pop pair also has a second failure mode: a pop that conflicts strands work outside the branch.
+
+Rules:
+
+1. **To guarantee a clean tree before a git operation, commit — don't stash.** A commit lands on the
+   branch, survives every subsequent failure, and is undone with `git reset --soft HEAD~1`.
+   `SyncFeatureBranchUseCase` is the shared commit-then-rebase workflow; use it instead of
+   reimplementing the dance.
+2. **If you must stash, `-u` is mandatory** — and remember `git status --porcelain` and
+   `git stash push` disagree about what "dirty" means. Any guard that pairs them is a latent bug.
+3. **Automated commits pass `{ noVerify: true }` to `commitAll`.** The target repo's pre-commit
+   linter or commitlint rules must never be able to block Shep's own housekeeping commit.
+4. **Test the untracked-file case with real git.** Every mock-based test passed; only
+   `tests/integration/application/use-cases/features/sync-feature-branch.use-case.test.ts` (real
+   repo, real remote, untracked file) reproduces it.
+
 ## A second surface for an entity must offer the same actions — parity is part of the feature
 
 Spec 106 added the session-tree sub-nav as a second way to browse repositories, but the rows were
@@ -1410,6 +1433,30 @@ independent causes, both invisible to the type system:
 - Component tests that only feed canonical enum values prove nothing about
   production data. Add a case using the value the DB actually holds
   (`sqlite3 ~/.shep/data "select default_mode from settings"` — check it).
+
+## A unit test that spawns a real binary is a timeout waiting for CPU contention
+
+`project-memory-section.test.ts` passed alone in 22s and failed in the full
+suite with `Test timed out in 60000ms` — on a *synchronous* test body. The cause
+was not the test but what it reached: `FeatureContextBuilder.buildContext()`
+builds its CLI-reference section with `execFileSync('shep', ['--help'])` plus
+one `execFileSync('shep', [cmd, '--help'])` per subcommand. With shep installed
+in PATH that is dozens of real CLI boots inside a "unit" test; with shep absent
+it silently takes the `catch` branch instead. Either way the assertions under
+test (the project-memory block) never needed a subprocess.
+
+**Rules:**
+- A test under `tests/unit/` must not spawn a process, touch the network, or
+  depend on what is installed in PATH. If the code under test does, mock the
+  boundary (`vi.mock('node:child_process', ...)`) — do not raise the timeout.
+- Diagnose a timeout on a synchronous test body as hidden I/O, never as
+  flakiness. Sync code cannot time out on its own; something under it blocked.
+- A test that passes in isolation and fails in the full suite is a resource
+  problem, not a fluke. Compare its solo duration against the timeout: 22s of
+  a 60s budget leaves no headroom once workers compete for CPU.
+- Machine-dependent branches (`try { spawn } catch { fallback }`) make a test
+  assert different things on CI than on a dev box. Pin the branch explicitly.
+
 
 ## An event-only invariant strands state the moment nobody is listening
 
