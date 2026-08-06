@@ -507,6 +507,7 @@
   },
   "repositoryNode": {
     "removeRepository": "Удалить репозиторий",
+    "removeFailed": "Не удалось удалить репозиторий",
     "removeConfirmTitle": "Удалить репозиторий?",
     "removeConfirmDescription": "Это удалит <strong>{{name}}</strong> и все его функции из рабочего пространства.",
     "removeConfirmDescriptionKeepFiles": "Файлы репозитория на диске не будут затронуты.",
@@ -517,6 +518,10 @@
     "openInIde": "Открыть в IDE",
     "openInShell": "Открыть в терминале",
     "openFolder": "Открыть папку",
+    "openRepository": "Открыть репозиторий",
+    "webhookEnable": "Включить вебхук",
+    "webhookDisable": "Отключить вебхук",
+    "webhookUnavailable": "Вебхук недоступен — туннель не запущен",
     "chatWithAgent": "Чат с агентом",
     "newFeature": "Новая функция",
     "new": "Новая",
@@ -534,6 +539,7 @@
     "createNew": "Создать новое",
     "newFeature": "Новая функция",
     "localFolder": "Локальная папка",
+    "folderOfRepos": "Папка с репозиториями",
     "adoptBranch": "Принять ветку",
     "fromGithub": "Из GitHub",
     "newApplication": "Новое приложение",
@@ -894,5 +900,30 @@
     "scope": {
       "organization": "Organization"
     }
+  },
+  "sessionTree": {
+    "title": "Сессии",
+    "loading": "Загрузка сессий…",
+    "empty": "Пока нет отслеживаемых репозиториев",
+    "noSessions": "Нет сессий",
+    "notConverted": "Не преобразованы",
+    "showArchived": "Показать архив",
+    "hideArchived": "Скрыть архив",
+    "refresh": "Обновить",
+    "collapseAll": "Свернуть все",
+    "expandAll": "Развернуть все",
+    "collapsePanel": "Свернуть панель",
+    "expandPanel": "Развернуть панель",
+    "sessionActions": "Действия сессии",
+    "repositoryActions": "Действия с репозиторием",
+    "archive": "В архив",
+    "unarchive": "Восстановить",
+    "delete": "Удалить расшифровку…",
+    "deleteConfirmTitle": "Удалить эту расшифровку?",
+    "deleteConfirmDescription": "Файл беседы будет безвозвратно удалён с диска. Отменить нельзя, и shep не владеет этим файлом.",
+    "deleteConfirm": "Удалить безвозвратно",
+    "deleteAdoptedNote": "Функция, созданная из этой сессии, не будет удалена.",
+    "cancel": "Отмена",
+    "archivedHidden": "Скрыто в архиве: {{count}}"
   }
 }

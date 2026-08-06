@@ -148,6 +148,8 @@ import { ListToolsUseCase } from '../../../application/use-cases/tools/list-tool
 import { LaunchToolUseCase } from '../../../application/use-cases/tools/launch-tool.use-case.js';
 import { LaunchIdeUseCase } from '../../../application/use-cases/ide/launch-ide.use-case.js';
 import { AddRepositoryUseCase } from '../../../application/use-cases/repositories/add-repository.use-case.js';
+import { DiscoverImportCandidatesUseCase } from '../../../application/use-cases/repositories/discover-import-candidates.use-case.js';
+import { ImportLocalRepositoriesUseCase } from '../../../application/use-cases/repositories/import-local-repositories.use-case.js';
 import { CreateProjectUseCase } from '../../../application/use-cases/projects/create-project.use-case.js';
 import { CheckAgentAuthUseCase } from '../../../application/use-cases/agents/check-agent-auth.use-case.js';
 import { ListRepositoriesUseCase } from '../../../application/use-cases/repositories/list-repositories.use-case.js';
@@ -182,6 +184,13 @@ import { ReadApplicationFileRawUseCase } from '../../../application/use-cases/ap
 import { WriteApplicationFileUseCase } from '../../../application/use-cases/applications/write-application-file.use-case.js';
 import { WatchApplicationFilesUseCase } from '../../../application/use-cases/applications/watch-application-files.use-case.js';
 import { ListAgentSessionsUseCase } from '../../../application/use-cases/agents/list-agent-sessions.use-case.js';
+import { ListSessionsForPathsUseCase } from '../../../application/use-cases/agents/list-sessions-for-paths.use-case.js';
+import { BuildSessionTreeUseCase } from '../../../application/use-cases/agents/build-session-tree.use-case.js';
+import { ArchiveAgentSessionUseCase } from '../../../application/use-cases/agents/archive-agent-session.use-case.js';
+import { DeleteAgentSessionUseCase } from '../../../application/use-cases/agents/delete-agent-session.use-case.js';
+import { SessionAdoptionSummarizer } from '../../../application/use-cases/agents/session-adoption-summarizer.js';
+import { AdoptAgentSessionUseCase } from '../../../application/use-cases/agents/adopt-agent-session.use-case.js';
+import { ResumeAgentSessionUseCase } from '../../../application/use-cases/agents/resume-agent-session.use-case.js';
 import { GetAgentSessionUseCase } from '../../../application/use-cases/agents/get-agent-session.use-case.js';
 import { StreamAgentEventsUseCase } from '../../../application/use-cases/agents/stream-agent-events.use-case.js';
 
@@ -304,6 +313,8 @@ export function registerUseCases(container: DependencyContainer): void {
   container.registerSingleton(WriteApplicationFileUseCase);
   container.registerSingleton(WatchApplicationFilesUseCase);
   container.registerSingleton(AddRepositoryUseCase);
+  container.registerSingleton(DiscoverImportCandidatesUseCase);
+  container.registerSingleton(ImportLocalRepositoriesUseCase);
   container.registerSingleton(CreateProjectUseCase);
   container.registerSingleton(CheckAgentAuthUseCase);
   container.registerSingleton(ListRepositoriesUseCase);
@@ -334,6 +345,13 @@ export function registerUseCases(container: DependencyContainer): void {
   container.registerSingleton(ResumeApplicationWorkflowUseCase);
   container.registerSingleton(UpdateApplicationUseCase);
   container.registerSingleton(ListAgentSessionsUseCase);
+  container.registerSingleton(ListSessionsForPathsUseCase);
+  container.registerSingleton(BuildSessionTreeUseCase);
+  container.registerSingleton(ArchiveAgentSessionUseCase);
+  container.registerSingleton(DeleteAgentSessionUseCase);
+  container.registerSingleton(SessionAdoptionSummarizer);
+  container.registerSingleton(AdoptAgentSessionUseCase);
+  container.registerSingleton(ResumeAgentSessionUseCase);
   container.registerSingleton(GetAgentSessionUseCase);
   container.registerSingleton(StreamAgentEventsUseCase);
 
@@ -439,6 +457,30 @@ export function registerUseCases(container: DependencyContainer): void {
   });
   container.register('AddRepositoryUseCase', {
     useFactory: (c) => c.resolve(AddRepositoryUseCase),
+  });
+  container.register('ListSessionsForPathsUseCase', {
+    useFactory: (c) => c.resolve(ListSessionsForPathsUseCase),
+  });
+  container.register('BuildSessionTreeUseCase', {
+    useFactory: (c) => c.resolve(BuildSessionTreeUseCase),
+  });
+  container.register('ArchiveAgentSessionUseCase', {
+    useFactory: (c) => c.resolve(ArchiveAgentSessionUseCase),
+  });
+  container.register('DeleteAgentSessionUseCase', {
+    useFactory: (c) => c.resolve(DeleteAgentSessionUseCase),
+  });
+  container.register('AdoptAgentSessionUseCase', {
+    useFactory: (c) => c.resolve(AdoptAgentSessionUseCase),
+  });
+  container.register('ResumeAgentSessionUseCase', {
+    useFactory: (c) => c.resolve(ResumeAgentSessionUseCase),
+  });
+  container.register('DiscoverImportCandidatesUseCase', {
+    useFactory: (c) => c.resolve(DiscoverImportCandidatesUseCase),
+  });
+  container.register('ImportLocalRepositoriesUseCase', {
+    useFactory: (c) => c.resolve(ImportLocalRepositoriesUseCase),
   });
   container.register('CreateProjectUseCase', {
     useFactory: (c) => c.resolve(CreateProjectUseCase),

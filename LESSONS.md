@@ -1,5 +1,96 @@
 # Lessons Learned
 
+## A second surface for an entity must offer the same actions — parity is part of the feature
+
+Spec 106 added the session-tree sub-nav as a second way to browse repositories, but the rows were
+read-only: every action (IDE, shell, folder, webhook, chat, new feature, dev server, remove) still
+required going back to the canvas card. The user's report was one sentence: "we should be able to do
+the same actions we can do on the canvas on a repo."
+
+Rules:
+
+1. **When you add a second surface onto an existing entity, the action set is part of the scope, not
+   a follow-up.** Ask "what can the user do to this thing on the surface that already exists?" and
+   answer all of it, or say explicitly which parts you left out and why.
+2. **Two surfaces means the action list gets extracted, not copied.** `repository-actions.ts` is a
+   pure builder (labels, tones, loading/disabled rules) that both the canvas toolbar and the tree
+   dropdown consume via `useRepositoryCardActions`. The payoff is the invariant: an action added
+   there appears on both surfaces, and it is unit-testable without React, routers, or providers.
+3. **Anything the new surface renders per row must be lazy.** The tree renders one action menu per
+   repository. Mounting the hooks eagerly fired a webhook probe and a deployment hydration for all
+   22 rows on every tree load. Putting the hook-bearing component *inside* `DropdownMenuContent`
+   fixes it for free — Radix unmounts closed content — and a test asserting `fetch` is untouched
+   before the menu opens keeps it that way.
+
+## Provider access is a layout decision — check the React tree before promising a shared action
+
+The session tree lived in `app-shell` (root layout) while `DeploymentStatusProvider` and
+`SessionsProvider` lived under the `(dashboard)` layout and inside `ControlCenter`. `useDeployAction`
+falls back to a **silent no-op store** when its provider is absent, so a Start Dev Server button in
+the tree would have rendered, clicked, and done nothing — no error, no log. Moving the panel into the
+`(dashboard)` layout put it inside both providers and let the route-gate module
+(`session-tree-visibility.ts`) be deleted outright: the layout boundary already answers "which routes
+show the tree", and it cannot be wrong.
+
+Rules:
+
+1. **Before wiring a shared action into a new surface, verify the provider is an ancestor of that
+   surface** — not merely "somewhere in the app". Optional-context hooks with no-op fallbacks
+   (`useDeploymentStatusContextOptional`, `useSessionsContext`) fail silently by design.
+2. **Prefer moving the consumer into the provider's subtree over mounting a second provider.** Two
+   stores for the same data means the same Run button shows different state on two surfaces.
+3. **A route-group layout is a better route gate than a path list.** If chrome belongs to every route
+   in a group, render it in that group's `layout.tsx` and delete the predicate.
+
+## A new Feature column needs FOUR edits, and the mapper test won't catch the missing one
+
+Adding `sourceAgentSessionId`/`sourceAgentType` (spec 105) needed: the TypeSpec model, the
+migration, `feature.mapper.ts`, **and** the explicit column lists in
+`sqlite-feature.repository.ts`. I did the first three, and the mapper unit test passed happily —
+because `toDatabase()` produced the fields correctly. But `INSERT` and `UPDATE` in the repository
+enumerate every column by name (`active_plugins, ...` / `active_plugins = @active_plugins`), so the
+new fields were silently dropped on the way to SQLite. Only a repository-level round-trip test
+(`create` → `findById`) exposed it.
+
+**Rule:** when adding a persisted field, write the assertion at the **repository** level, not the
+mapper level. A mapper test proves the object was shaped right; it proves nothing about whether the
+SQL carries it. Grep the repository for a neighbouring column name (e.g. `active_plugins`) and
+confirm you've added yours to every list that mentions it — there are three: INSERT columns, INSERT
+`@params`, and the UPDATE `SET` clause.
+
+## `startsWith('/')` is not an absolute-path check — CI runs windows-latest
+
+I guarded two use cases with `if (!path.startsWith('/'))`. `normalizePath` converts backslashes to
+forward slashes, so a valid Windows path arrives as `C:/Users/dev/project` — which fails that check,
+meaning bulk import would have rejected every path on Windows. Local tests all passed because they
+used POSIX fixtures.
+
+**Rule:** use `domain/shared/absolute-path.ts` (`isAbsolutePath`) for absolute-path validation, never
+a `startsWith('/')` literal. When adding any path predicate, add a Windows drive-letter case to the
+test in the same commit — `src/CLAUDE.md` and `packages/CLAUDE.md` both mandate cross-platform
+behaviour, and macOS-only test runs will not tell you.
+
+## Adding one key to `translations/en/*.json` breaks eight other locales
+
+Adding the `commands.repo.import.*` keys to `en/cli.json` turned
+`tests/unit/translations/translation-completeness.test.ts` red with 8 failures — it asserts key
+parity between English and each of de, fr, es, pt, ru, uk, ar, he.
+
+**Rule:** i18n keys are added to all nine locale files in the same change, never English-only. Read
+the key order from the English file and write the same ordered keys into each locale so the diff
+stays reviewable.
+
+## `pnpm tsp:compile` leaves the generated file unformatted — use `pnpm tsp:codegen`
+
+Running `tsp:compile` as a validation step rewrote
+`packages/core/src/domain/generated/output.ts` with double quotes, producing a 500-line phantom diff
+that looks like codegen drift. `tsp:codegen` is `tsp compile` **plus** `prettier --write` on the
+generated directory.
+
+**Rule:** always regenerate with `pnpm tsp:codegen`. If `tsp:compile` has already dirtied the
+generated file, run `pnpm tsp:codegen` to restore it rather than reverting — and don't mistake the
+quote-style churn for a real model change.
+
 ## New files under `domain/` must NOT use `.js` extensions in relative imports
 
 Adding `domain/shared/worktree-config.ts` (spec-less feature for issue #833), I wrote
@@ -1286,3 +1377,36 @@ toggling `colorScheme` / `document.documentElement.classList.add('dark')` for
 dark mode. Commit PNGs under an `evidence/` dir and embed in the PR comment
 via `https://github.com/<owner>/<repo>/blob/<branch>/<path>.png?raw=true`
 (renders inline for authorized viewers, private repos included).
+
+## Two vocabularies for the same concept = a silently wrong default
+
+The create drawer's Fast/Spec picker showed **nothing** selected and every
+web-created feature ran the spec workflow even when Fast was clicked. Two
+independent causes, both invisible to the type system:
+
+1. **Casing drift between a persisted label and a domain enum.**
+   `settings.workflow.defaultMode` predates `BuildMode` and stores
+   `'Regular' | 'Fast' | 'Exploration'`; the enum is lowercase
+   (`'fast' | 'spec' | ...`). Consumers wrote `defaultMode as BuildMode` and
+   `defaultMode !== 'spec'` — both compile, both are always wrong. Fix:
+   `normalizeBuildMode()` in `domain/shared/build-mode.ts` is the ONE bridge;
+   every reader funnels through it.
+2. **A field renamed at a layer boundary and dropped by an object spread.**
+   The web action forwarded `...(mode ? { mode } : {})` while
+   `CreateFeatureUseCase` reads `buildMode`. Excess-property checking does NOT
+   apply to spread properties, so TS never flagged it and the mode vanished.
+
+**Rules:**
+- Never write `someString as SomeEnum`. If a stored value must become an enum,
+  route it through a normalizer that handles legacy spellings and has a
+  documented fallback — and unit-test the legacy spellings, not just the
+  canonical ones.
+- A UI picker whose "selected" state is `value === option` MUST render exactly
+  one pressed option for ANY input. Collapse out-of-range/legacy values onto a
+  renderable option instead of letting the group render all-unpressed.
+- When wiring a payload across a layer boundary, grep the *receiving* type for
+  the field name. `...(x ? { x } : {})` into a typed parameter is an
+  unchecked hole — a typo or rename there fails silently at runtime.
+- Component tests that only feed canonical enum values prove nothing about
+  production data. Add a case using the value the DB actually holds
+  (`sqlite3 ~/.shep/data "select default_mode from settings"` — check it).

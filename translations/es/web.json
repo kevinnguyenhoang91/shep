@@ -507,6 +507,7 @@
   },
   "repositoryNode": {
     "removeRepository": "Eliminar repositorio",
+    "removeFailed": "No se pudo eliminar el repositorio",
     "removeConfirmTitle": "¿Eliminar repositorio?",
     "removeConfirmDescription": "Esto eliminará <strong>{{name}}</strong> y todas sus funciones del espacio de trabajo.",
     "removeConfirmDescriptionKeepFiles": "Los archivos del repositorio en disco no se verán afectados.",
@@ -517,6 +518,10 @@
     "openInIde": "Abrir en IDE",
     "openInShell": "Abrir en terminal",
     "openFolder": "Abrir carpeta",
+    "openRepository": "Abrir repositorio",
+    "webhookEnable": "Activar webhook",
+    "webhookDisable": "Desactivar webhook",
+    "webhookUnavailable": "Webhook no disponible — el túnel no está activo",
     "chatWithAgent": "Chat con agente",
     "newFeature": "Nueva función",
     "new": "Nueva",
@@ -534,6 +539,7 @@
     "createNew": "Crear nuevo",
     "newFeature": "Nueva función",
     "localFolder": "Carpeta local",
+    "folderOfRepos": "Carpeta de repositorios",
     "adoptBranch": "Adoptar rama",
     "fromGithub": "Desde GitHub",
     "newApplication": "Nueva Aplicación",
@@ -894,5 +900,30 @@
     "scope": {
       "organization": "Organization"
     }
+  },
+  "sessionTree": {
+    "title": "Sesiones",
+    "loading": "Cargando sesiones…",
+    "empty": "Aún no hay repositorios rastreados",
+    "noSessions": "Sin sesiones",
+    "notConverted": "Sin convertir",
+    "showArchived": "Mostrar archivadas",
+    "hideArchived": "Ocultar archivadas",
+    "refresh": "Actualizar",
+    "collapseAll": "Contraer todo",
+    "expandAll": "Expandir todo",
+    "collapsePanel": "Contraer panel",
+    "expandPanel": "Expandir panel",
+    "sessionActions": "Acciones de sesión",
+    "repositoryActions": "Acciones del repositorio",
+    "archive": "Archivar",
+    "unarchive": "Restaurar",
+    "delete": "Eliminar transcripción…",
+    "deleteConfirmTitle": "¿Eliminar esta transcripción?",
+    "deleteConfirmDescription": "Esto elimina permanentemente el archivo de conversación del disco. No se puede deshacer, y shep no es propietario de este archivo.",
+    "deleteConfirm": "Eliminar permanentemente",
+    "deleteAdoptedNote": "La funcionalidad adoptada de esta sesión no se eliminará.",
+    "cancel": "Cancelar",
+    "archivedHidden": "{{count}} archivadas ocultas"
   }
 }

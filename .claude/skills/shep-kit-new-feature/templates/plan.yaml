@@ -17,12 +17,13 @@ phases:
     taskIds:
       - task-1
       - task-2
+  # Additional phases are added by `/shep-kit:plan` alongside their tasks in
+  # tasks.yaml. Do not reference task ids here before they exist — spec:validate
+  # fails the consistency gate on dangling taskIds.
   - id: phase-2
     name: 'Core Implementation'
     parallel: false
-    taskIds:
-      - task-3
-      - task-4
+    taskIds: []
 
 # File change tracking
 filesToCreate:

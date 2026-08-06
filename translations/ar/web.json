@@ -507,6 +507,7 @@
   },
   "repositoryNode": {
     "removeRepository": "إزالة المستودع",
+    "removeFailed": "فشل إزالة المستودع",
     "removeConfirmTitle": "إزالة المستودع؟",
     "removeConfirmDescription": "سيؤدي هذا إلى إزالة <strong>{{name}}</strong> وجميع ميزاته من مساحة العمل.",
     "removeConfirmDescriptionKeepFiles": "لن تتأثر ملفات المستودع على القرص.",
@@ -517,6 +518,10 @@
     "openInIde": "فتح في IDE",
     "openInShell": "فتح في الطرفية",
     "openFolder": "فتح المجلد",
+    "openRepository": "فتح المستودع",
+    "webhookEnable": "تمكين الويب هوك",
+    "webhookDisable": "تعطيل الويب هوك",
+    "webhookUnavailable": "الويب هوك غير متاح — النفق غير مشغّل",
     "chatWithAgent": "محادثة مع الوكيل",
     "newFeature": "ميزة جديدة",
     "new": "جديد",
@@ -534,6 +539,7 @@
     "createNew": "إنشاء جديد",
     "newFeature": "ميزة جديدة",
     "localFolder": "مجلد محلي",
+    "folderOfRepos": "مجلد مستودعات",
     "adoptBranch": "تبني فرع",
     "fromGithub": "من GitHub",
     "newApplication": "تطبيق جديد",
@@ -894,5 +900,30 @@
     "scope": {
       "organization": "Organization"
     }
+  },
+  "sessionTree": {
+    "title": "الجلسات",
+    "loading": "جارٍ تحميل الجلسات…",
+    "empty": "لا توجد مستودعات متتبعة بعد",
+    "noSessions": "لا جلسات",
+    "notConverted": "غير محوّلة",
+    "showArchived": "إظهار المؤرشفة",
+    "hideArchived": "إخفاء المؤرشفة",
+    "refresh": "تحديث",
+    "collapseAll": "طي الكل",
+    "expandAll": "توسيع الكل",
+    "collapsePanel": "طي اللوحة",
+    "expandPanel": "توسيع اللوحة",
+    "sessionActions": "إجراءات الجلسة",
+    "repositoryActions": "إجراءات المستودع",
+    "archive": "أرشفة",
+    "unarchive": "استعادة",
+    "delete": "حذف النص…",
+    "deleteConfirmTitle": "حذف هذا النص؟",
+    "deleteConfirmDescription": "سيؤدي هذا إلى إزالة ملف المحادثة نهائيًا من القرص. لا يمكن التراجع، وshep لا يملك هذا الملف.",
+    "deleteConfirm": "حذف نهائي",
+    "deleteAdoptedNote": "لن يتم حذف الميزة المستمدة من هذه الجلسة.",
+    "cancel": "إلغاء",
+    "archivedHidden": "{{count}} مؤرشفة مخفية"
   }
 }
