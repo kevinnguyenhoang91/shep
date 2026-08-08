@@ -17,6 +17,7 @@ import { archiveFeature } from '@/app/actions/archive-feature';
 import { deleteFeature } from '@/app/actions/delete-feature';
 import { resumeFeature } from '@/app/actions/resume-feature';
 import { startFeature } from '@/app/actions/start-feature';
+import { blockedStartMessage } from '@/lib/start-feature-result';
 import { stopFeature } from '@/app/actions/stop-feature';
 import { unarchiveFeature } from '@/app/actions/unarchive-feature';
 import { addRepository } from '@/app/actions/add-repository';
@@ -468,6 +469,9 @@ export function useControlCenterState(
           if (result.error) {
             updateFeature(nodeId, { state: 'pending' });
             toast.error(result.error);
+          } else if (result.blocked) {
+            updateFeature(nodeId, { state: 'blocked' });
+            toast.info(blockedStartMessage(result));
           } else {
             toast.success('Feature started');
           }

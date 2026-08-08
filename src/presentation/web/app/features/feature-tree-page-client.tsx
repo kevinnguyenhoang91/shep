@@ -67,6 +67,7 @@ import { archiveFeature } from '@/app/actions/archive-feature';
 import { unarchiveFeature } from '@/app/actions/unarchive-feature';
 import { deleteFeature } from '@/app/actions/delete-feature';
 import { startFeature } from '@/app/actions/start-feature';
+import { blockedStartMessage } from '@/lib/start-feature-result';
 import { stopFeature } from '@/app/actions/stop-feature';
 import { resumeFeature } from '@/app/actions/resume-feature';
 import { createFeature } from '@/app/actions/create-feature';
@@ -329,6 +330,8 @@ export function FeatureTreePageClient({
         const result = await startFeature(featureId);
         if (result.error) {
           toast.error(result.error);
+        } else if (result.blocked) {
+          toast.info(blockedStartMessage(result));
         } else {
           toast.success('Feature started');
         }

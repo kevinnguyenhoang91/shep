@@ -225,10 +225,10 @@ describe('StartFeatureUseCase', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Pending feature with parent not in POST_IMPLEMENTATION → Blocked, no spawn
+  // Pending feature whose parent has not completed → Blocked, no spawn
   // -------------------------------------------------------------------------
 
-  it('should transition to Blocked when parent not in POST_IMPLEMENTATION', async () => {
+  it('should transition to Blocked when the parent has not completed', async () => {
     const feature = createTestFeature({ parentId: 'parent-id' });
     const parent = createTestFeature({
       id: 'parent-id',
@@ -260,11 +260,7 @@ describe('StartFeatureUseCase', () => {
     expect(processService.spawn).not.toHaveBeenCalled();
   });
 
-  // -------------------------------------------------------------------------
-  // Pending feature with parent in POST_IMPLEMENTATION → Requirements, spawns
-  // -------------------------------------------------------------------------
-
-  it('should transition to Requirements when parent is in POST_IMPLEMENTATION', async () => {
+  it('should transition to Blocked when the parent is still implementing', async () => {
     const feature = createTestFeature({ parentId: 'parent-id' });
     const parent = createTestFeature({
       id: 'parent-id',
@@ -275,8 +271,79 @@ describe('StartFeatureUseCase', () => {
 
     const result = await useCase.execute('feat-001');
 
+    expect(result.feature.lifecycle).toBe(SdlcLifecycle.Blocked);
+    expect(processService.spawn).not.toHaveBeenCalled();
+  });
+
+  it('should transition to Blocked when the parent PR is open but not merged', async () => {
+    const feature = createTestFeature({ parentId: 'parent-id' });
+    const parent = createTestFeature({ id: 'parent-id', lifecycle: SdlcLifecycle.Review });
+    featureRepo.findById.mockResolvedValueOnce(feature).mockResolvedValueOnce(parent);
+    runRepo.findById.mockResolvedValue(createTestRun());
+
+    const result = await useCase.execute('feat-001');
+
+    expect(result.feature.lifecycle).toBe(SdlcLifecycle.Blocked);
+    expect(processService.spawn).not.toHaveBeenCalled();
+  });
+
+  it('should report why the feature was blocked instead of started', async () => {
+    const feature = createTestFeature({ parentId: 'parent-id' });
+    const parent = createTestFeature({
+      id: 'parent-id',
+      name: 'Creator Studio',
+      lifecycle: SdlcLifecycle.Implementation,
+    });
+    featureRepo.findById.mockResolvedValueOnce(feature).mockResolvedValueOnce(parent);
+    runRepo.findById.mockResolvedValue(createTestRun());
+
+    const result = await useCase.execute('feat-001');
+
+    expect(result.blocked).toBe(true);
+    expect(result.blockedBy).toEqual({
+      id: 'parent-id',
+      name: 'Creator Studio',
+      lifecycle: SdlcLifecycle.Implementation,
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Pending feature whose parent completed → Requirements, spawns
+  // -------------------------------------------------------------------------
+
+  it('should transition to Requirements when the parent has completed', async () => {
+    const feature = createTestFeature({ parentId: 'parent-id' });
+    const parent = createTestFeature({
+      id: 'parent-id',
+      lifecycle: SdlcLifecycle.Maintain,
+    });
+    featureRepo.findById.mockResolvedValueOnce(feature).mockResolvedValueOnce(parent);
+    runRepo.findById.mockResolvedValue(createTestRun());
+
+    const result = await useCase.execute('feat-001');
+
     expect(result.feature.lifecycle).toBe(SdlcLifecycle.Requirements);
+    expect(result.blocked).toBe(false);
     expect(processService.spawn).toHaveBeenCalledOnce();
+  });
+
+  it('should sync the child onto its parent branch before spawning', async () => {
+    const feature = createTestFeature({ parentId: 'parent-id' });
+    const parent = createTestFeature({
+      id: 'parent-id',
+      lifecycle: SdlcLifecycle.Maintain,
+      branch: 'feat/parent-feature',
+    });
+    featureRepo.findById.mockResolvedValueOnce(feature).mockResolvedValueOnce(parent);
+    runRepo.findById.mockResolvedValue(createTestRun());
+
+    await useCase.execute('feat-001');
+
+    expect(syncFeatureBranch.execute).toHaveBeenCalledWith({
+      repositoryPath: '/test/repo',
+      branch: 'feat/test-feature',
+      parentBranch: 'feat/parent-feature',
+    });
   });
 
   it('should transition fast feature with satisfied parent to Implementation', async () => {

@@ -22,12 +22,13 @@ export function createStartCommand(): Command {
     .action(async (id: string) => {
       try {
         const useCase = container.resolve(StartFeatureUseCase);
-        const { feature, agentRun } = await spinner(t('cli:commands.feat.start.spinnerText'), () =>
-          useCase.execute(id)
+        const { feature, agentRun, blocked } = await spinner(
+          t('cli:commands.feat.start.spinnerText'),
+          () => useCase.execute(id)
         );
 
         messages.newline();
-        if (feature.lifecycle === 'Blocked') {
+        if (blocked) {
           messages.warning(t('cli:commands.feat.start.blockedWarning'));
         } else {
           messages.success(t('cli:commands.feat.start.featureStarted'));
@@ -39,7 +40,7 @@ export function createStartCommand(): Command {
         console.log(
           `  ${colors.muted(t('cli:commands.feat.start.statusLabel'))}  ${feature.lifecycle}`
         );
-        if (feature.lifecycle !== 'Blocked') {
+        if (!blocked) {
           console.log(
             `  ${colors.muted(t('cli:commands.feat.start.agentLabel'))}   ${colors.success(t('cli:commands.feat.start.spawnedStatus'))} (run ${agentRun.id.slice(0, 8)})`
           );

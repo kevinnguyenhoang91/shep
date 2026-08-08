@@ -29,6 +29,9 @@ import type { IConflictResolutionService } from '../../ports/output/services/con
 /** Conventional-commit subject used for Shep's automatic checkpoint commits. */
 export const AUTO_COMMIT_SUBJECT = 'chore: auto-commit work in progress before sync';
 
+/** Name of the git remote every Shep repository tracks. */
+const REMOTE_NAME = 'origin';
+
 /**
  * Build the message for the automatic checkpoint commit.
  *
@@ -49,13 +52,25 @@ export interface SyncFeatureBranchInput {
   repositoryPath: string;
   /** Feature branch to bring in sync with the base branch. */
   branch: string;
+  /**
+   * Branch of the feature this one depends on, when it has a parent.
+   *
+   * A dependent feature must start from its parent's work. Where that work
+   * lives depends on whether the parent landed: once merged, it is in the base
+   * branch (and the parent branch is often deleted); until then, it exists only
+   * on the parent branch. Passing this lets the use case pick the right target
+   * instead of every caller re-deriving it.
+   */
+  parentBranch?: string;
 }
 
 export interface SyncFeatureBranchResult {
   /** Directory the git operations ran in — worktree path or repository root. */
   cwd: string;
-  /** Base branch the feature branch was rebased onto. */
+  /** Repository's base branch. */
   baseBranch: string;
+  /** Branch the feature branch was actually rebased onto — base or parent. */
+  rebasedOnto: string;
   /** Whether work in progress was committed before the rebase. */
   committed: boolean;
   /** SHA of the automatic checkpoint commit, when one was created. */
@@ -98,13 +113,21 @@ export class SyncFeatureBranchUseCase {
     //    latest upstream state, not a stale local ref.
     await this.gitPrService.syncMain(cwd, baseBranch);
 
-    // 3. Rebase, delegating any conflicts to agent-powered resolution.
+    // 3. Decide what to rebase onto — the base branch, or a parent branch whose
+    //    work has not reached the base branch yet.
+    const rebasedOnto = await this.resolveRebaseTarget(cwd, baseBranch, input.parentBranch);
+
+    // 4. Rebase, delegating any conflicts to agent-powered resolution.
     let conflictsResolved = false;
     try {
-      await this.gitPrService.rebaseOnMain(cwd, input.branch, baseBranch);
+      if (rebasedOnto === baseBranch) {
+        await this.gitPrService.rebaseOnMain(cwd, input.branch, baseBranch);
+      } else {
+        await this.gitPrService.rebaseOnBranch(cwd, input.branch, rebasedOnto);
+      }
     } catch (error) {
       if (error instanceof GitPrError && error.code === GitPrErrorCode.REBASE_CONFLICT) {
-        await this.conflictResolutionService.resolve(cwd, input.branch, baseBranch);
+        await this.conflictResolutionService.resolve(cwd, input.branch, rebasedOnto);
         conflictsResolved = true;
       } else {
         throw error;
@@ -114,10 +137,70 @@ export class SyncFeatureBranchUseCase {
     return {
       cwd,
       baseBranch,
+      rebasedOnto,
       committed,
       ...(commitSha ? { commitSha } : {}),
       conflictsResolved,
     };
+  }
+
+  /**
+   * Pick the branch this feature should be rebased onto.
+   *
+   * With no parent — or a parent that already landed on the base branch — the
+   * base branch carries everything the feature needs, so rebasing onto it is
+   * both sufficient and durable (the parent branch may already be deleted).
+   * A parent that has NOT landed still holds its work on its own branch, and
+   * that branch is the only place the child can pick it up.
+   *
+   * Must run AFTER `syncMain`, so the ancestry check reads a freshly fetched
+   * base ref rather than a stale local one.
+   */
+  private async resolveRebaseTarget(
+    cwd: string,
+    baseBranch: string,
+    parentBranch?: string
+  ): Promise<string> {
+    if (!parentBranch || parentBranch === baseBranch) {
+      return baseBranch;
+    }
+
+    // A parent branch that no longer exists was merged and cleaned up, so its
+    // work reaches the child through the base branch. This has to be checked
+    // separately: `verifyMerge` reports an unresolvable branch as NOT merged,
+    // which would send the rebase at a branch that cannot even be fetched.
+    if (!(await this.branchExists(cwd, parentBranch))) {
+      return baseBranch;
+    }
+
+    // `syncMain` updates origin/<base> rather than the local ref when the base
+    // branch is checked out elsewhere, so compare against the remote ref when
+    // there is one.
+    const baseRef = (await this.gitPrService.hasRemote(cwd))
+      ? `${REMOTE_NAME}/${baseBranch}`
+      : baseBranch;
+
+    try {
+      const landed = await this.gitPrService.verifyMerge(cwd, parentBranch, baseRef);
+      return landed ? baseBranch : parentBranch;
+    } catch {
+      // Ancestry could not be established — prefer the base branch, which is
+      // always fetchable, over a parent branch we know nothing about.
+      return baseBranch;
+    }
+  }
+
+  /** Does this branch resolve either locally or as a remote-tracking ref? */
+  private async branchExists(cwd: string, branch: string): Promise<boolean> {
+    for (const ref of [branch, `${REMOTE_NAME}/${branch}`]) {
+      try {
+        await this.gitPrService.revParse(cwd, ref);
+        return true;
+      } catch {
+        // Try the next ref
+      }
+    }
+    return false;
   }
 
   /**

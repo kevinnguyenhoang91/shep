@@ -260,11 +260,11 @@ describe('StartFeatureUseCase (integration)', () => {
     expect(processService.spawn).not.toHaveBeenCalled();
   });
 
-  it('should transition to Requirements when parent IS in POST_IMPLEMENTATION', async () => {
+  it('should transition to Requirements when the parent has completed', async () => {
     const parentRun = createTestRun();
     const parentFeature = createTestFeature({
       agentRunId: parentRun.id,
-      lifecycle: SdlcLifecycle.Implementation,
+      lifecycle: SdlcLifecycle.Maintain,
       name: 'Parent Feature',
     });
 
@@ -285,7 +285,7 @@ describe('StartFeatureUseCase (integration)', () => {
 
     const result = await useCase.execute(childFeature.id);
 
-    // Parent is in POST_IMPLEMENTATION (Implementation) → child starts normally
+    // Parent's work has landed (Maintain) → child starts normally
     expect(result.feature.lifecycle).toBe(SdlcLifecycle.Requirements);
 
     const updated = await featureRepo.findById(childFeature.id);

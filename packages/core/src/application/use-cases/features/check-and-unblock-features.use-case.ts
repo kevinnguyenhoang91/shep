@@ -8,17 +8,18 @@
  * Business Rules:
  * - Only direct children of parentFeatureId are evaluated (no recursive traversal).
  *   Grandchildren stay Blocked until their own direct parent progresses.
- * - Gate: satisfiesDependencyGate(parent) — Implementation, Review, Maintain, or
- *   Archived-after-completion.
+ * - Gate: satisfiesDependencyGate(parent) — Maintain, or Archived-after-completion.
  *   This is the ONLY place the dependency gate is evaluated for a Blocked -> Started
  *   transition — callers delegate here instead of re-deriving it.
  * - Idempotent: already-Started children are not touched; calling execute() twice is safe.
  * - Soft-deleted children are never resurrected (findByParentId includes them so it
  *   can serve cascade deletes).
  * - spawn() is skipped for children missing agentRunId or specPath (defensive guard).
- * - Auto-rebase: each blocked child's branch is rebased onto the parent branch
- *   before spawning the agent. Rebase failures are isolated per-child and recorded
- *   in the activity timeline. Agent spawns regardless of rebase outcome.
+ * - Auto-rebase: each blocked child is brought in sync before its agent spawns, via
+ *   SyncFeatureBranchUseCase — onto the base branch once the parent's work landed
+ *   there, onto the parent branch while it has not. Rebase failures are isolated
+ *   per-child and recorded in the activity timeline. Agent spawns regardless of
+ *   rebase outcome.
  * - NFR-3: rebase is skipped if the child has an active (running) agent run.
  *
  * Called from: UpdateFeatureLifecycleUseCase after every lifecycle transition.
@@ -36,16 +37,11 @@ import type { Feature } from '../../../domain/generated/output.js';
 import type { IFeatureRepository } from '../../ports/output/repositories/feature-repository.interface.js';
 import type { IFeatureAgentProcessService } from '../../ports/output/agents/feature-agent-process.interface.js';
 import type { ISettingsRepository } from '../../ports/output/repositories/settings.repository.interface.js';
-import type { IGitPrService } from '../../ports/output/services/git-pr-service.interface.js';
-import {
-  GitPrError,
-  GitPrErrorCode,
-} from '../../ports/output/services/git-pr-service.interface.js';
 import type { IWorktreeService } from '../../ports/output/services/worktree-service.interface.js';
-import type { IConflictResolutionService } from '../../ports/output/services/conflict-resolution.interface.js';
 import type { IAgentRunRepository } from '../../ports/output/agents/agent-run-repository.interface.js';
 import type { IPhaseTimingRepository } from '../../ports/output/agents/phase-timing-repository.interface.js';
 import { satisfiesDependencyGate } from '../../../domain/lifecycle-gates.js';
+import { SyncFeatureBranchUseCase } from './sync-feature-branch.use-case.js';
 
 /** Maximum time (ms) to wait for a single child rebase before aborting. */
 const REBASE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -58,12 +54,10 @@ export class CheckAndUnblockFeaturesUseCase {
     private readonly agentProcess: IFeatureAgentProcessService,
     @inject('ISettingsRepository')
     private readonly settingsRepository: ISettingsRepository,
-    @inject('IGitPrService')
-    private readonly gitPrService: IGitPrService,
     @inject('IWorktreeService')
     private readonly worktreeService: IWorktreeService,
-    @inject('IConflictResolutionService')
-    private readonly conflictResolutionService: IConflictResolutionService,
+    @inject(SyncFeatureBranchUseCase)
+    private readonly syncFeatureBranch: SyncFeatureBranchUseCase,
     @inject('IAgentRunRepository')
     private readonly agentRunRepo: IAgentRunRepository,
     @inject('IPhaseTimingRepository')
@@ -140,14 +134,15 @@ export class CheckAndUnblockFeaturesUseCase {
   }
 
   /**
-   * Rebase a child feature branch onto the parent feature branch.
+   * Bring a child feature branch in sync with the work it depends on.
    *
-   * Creates an agent run + phase timing for activity timeline tracking.
-   * Stashes uncommitted changes before rebase and restores in finally block.
-   * Delegates to ConflictResolutionService on conflicts.
-   * Failures are recorded but do not prevent agent spawn.
+   * Creates an agent run + phase timing for activity timeline tracking, then
+   * delegates the git work to SyncFeatureBranchUseCase, which commits work in
+   * progress (never stashes — `git stash push` ignores untracked files),
+   * chooses between the base branch and the parent branch, and hands conflicts
+   * to the agent. Failures are recorded but do not prevent agent spawn.
    *
-   * Skips rebase if the child has an active (running) agent run (NFR-3).
+   * Skips the rebase if the child has an active (running) agent run (NFR-3).
    */
   private async rebaseChildOntoParent(child: Feature, parent: Feature): Promise<void> {
     // NFR-3: skip rebase if child has an active agent run
@@ -189,27 +184,14 @@ export class CheckAndUnblockFeaturesUseCase {
     const startMs = Date.now();
 
     try {
-      // Resolve CWD — worktree path if it exists, else repo root
-      const cwd = await this.resolveCwd(child.repositoryPath, child.branch);
-
-      // Stash uncommitted changes (smart rebase)
-      const didStash = await this.gitPrService.stash(
-        cwd,
-        'shep-rebase: auto-stash before parent rebase'
-      );
-
-      try {
-        // Rebase child branch onto parent branch (with timeout)
-        await Promise.race([
-          this.performRebase(cwd, child.branch, parent.branch),
-          this.createTimeout(REBASE_TIMEOUT_MS, child.branch),
-        ]);
-      } finally {
-        // Restore stashed changes (regardless of rebase outcome)
-        if (didStash) {
-          await this.gitPrService.stashPop(cwd);
-        }
-      }
+      await Promise.race([
+        this.syncFeatureBranch.execute({
+          repositoryPath: child.repositoryPath,
+          branch: child.branch,
+          parentBranch: parent.branch,
+        }),
+        this.createTimeout(REBASE_TIMEOUT_MS, child.branch),
+      ]);
 
       // Rebase succeeded
       await this.completeTiming(agentRunId, phaseTimingId, startMs, 'success');
@@ -218,26 +200,6 @@ export class CheckAndUnblockFeaturesUseCase {
       // agent spawn proceeds regardless of rebase outcome
       const message = error instanceof Error ? error.message : String(error);
       await this.completeTiming(agentRunId, phaseTimingId, startMs, 'error', message);
-    }
-  }
-
-  /**
-   * Perform the rebase with conflict resolution.
-   */
-  private async performRebase(
-    cwd: string,
-    childBranch: string,
-    parentBranch: string
-  ): Promise<void> {
-    try {
-      await this.gitPrService.rebaseOnBranch(cwd, childBranch, parentBranch);
-    } catch (error) {
-      if (error instanceof GitPrError && error.code === GitPrErrorCode.REBASE_CONFLICT) {
-        // Delegate to agent-powered conflict resolution
-        await this.conflictResolutionService.resolve(cwd, childBranch, parentBranch);
-      } else {
-        throw error;
-      }
     }
   }
 
@@ -275,18 +237,5 @@ export class CheckAndUnblockFeaturesUseCase {
       exitCode === 'success' ? AgentRunStatus.completed : AgentRunStatus.failed,
       { completedAt, ...(errorMessage && { error: errorMessage }) }
     );
-  }
-
-  /**
-   * Resolve the correct working directory for the child feature.
-   * Uses the worktree path if a worktree exists for this branch,
-   * otherwise falls back to the repository root.
-   */
-  private async resolveCwd(repositoryPath: string, branch: string): Promise<string> {
-    const hasWorktree = await this.worktreeService.exists(repositoryPath, branch);
-    if (hasWorktree) {
-      return this.worktreeService.getWorktreePath(repositoryPath, branch);
-    }
-    return repositoryPath;
   }
 }

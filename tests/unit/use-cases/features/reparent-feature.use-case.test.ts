@@ -223,9 +223,24 @@ describe('ReparentFeatureUseCase', () => {
     );
   });
 
-  it('should keep child lifecycle when reparented under Implementation parent', async () => {
+  it('should transition Started child to Blocked when reparented under Implementation parent', async () => {
     const child = makeFeature({ id: 'child-1', lifecycle: SdlcLifecycle.Started });
     const parent = makeFeature({ id: 'parent-1', lifecycle: SdlcLifecycle.Implementation });
+    vi.mocked(mockFeatureRepo.findById).mockResolvedValueOnce(child).mockResolvedValueOnce(parent);
+
+    await useCase.execute({ featureId: 'child-1', parentId: 'parent-1' });
+
+    expect(mockFeatureRepo.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'child-1',
+        lifecycle: SdlcLifecycle.Blocked,
+      })
+    );
+  });
+
+  it('should keep child lifecycle when reparented under a completed parent', async () => {
+    const child = makeFeature({ id: 'child-1', lifecycle: SdlcLifecycle.Started });
+    const parent = makeFeature({ id: 'parent-1', lifecycle: SdlcLifecycle.Maintain });
     vi.mocked(mockFeatureRepo.findById).mockResolvedValueOnce(child).mockResolvedValueOnce(parent);
 
     await useCase.execute({ featureId: 'child-1', parentId: 'parent-1' });

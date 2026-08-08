@@ -25,6 +25,14 @@ import { SyncFeatureBranchUseCase } from './sync-feature-branch.use-case.js';
 export interface StartFeatureResult {
   feature: Feature;
   agentRun: AgentRun;
+  /** True when the dependency gate held the feature back instead of starting it. */
+  blocked: boolean;
+  /** The parent that holds this feature back, present only when `blocked`. */
+  blockedBy?: {
+    id: string;
+    name: string;
+    lifecycle: SdlcLifecycle;
+  };
 }
 
 @injectable()
@@ -93,15 +101,18 @@ export class StartFeatureUseCase {
       }
     }
 
-    // Check parent gate if feature has a parent
+    // Check parent gate if feature has a parent. A feature may only start once
+    // the work it depends on has landed — otherwise it goes (back) to Blocked
+    // and waits for CheckAndUnblockFeaturesUseCase to release it.
     let targetLifecycle =
       resolved.fast === true || resolved.buildMode === BuildMode.Fast
         ? SdlcLifecycle.Implementation
         : SdlcLifecycle.Requirements;
     let shouldSpawn = true;
+    let parent: Feature | null = null;
 
     if (resolved.parentId) {
-      const parent = await this.featureRepo.findById(resolved.parentId);
+      parent = await this.featureRepo.findById(resolved.parentId);
       if (!parent || !satisfiesDependencyGate(parent)) {
         targetLifecycle = SdlcLifecycle.Blocked;
         shouldSpawn = false;
@@ -118,13 +129,15 @@ export class StartFeatureUseCase {
 
     // Spawn agent if not blocked
     if (shouldSpawn) {
-      // Commit whatever is already in the worktree and rebase onto the latest
-      // base branch so the agent starts in sync. Best-effort: a repo without a
+      // Commit whatever is already in the worktree and rebase so the agent
+      // starts in sync — onto the parent's work when this feature depends on
+      // another, onto the base branch otherwise. Best-effort: a repo without a
       // remote, or a rebase that needs a human, must not block the agent.
       try {
         await this.syncFeatureBranch.execute({
           repositoryPath: resolved.repositoryPath,
           branch: resolved.branch,
+          ...(parent ? { parentBranch: parent.branch } : {}),
         });
       } catch {
         // Sync failure is non-fatal — the agent starts from the current tree.
@@ -161,6 +174,13 @@ export class StartFeatureUseCase {
       );
     }
 
-    return { feature: updatedFeature, agentRun };
+    return {
+      feature: updatedFeature,
+      agentRun,
+      blocked: !shouldSpawn,
+      ...(!shouldSpawn && parent
+        ? { blockedBy: { id: parent.id, name: parent.name, lifecycle: parent.lifecycle } }
+        : {}),
+    };
   }
 }

@@ -5,14 +5,21 @@ import type { StartFeatureUseCase } from '@shepai/core/application/use-cases/fea
 
 export async function startFeature(
   featureId: string
-): Promise<{ started: boolean; error?: string }> {
+): Promise<{ started: boolean; blocked?: boolean; blockedBy?: string; error?: string }> {
   if (!featureId.trim()) {
     return { started: false, error: 'Feature id is required' };
   }
 
   try {
     const useCase = resolve<StartFeatureUseCase>('StartFeatureUseCase');
-    await useCase.execute(featureId);
+    const result = await useCase.execute(featureId);
+    if (result.blocked) {
+      return {
+        started: false,
+        blocked: true,
+        ...(result.blockedBy ? { blockedBy: result.blockedBy.name } : {}),
+      };
+    }
     return { started: true };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to start feature';

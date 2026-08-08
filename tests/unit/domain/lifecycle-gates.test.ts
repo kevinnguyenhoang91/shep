@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { SdlcLifecycle } from '@/domain/generated/output.js';
 import {
-  POST_IMPLEMENTATION,
+  COMPLETED_LIFECYCLES,
   EXPLORING_TRANSITIONS,
   satisfiesDependencyGate,
 } from '@/domain/lifecycle-gates.js';
@@ -22,31 +22,37 @@ describe('SdlcLifecycle', () => {
   });
 });
 
-describe('POST_IMPLEMENTATION', () => {
+describe('COMPLETED_LIFECYCLES', () => {
   it('should NOT contain SdlcLifecycle.Pending', () => {
-    expect(POST_IMPLEMENTATION.has(SdlcLifecycle.Pending)).toBe(false);
+    expect(COMPLETED_LIFECYCLES.has(SdlcLifecycle.Pending)).toBe(false);
   });
 
   it('should NOT contain SdlcLifecycle.Exploring', () => {
-    expect(POST_IMPLEMENTATION.has(SdlcLifecycle.Exploring)).toBe(false);
+    expect(COMPLETED_LIFECYCLES.has(SdlcLifecycle.Exploring)).toBe(false);
   });
 
-  it('should contain Implementation, Review, and Maintain', () => {
-    expect(POST_IMPLEMENTATION.has(SdlcLifecycle.Implementation)).toBe(true);
-    expect(POST_IMPLEMENTATION.has(SdlcLifecycle.Review)).toBe(true);
-    expect(POST_IMPLEMENTATION.has(SdlcLifecycle.Maintain)).toBe(true);
+  it('should contain Maintain — the only lifecycle meaning the work landed', () => {
+    expect(COMPLETED_LIFECYCLES.has(SdlcLifecycle.Maintain)).toBe(true);
+    expect(COMPLETED_LIFECYCLES.size).toBe(1);
+  });
+
+  it('should NOT contain Implementation or Review — that work has not landed yet', () => {
+    expect(COMPLETED_LIFECYCLES.has(SdlcLifecycle.Implementation)).toBe(false);
+    expect(COMPLETED_LIFECYCLES.has(SdlcLifecycle.Review)).toBe(false);
   });
 });
 
 describe('satisfiesDependencyGate', () => {
-  it('should open the gate for Implementation, Review, and Maintain', () => {
-    for (const lifecycle of [
-      SdlcLifecycle.Implementation,
-      SdlcLifecycle.Review,
-      SdlcLifecycle.Maintain,
-    ]) {
-      expect(satisfiesDependencyGate({ lifecycle })).toBe(true);
-    }
+  it('should open the gate only for Maintain', () => {
+    expect(satisfiesDependencyGate({ lifecycle: SdlcLifecycle.Maintain })).toBe(true);
+  });
+
+  it('should keep the gate CLOSED while the parent is still implementing', () => {
+    // The merge node sets Maintain only when the branch actually merged, and
+    // Review when the PR is still open. A child that starts against either one
+    // builds on work that can still change or may never land.
+    expect(satisfiesDependencyGate({ lifecycle: SdlcLifecycle.Implementation })).toBe(false);
+    expect(satisfiesDependencyGate({ lifecycle: SdlcLifecycle.Review })).toBe(false);
   });
 
   it('should keep the gate closed for pre-implementation states', () => {
@@ -78,13 +84,16 @@ describe('satisfiesDependencyGate', () => {
     ).toBe(true);
   });
 
-  it('should keep the gate CLOSED for a feature archived before it reached implementation', () => {
-    expect(
-      satisfiesDependencyGate({
-        lifecycle: SdlcLifecycle.Archived,
-        previousLifecycle: SdlcLifecycle.Planning,
-      })
-    ).toBe(false);
+  it('should keep the gate CLOSED for a feature archived before it completed', () => {
+    for (const previousLifecycle of [
+      SdlcLifecycle.Planning,
+      SdlcLifecycle.Implementation,
+      SdlcLifecycle.Review,
+    ]) {
+      expect(
+        satisfiesDependencyGate({ lifecycle: SdlcLifecycle.Archived, previousLifecycle })
+      ).toBe(false);
+    }
   });
 
   it('should keep the gate CLOSED for an archived feature with no recorded previous lifecycle', () => {

@@ -14,6 +14,7 @@ import { BuildMode } from '@shepai/core/domain/generated/output';
 import { approveFeature } from '@/app/actions/approve-feature';
 import { resumeFeature } from '@/app/actions/resume-feature';
 import { startFeature } from '@/app/actions/start-feature';
+import { blockedStartMessage } from '@/lib/start-feature-result';
 import { stopFeature } from '@/app/actions/stop-feature';
 import { rejectFeature } from '@/app/actions/reject-feature';
 import { submitExplorationFeedback } from '@/app/actions/submit-exploration-feedback';
@@ -578,6 +579,14 @@ export function FeatureDrawerClient({
       const result = await startFeature(featureId);
       if (result.error) {
         toast.error(result.error);
+        return;
+      }
+      if (result.blocked) {
+        toast.info(blockedStartMessage(result));
+        setView((prev) => {
+          if (prev.type !== 'feature') return prev;
+          return { ...prev, node: { ...prev.node, state: 'blocked' } };
+        });
         return;
       }
       toast.success('Feature started');

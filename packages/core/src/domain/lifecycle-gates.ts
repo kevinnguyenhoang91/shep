@@ -11,34 +11,37 @@ import { SdlcLifecycle } from './generated/output';
 import type { Feature } from './generated/output';
 
 /**
- * Lifecycle values at or beyond the Implementation gate.
+ * Lifecycle values that mean a feature's work is finished and has landed.
+ *
+ * Only Maintain qualifies. The merge node is explicit about this: it sets
+ * Maintain when the branch actually merged and Review when the PR is still
+ * open (`merged ? Maintain : Review`). Every other lifecycle — including
+ * Implementation and Review — describes work that can still change, or that
+ * may never land at all if the PR is closed.
  *
  * A parent whose lifecycle is a member of this set satisfies Gate 1:
  * directly-blocked children may transition from Blocked to Started.
- *
- * Note: Pending and Exploring are intentionally excluded — pending features
- * are user-deferred and exploring features are in prototyping mode; neither
- * can unblock child features.
  */
-export const POST_IMPLEMENTATION = new Set<SdlcLifecycle>([
-  SdlcLifecycle.Implementation,
-  SdlcLifecycle.Review,
-  SdlcLifecycle.Maintain,
-]);
+export const COMPLETED_LIFECYCLES = new Set<SdlcLifecycle>([SdlcLifecycle.Maintain]);
 
 /**
  * Does a parent feature's progress satisfy the dependency gate for its children?
  *
  * This is the single predicate every dependency decision must use — creating a
  * child, starting a Pending child, reparenting, and auto-unblocking. Comparing
- * against POST_IMPLEMENTATION directly misses the Archived case below.
+ * against COMPLETED_LIFECYCLES directly misses the Archived case below.
+ *
+ * A child is released only once its parent's work is DONE, because the child
+ * rebases onto that work before it starts: releasing early would build the
+ * child on commits that are still being rewritten, or on a branch whose PR is
+ * never merged.
  *
  * Archived is treated as a filing concern, not a rollback of progress: features
  * are auto-archived a configurable delay after reaching Maintain, so a parent
  * that completed and was then archived MUST still release its children —
  * `previousLifecycle` carries the progress it had when it was archived. A parent
- * archived *before* reaching the gate keeps its children blocked, because its
- * work never landed.
+ * archived *before* completing keeps its children blocked, because its work
+ * never landed.
  *
  * @param parent - The parent feature (only its lifecycle fields are read).
  * @returns True when direct children may leave Blocked.
@@ -48,11 +51,11 @@ export function satisfiesDependencyGate(
 ): boolean {
   if (parent.lifecycle === SdlcLifecycle.Archived) {
     return (
-      parent.previousLifecycle !== undefined && POST_IMPLEMENTATION.has(parent.previousLifecycle)
+      parent.previousLifecycle !== undefined && COMPLETED_LIFECYCLES.has(parent.previousLifecycle)
     );
   }
 
-  return POST_IMPLEMENTATION.has(parent.lifecycle);
+  return COMPLETED_LIFECYCLES.has(parent.lifecycle);
 }
 
 /**

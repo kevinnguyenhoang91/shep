@@ -99,6 +99,8 @@ describe('createStartCommand', () => {
         lifecycle: 'Blocked',
       },
       agentRun: { id: 'run-001' },
+      blocked: true,
+      blockedBy: { id: 'parent-001', name: 'Parent Feature', lifecycle: 'Implementation' },
     });
     const { messages: mockMessages } = await import(
       '../../../../../../src/presentation/cli/ui/index.js'

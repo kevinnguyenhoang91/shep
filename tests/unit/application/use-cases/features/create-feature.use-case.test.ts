@@ -331,24 +331,26 @@ describe('CreateFeatureUseCase', () => {
       expect(mockAgentProcess.spawn).not.toHaveBeenCalled();
     });
 
-    it('should create child in Started state when parent lifecycle is Implementation', async () => {
+    it('should create child in Blocked state when parent lifecycle is Implementation', async () => {
+      // The parent is still writing the code the child depends on.
       const parent = makeParentFeature({ lifecycle: SdlcLifecycle.Implementation });
       mockFeatureRepo.findById = vi.fn().mockResolvedValue(parent);
 
       const result = await useCase.execute({ ...baseInput, parentId: 'parent-id' });
 
-      expect(result.feature.lifecycle).toBe(SdlcLifecycle.Started);
-      expect(mockAgentProcess.spawn).toHaveBeenCalledOnce();
+      expect(result.feature.lifecycle).toBe(SdlcLifecycle.Blocked);
+      expect(mockAgentProcess.spawn).not.toHaveBeenCalled();
     });
 
-    it('should create child in Started state when parent lifecycle is Review', async () => {
+    it('should create child in Blocked state when parent lifecycle is Review', async () => {
+      // The parent's PR is open — its work has not landed and may still change.
       const parent = makeParentFeature({ lifecycle: SdlcLifecycle.Review });
       mockFeatureRepo.findById = vi.fn().mockResolvedValue(parent);
 
       const result = await useCase.execute({ ...baseInput, parentId: 'parent-id' });
 
-      expect(result.feature.lifecycle).toBe(SdlcLifecycle.Started);
-      expect(mockAgentProcess.spawn).toHaveBeenCalledOnce();
+      expect(result.feature.lifecycle).toBe(SdlcLifecycle.Blocked);
+      expect(mockAgentProcess.spawn).not.toHaveBeenCalled();
     });
 
     it('should create child in Started state when parent lifecycle is Maintain', async () => {

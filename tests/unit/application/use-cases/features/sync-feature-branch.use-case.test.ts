@@ -33,6 +33,10 @@ function createMockGitPrService(): IGitPrService {
     commitAll: vi.fn().mockResolvedValue('abc1234'),
     syncMain: vi.fn().mockResolvedValue(undefined),
     rebaseOnMain: vi.fn().mockResolvedValue(undefined),
+    rebaseOnBranch: vi.fn().mockResolvedValue(undefined),
+    hasRemote: vi.fn().mockResolvedValue(true),
+    verifyMerge: vi.fn().mockResolvedValue(true),
+    revParse: vi.fn().mockResolvedValue('abc1234'),
   } as unknown as IGitPrService;
 }
 
@@ -224,6 +228,166 @@ describe('SyncFeatureBranchUseCase', () => {
     expect(error).toBeInstanceOf(GitPrError);
     expect(error.code).toBe(GitPrErrorCode.SYNC_FAILED);
     expect(gitPrService.rebaseOnMain).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Parent branch — a child must start from its parent's work
+  // -------------------------------------------------------------------------
+
+  const PARENT_BRANCH = 'feat/parent-feature';
+
+  it('should rebase onto the base branch when the parent branch already landed there', async () => {
+    vi.mocked(gitPrService.verifyMerge).mockResolvedValue(true);
+
+    const result = await useCase.execute({
+      repositoryPath: REPO_PATH,
+      branch: BRANCH,
+      parentBranch: PARENT_BRANCH,
+    });
+
+    expect(gitPrService.rebaseOnMain).toHaveBeenCalledWith(REPO_PATH, BRANCH, 'main');
+    expect(gitPrService.rebaseOnBranch).not.toHaveBeenCalled();
+    expect(result.rebasedOnto).toBe('main');
+  });
+
+  it('should rebase onto the parent branch when the parent has not landed on base', async () => {
+    vi.mocked(gitPrService.verifyMerge).mockResolvedValue(false);
+
+    const result = await useCase.execute({
+      repositoryPath: REPO_PATH,
+      branch: BRANCH,
+      parentBranch: PARENT_BRANCH,
+    });
+
+    expect(gitPrService.rebaseOnBranch).toHaveBeenCalledWith(REPO_PATH, BRANCH, PARENT_BRANCH);
+    expect(gitPrService.rebaseOnMain).not.toHaveBeenCalled();
+    expect(result.rebasedOnto).toBe(PARENT_BRANCH);
+  });
+
+  it('should test the parent against the freshly fetched remote base ref', async () => {
+    await useCase.execute({
+      repositoryPath: REPO_PATH,
+      branch: BRANCH,
+      parentBranch: PARENT_BRANCH,
+    });
+
+    expect(gitPrService.verifyMerge).toHaveBeenCalledWith(REPO_PATH, PARENT_BRANCH, 'origin/main');
+    // The fetch must happen first, or the ancestry check reads a stale ref.
+    expect(vi.mocked(gitPrService.syncMain).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(gitPrService.verifyMerge).mock.invocationCallOrder[0]
+    );
+  });
+
+  it('should test against the local base branch when the repository has no remote', async () => {
+    vi.mocked(gitPrService.hasRemote).mockResolvedValue(false);
+
+    await useCase.execute({
+      repositoryPath: REPO_PATH,
+      branch: BRANCH,
+      parentBranch: PARENT_BRANCH,
+    });
+
+    expect(gitPrService.verifyMerge).toHaveBeenCalledWith(REPO_PATH, PARENT_BRANCH, 'main');
+  });
+
+  it('should fall back to the base branch when the parent branch no longer exists', async () => {
+    // Post-merge cleanup deletes the parent branch, locally and on the remote.
+    // `verifyMerge` reports an unresolvable branch as NOT merged, so relying on
+    // it alone would aim the rebase at a branch that cannot even be fetched.
+    vi.mocked(gitPrService.revParse).mockRejectedValue(new Error('unknown revision'));
+    vi.mocked(gitPrService.verifyMerge).mockResolvedValue(false);
+
+    const result = await useCase.execute({
+      repositoryPath: REPO_PATH,
+      branch: BRANCH,
+      parentBranch: PARENT_BRANCH,
+    });
+
+    expect(result.rebasedOnto).toBe('main');
+    expect(gitPrService.rebaseOnMain).toHaveBeenCalled();
+    expect(gitPrService.rebaseOnBranch).not.toHaveBeenCalled();
+  });
+
+  it('should use the parent branch when only its remote-tracking ref resolves', async () => {
+    vi.mocked(gitPrService.revParse).mockImplementation(async (_cwd: string, ref: string) => {
+      if (ref === `origin/${PARENT_BRANCH}`) return 'abc1234';
+      throw new Error('unknown revision');
+    });
+    vi.mocked(gitPrService.verifyMerge).mockResolvedValue(false);
+
+    const result = await useCase.execute({
+      repositoryPath: REPO_PATH,
+      branch: BRANCH,
+      parentBranch: PARENT_BRANCH,
+    });
+
+    expect(result.rebasedOnto).toBe(PARENT_BRANCH);
+  });
+
+  it('should fall back to the base branch when ancestry cannot be established', async () => {
+    vi.mocked(gitPrService.verifyMerge).mockRejectedValue(
+      new GitPrError('bad revision', GitPrErrorCode.GIT_ERROR)
+    );
+
+    const result = await useCase.execute({
+      repositoryPath: REPO_PATH,
+      branch: BRANCH,
+      parentBranch: PARENT_BRANCH,
+    });
+
+    expect(result.rebasedOnto).toBe('main');
+  });
+
+  it('should rebase onto the base branch when the parent branch IS the base branch', async () => {
+    const result = await useCase.execute({
+      repositoryPath: REPO_PATH,
+      branch: BRANCH,
+      parentBranch: 'main',
+    });
+
+    expect(gitPrService.verifyMerge).not.toHaveBeenCalled();
+    expect(gitPrService.rebaseOnMain).toHaveBeenCalledWith(REPO_PATH, BRANCH, 'main');
+    expect(result.rebasedOnto).toBe('main');
+  });
+
+  it('should not consult the parent when no parentBranch is given', async () => {
+    const result = await useCase.execute({ repositoryPath: REPO_PATH, branch: BRANCH });
+
+    expect(gitPrService.verifyMerge).not.toHaveBeenCalled();
+    expect(result.rebasedOnto).toBe('main');
+  });
+
+  it('should resolve conflicts against the parent branch when rebasing onto it', async () => {
+    vi.mocked(gitPrService.verifyMerge).mockResolvedValue(false);
+    vi.mocked(gitPrService.rebaseOnBranch).mockRejectedValue(
+      new GitPrError('Rebase conflicts detected', GitPrErrorCode.REBASE_CONFLICT)
+    );
+
+    const result = await useCase.execute({
+      repositoryPath: REPO_PATH,
+      branch: BRANCH,
+      parentBranch: PARENT_BRANCH,
+    });
+
+    expect(conflictResolution.resolve).toHaveBeenCalledWith(REPO_PATH, BRANCH, PARENT_BRANCH);
+    expect(result.conflictsResolved).toBe(true);
+  });
+
+  it('should checkpoint work in progress before rebasing onto the parent branch', async () => {
+    // The commit must land before the target is even resolved — nothing about
+    // the parent may put the child's uncommitted work at risk.
+    vi.mocked(gitPrService.hasUncommittedChanges).mockResolvedValue(true);
+    vi.mocked(gitPrService.verifyMerge).mockResolvedValue(false);
+
+    await useCase.execute({
+      repositoryPath: REPO_PATH,
+      branch: BRANCH,
+      parentBranch: PARENT_BRANCH,
+    });
+
+    expect(vi.mocked(gitPrService.commitAll).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(gitPrService.rebaseOnBranch).mock.invocationCallOrder[0]
+    );
   });
 
   it('should propagate a failing auto-commit without rebasing over the work', async () => {

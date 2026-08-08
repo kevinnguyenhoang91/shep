@@ -1,5 +1,48 @@
 # Lessons Learned
 
+## A dependency gate must open on "the work landed", not on "the work started"
+
+The dependency gate released a child as soon as its parent reached
+`Implementation` (`POST_IMPLEMENTATION = {Implementation, Review, Maintain}`), so
+clicking Start on a node visibly chained behind a still-running one just… started
+it. Two things were wrong, and the second was invisible until the first was fixed:
+
+1. **The gate encoded progress, not completion.** The merge node is unambiguous —
+   `merged ? Maintain : Review` — so only `Maintain` means the branch actually
+   landed. `Implementation` means the parent is still writing the code, and
+   `Review` means its PR may still change or never merge. The gate is now
+   `COMPLETED_LIFECYCLES = {Maintain}` (plus `Archived` carrying
+   `previousLifecycle: Maintain`).
+2. **Two paths to the same transition disagreed.** Auto-unblock rebased the child
+   onto the parent branch; manual Start called `SyncFeatureBranchUseCase` with no
+   parent at all and rebased onto `main` — so a manually-started child silently
+   inherited *none* of its parent's work. Both now call the same use case, which
+   picks the target: base branch when the parent's work is already an ancestor of
+   it, parent branch while it is not.
+
+**Rules:**
+- When a gate answers "may B build on A?", the predicate is about A's work being
+  **durable**, not about A having begun. Name the set for the property
+  (`COMPLETED_LIFECYCLES`), not for its position in an enum (`POST_IMPLEMENTATION`)
+  — the positional name is what made `Implementation` look like it belonged.
+- If two code paths perform the same transition, they must share the use case that
+  performs its side effects. Anything a UI button and a background reconciler both
+  do WILL drift; only the divergence's victim (here, a child missing its parent's
+  commits) tells you, and it tells you late.
+- `verifyMerge` returns **false** for a branch it cannot resolve — the same answer
+  it gives for "not merged". A deleted-after-merge parent therefore reads as
+  unmerged and aims the rebase at a branch that cannot even be fetched. Probe
+  existence separately (`revParse` on `<branch>` and `origin/<branch>`) before
+  trusting a boolean that conflates "no" with "don't know".
+- **Only the real-git integration test caught that.** Every mock returned what I
+  assumed `verifyMerge` returns. Any use case that branches on a git predicate
+  needs one real-repo test per branch — `push origin --delete` + `branch -D` is
+  three lines and reproduces the whole class of bug.
+- Changing a gate changes what the UI must say. Start on a blocked child used to
+  toast "Feature started" while quietly writing `Blocked`; the use case now
+  returns `{ blocked, blockedBy }` so CLI and web report the truth instead of
+  re-deriving it from `feature.lifecycle === 'Blocked'`.
+
 ## `git stash push` ignores untracked files — never use it as a "make the tree clean" primitive
 
 `RebaseFeatureOnMainUseCase` stashed before rebasing, so a dirty worktree was supposed to be
@@ -1534,10 +1577,10 @@ archived. Nothing was ever going to release it, for three compounding reasons:
    evaluates that child's own children. The feature just attached was never
    evaluated against its NEW parent. Its `newLifecycle` branch also only ever
    *added* `Blocked`; there was no branch that cleared it.
-2. **A gate duplicated in four places.** `POST_IMPLEMENTATION.has(parent.lifecycle)`
+2. **A gate duplicated in four places.** `COMPLETED_LIFECYCLES.has(parent.lifecycle)` (then named `POST_IMPLEMENTATION`)
    was inlined in create / start / reparent / check-and-unblock. Copies drift.
 3. **`Archived` slammed the gate shut.** Auto-archive moves *every* completed
-   feature to `Archived` on a delay, and `Archived ∉ POST_IMPLEMENTATION` — so
+   feature to `Archived` on a delay, and `Archived ∉` the gate set — so
    waiting long enough was itself enough to strand a child forever.
 
 **Rules:**

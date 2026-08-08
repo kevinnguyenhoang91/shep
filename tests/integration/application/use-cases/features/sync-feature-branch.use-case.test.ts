@@ -149,6 +149,78 @@ describe('SyncFeatureBranchUseCase (real git)', () => {
     expect(parseInt(after.trim(), 10)).toBe(parseInt(before.trim(), 10) + 1);
   });
 
+  // -------------------------------------------------------------------------
+  // Dependent features — the child must start from its parent's work
+  // -------------------------------------------------------------------------
+
+  const PARENT_BRANCH = 'feat/parent';
+
+  /** Publish a parent branch carrying one commit of its own. */
+  const createParentBranch = async (): Promise<void> => {
+    await git(repoPath, ['checkout', '-b', PARENT_BRANCH, `origin/${BASE_BRANCH}`]);
+    await commitFile(repoPath, 'parent.txt', 'parent work\n', 'feat: parent work');
+    await git(repoPath, ['push', '-u', 'origin', PARENT_BRANCH]);
+    await git(repoPath, ['checkout', FEATURE_BRANCH]);
+  };
+
+  it('should pick up the parent commits when the parent has not landed on base', async () => {
+    await createParentBranch();
+
+    const result = await useCase.execute({
+      repositoryPath: repoPath,
+      branch: FEATURE_BRANCH,
+      parentBranch: PARENT_BRANCH,
+    });
+
+    expect(result.rebasedOnto).toBe(PARENT_BRANCH);
+    // The parent's commit is now in the child's history, files and all
+    expect(await isAncestor(`origin/${PARENT_BRANCH}`, 'HEAD')).toBe(true);
+    expect(existsSync(join(repoPath, 'parent.txt'))).toBe(true);
+    expect(existsSync(join(repoPath, 'feature.txt'))).toBe(true);
+  });
+
+  it('should rebase onto the remote base branch once the parent has merged', async () => {
+    await createParentBranch();
+
+    // Land the parent on the base branch and delete it, as post-merge cleanup does
+    await git(repoPath, ['checkout', BASE_BRANCH]);
+    await git(repoPath, ['merge', '--no-ff', '-m', 'chore: merge parent', PARENT_BRANCH]);
+    await git(repoPath, ['push', 'origin', BASE_BRANCH]);
+    await git(repoPath, ['push', 'origin', '--delete', PARENT_BRANCH]);
+    await git(repoPath, ['checkout', FEATURE_BRANCH]);
+    await git(repoPath, ['branch', '-D', PARENT_BRANCH]);
+
+    const result = await useCase.execute({
+      repositoryPath: repoPath,
+      branch: FEATURE_BRANCH,
+      parentBranch: PARENT_BRANCH,
+    });
+
+    expect(result.rebasedOnto).toBe(BASE_BRANCH);
+    // The parent's work arrives through the base branch
+    expect(await isAncestor(`origin/${BASE_BRANCH}`, 'HEAD')).toBe(true);
+    expect(existsSync(join(repoPath, 'parent.txt'))).toBe(true);
+    expect(existsSync(join(repoPath, 'feature.txt'))).toBe(true);
+  });
+
+  it('should commit untracked work before rebasing onto the parent branch', async () => {
+    await createParentBranch();
+    writeFileSync(join(repoPath, 'wip.txt'), 'work in progress\n');
+
+    const result = await useCase.execute({
+      repositoryPath: repoPath,
+      branch: FEATURE_BRANCH,
+      parentBranch: PARENT_BRANCH,
+    });
+
+    expect(result.committed).toBe(true);
+    expect(result.rebasedOnto).toBe(PARENT_BRANCH);
+    const { stdout: status } = await git(repoPath, ['status', '--porcelain']);
+    expect(status.trim()).toBe('');
+    expect(readFileSync(join(repoPath, 'wip.txt'), 'utf-8')).toBe('work in progress\n');
+    expect(existsSync(join(repoPath, 'parent.txt'))).toBe(true);
+  });
+
   it('should skip the repository commit hooks', async () => {
     const hookPath = join(repoPath, '.git', 'hooks', 'pre-commit');
     writeFileSync(hookPath, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
