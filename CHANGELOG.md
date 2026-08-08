@@ -4,6 +4,45 @@
   </a>
 </p>
 
+# 🚀 Shep [v1.223.0](/compare/v1.222.1...v1.223.0) · _2026-08-08_
+
+> Your organization does not have access to Claude. Please login again or contact your administrator.
+
+
+
+### ✨ Features
+
+* **domain:** commit then rebase so a dirty worktree never fails sync ([#841](https://github.com/shep-ai/shep/issues/841)) ([92efe93](https://github.com/shep-ai/shep/commit/92efe9367d3b4ab28df7cae2defc5281427e99ba))
+
+* **domain:** commit then rebase so a dirty worktree never fails sync ([#842](https://github.com/shep-ai/shep/issues/842)) ([da80f00](https://github.com/shep-ai/shep/commit/da80f0007fbb98b8896e704f3d0f31a066568922))
+
+* **web:** focus the repo node on canvas when its tree row is clicked ([#840](https://github.com/shep-ai/shep/issues/840)) ([9e96760](https://github.com/shep-ai/shep/commit/9e96760671c8b4181d038a4340d7ee6d5ec2a4fa))
+
+
+## 📦 Install or update
+
+```bash
+# upgrade an existing install
+npm i -g @shepai/cli@1.223.0
+
+# or run instantly without installing
+npx @shepai/cli@latest
+```
+
+## 💬 Join the community
+
+[💬 **Discord**](https://discord.gg/ES6tdVFfur) · [📖 **Docs**](https://github.com/shep-ai/shep#readme) · [⭐ **Star on GitHub**](https://github.com/shep-ai/shep) · [🐛 **Report an issue**](https://github.com/shep-ai/shep/issues)
+
+---
+
+<sub>🤖 Released autonomously by Shep — built by parallel AI agents working in isolated git worktrees. Try it: `npx @shepai/cli`</sub>
+
+<p align="center">
+  <a href="https://github.com/shep-ai/shep">
+    <img src="https://raw.githubusercontent.com/shep-ai/shep/main/docs/screenshots/shep-card.jpg" alt="Shep — run multiple AI agents in parallel" width="720" />
+  </a>
+</p>
+
 # 🚀 Shep [v1.222.1](/compare/v1.222.0...v1.222.1) · _2026-08-06_
 
 > Your organization does not have access to Claude. Please login again or contact your administrator.
