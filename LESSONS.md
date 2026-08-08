@@ -245,10 +245,39 @@ Concrete instance: `SQLiteAgentMessageBus(repo, options: SQLiteAgentMessageBusOp
 
 Rules for any class with `@injectable()`:
 
-1. Every constructor param must either have an `@inject(token)` decorator OR be a class type that tsyringe can introspect. No interface params, no inline `{}` types, no primitives without `@inject`.
+1. **Every** constructor param needs an explicit `@inject(token)` — including class-typed ones, which take the class itself as the token: `@inject(MyUseCase) private readonly x: MyUseCase`. Relying on tsyringe introspecting the class type is NOT safe here; see the next lesson. No interface params, no inline `{}` types, no primitives without `@inject`.
 2. Default values do NOT save you — tsyringe still tries to resolve the param before the default kicks in.
 3. For test-only knobs (poll intervals, etc.), drop them from the constructor and expose a `setX(...)` method or a class-typed config object registered with `useValue`.
-4. Before adding a new `@injectable()` class, scan its constructor: any non-class type without `@inject` is a boot-time bomb that won't surface until something actually resolves the chain.
+4. Before adding a new `@injectable()` class, scan its constructor: any param without `@inject` is a bomb that won't surface until something actually resolves the chain.
+
+## A class-typed constructor param without `@inject` is silently `undefined` when run from source
+
+Symptom: "Rebase on Main" in the web UI failed with
+`Cannot read properties of undefined (reading 'execute')`. `RebaseFeatureOnMainUseCase`
+resolved fine, but its `syncFeatureBranch` field was `undefined`.
+
+Root cause: implicit class-token injection depends on `design:paramtypes`, which
+only `tsc` emits. **Every runtime we actually develop against uses esbuild or SWC
+— `tsx` (`pnpm dev:cli`, `pnpm dev:web`), vitest, and Next.js — and none of them
+emit decorator metadata.** With no metadata, tsyringe passes `undefined` for every
+param that has no explicit token, and *still constructs the object*. So it works in
+a packaged `pnpm build:cli` (tsc) release and breaks for anyone running from source
+— the exact inverse of the usual "works locally, breaks in prod".
+
+There is no error at the injection site. The crash surfaces later, at the first
+property access on the hollow field, pointing at a line that looks unrelated.
+
+**Rules:**
+
+1. Never write a bare class-typed constructor param. Always `@inject(TheClass)`.
+2. A DI guard test that only asserts `container.resolve(X)` is `toBeDefined()` proves
+   nothing — resolution succeeds with hollow dependencies. Assert the injected field
+   itself: `expect(injected(resolve(X), 'dep')).toBeInstanceOf(Dep)`.
+3. Because vitest shares the metadata-less runtime, this class of bug IS catchable by
+   unit tests — but only with assertion #2.
+4. To sweep for existing instances: resolve every function token in
+   `container._registry` and report fields that are `undefined`. Optional state fields
+   (`private qr?: string`) are false positives; constructor params are not.
 
 ## Settings Is the Single Source of Truth for Agent + Model — Never Hardcode UI Defaults
 

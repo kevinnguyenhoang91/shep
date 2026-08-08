@@ -40,6 +40,7 @@ export class StartFeatureUseCase {
     private readonly worktreeService: IWorktreeService,
     @inject('ISettingsRepository')
     private readonly settingsRepository: ISettingsRepository,
+    @inject(SyncFeatureBranchUseCase)
     private readonly syncFeatureBranch: SyncFeatureBranchUseCase
   ) {}
 

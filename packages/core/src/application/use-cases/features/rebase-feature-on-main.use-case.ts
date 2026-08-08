@@ -23,6 +23,7 @@ export class RebaseFeatureOnMainUseCase {
   constructor(
     @inject('IFeatureRepository')
     private readonly featureRepo: IFeatureRepository,
+    @inject(SyncFeatureBranchUseCase)
     private readonly syncFeatureBranch: SyncFeatureBranchUseCase,
     @inject('IAgentRunRepository')
     private readonly agentRunRepo: IAgentRunRepository,
