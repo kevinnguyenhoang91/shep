@@ -4,6 +4,45 @@
   </a>
 </p>
 
+# 🚀 Shep [v1.223.1](/compare/v1.223.0...v1.223.1) · _2026-08-08_
+
+> Your organization does not have access to Claude. Please login again or contact your administrator.
+
+
+
+### 🐛 Bug Fixes
+
+* **domain:** block dependent features until the parent's work has landed ([52f2e41](https://github.com/shep-ai/shep/commit/52f2e41c1d7b622b777031c9fc0bbe7527c2f6c0))
+
+* **agents:** inject supervisor policy and decision use cases by token ([189b318](https://github.com/shep-ai/shep/commit/189b318f850ef8e6dd6db7a4313972b4c1c9f9e7))
+
+* **domain:** inject SyncFeatureBranchUseCase by explicit class token ([7b6c157](https://github.com/shep-ai/shep/commit/7b6c157638ae4803de75744b479770cb6d73fb26))
+
+
+## 📦 Install or update
+
+```bash
+# upgrade an existing install
+npm i -g @shepai/cli@1.223.1
+
+# or run instantly without installing
+npx @shepai/cli@latest
+```
+
+## 💬 Join the community
+
+[💬 **Discord**](https://discord.gg/ES6tdVFfur) · [📖 **Docs**](https://github.com/shep-ai/shep#readme) · [⭐ **Star on GitHub**](https://github.com/shep-ai/shep) · [🐛 **Report an issue**](https://github.com/shep-ai/shep/issues)
+
+---
+
+<sub>🤖 Released autonomously by Shep — built by parallel AI agents working in isolated git worktrees. Try it: `npx @shepai/cli`</sub>
+
+<p align="center">
+  <a href="https://github.com/shep-ai/shep">
+    <img src="https://raw.githubusercontent.com/shep-ai/shep/main/docs/screenshots/shep-card.jpg" alt="Shep — run multiple AI agents in parallel" width="720" />
+  </a>
+</p>
+
 # 🚀 Shep [v1.223.0](/compare/v1.222.1...v1.223.0) · _2026-08-08_
 
 > Your organization does not have access to Claude. Please login again or contact your administrator.
