@@ -275,9 +275,18 @@ property access on the hollow field, pointing at a line that looks unrelated.
    itself: `expect(injected(resolve(X), 'dep')).toBeInstanceOf(Dep)`.
 3. Because vitest shares the metadata-less runtime, this class of bug IS catchable by
    unit tests — but only with assertion #2.
-4. To sweep for existing instances: resolve every function token in
-   `container._registry` and report fields that are `undefined`. Optional state fields
-   (`private qr?: string`) are false positives; constructor params are not.
+4. `tests/unit/infrastructure/di/hollow-dependency-guard.test.ts` now sweeps the whole
+   container for this automatically. If it fails, the named class has a constructor
+   parameter missing its `@inject(Token)` — do not weaken the guard, add the token.
+   It isolates constructor parameters as the LAST `ctor.length` own keys, because
+   TypeScript assigns parameter properties after declared field initializers run; that
+   keeps optional state (`private qr?: string`) out of the assertion.
+
+The same defect was present in `EvaluateSupervisorDecisionUseCase`,
+`AgentQuestionSupervisorRouter` and `FeatureAgentSupervisorGateEvaluator`, each with
+some parameters correctly tokenised and the `GetSupervisorPolicyUseCase` /
+`EvaluateSupervisorDecisionUseCase` ones bare — a partially-decorated constructor is
+the signature of this bug.
 
 ## Settings Is the Single Source of Truth for Agent + Model — Never Hardcode UI Defaults
 

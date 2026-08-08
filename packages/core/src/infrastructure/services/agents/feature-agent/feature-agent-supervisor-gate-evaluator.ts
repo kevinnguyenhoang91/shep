@@ -76,7 +76,9 @@ export class FeatureAgentSupervisorGateEvaluator {
   constructor(
     @inject('IApplicationRepository')
     private readonly applicationRepo: IApplicationRepository,
+    @inject(GetSupervisorPolicyUseCase)
     private readonly getPolicy: GetSupervisorPolicyUseCase,
+    @inject(EvaluateSupervisorDecisionUseCase)
     private readonly evaluateDecision: EvaluateSupervisorDecisionUseCase,
     @inject(ApproveAgentRunUseCase)
     private readonly approveAgentRun: ApproveAgentRunUseCase,

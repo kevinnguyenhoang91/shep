@@ -64,7 +64,9 @@ export interface AgentQuestionSupervisorRouteResult {
 @injectable()
 export class AgentQuestionSupervisorRouter {
   constructor(
+    @inject(GetSupervisorPolicyUseCase)
     private readonly getPolicy: GetSupervisorPolicyUseCase,
+    @inject(EvaluateSupervisorDecisionUseCase)
     private readonly evaluateDecision: EvaluateSupervisorDecisionUseCase,
     @inject(AnswerAgentQuestionUseCase)
     private readonly answerAgentQuestion: AnswerAgentQuestionUseCase

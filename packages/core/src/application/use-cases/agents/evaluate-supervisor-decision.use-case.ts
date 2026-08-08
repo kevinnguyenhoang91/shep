@@ -83,6 +83,7 @@ export class EvaluateSupervisorDecisionUseCase {
     private readonly activityLog: IActivityLogRepository,
     @inject('ISettingsRepository')
     private readonly settings: ISettingsRepository,
+    @inject(GetSupervisorPolicyUseCase)
     private readonly getPolicy: GetSupervisorPolicyUseCase,
     @inject(EscalateToUserUseCase)
     private readonly escalateToUser: EscalateToUserUseCase
