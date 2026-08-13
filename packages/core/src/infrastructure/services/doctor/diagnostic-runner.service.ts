@@ -66,7 +66,7 @@ function errorResult(name: string, err: unknown, durationMs: number): Diagnostic
 export class DiagnosticRunner implements IDiagnosticRunner {
   private readonly timeoutMs: number;
 
-  constructor(options: RunnerOptions = {}) {
+  constructor(@inject('RunnerOptions') options: RunnerOptions = {}) {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 

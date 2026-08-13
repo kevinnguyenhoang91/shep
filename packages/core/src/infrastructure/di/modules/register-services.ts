@@ -424,6 +424,7 @@ export function registerServices(container: DependencyContainer): void {
   // constructor; instantiate it directly to bypass tsyringe reflection.
   registerRecapPublisher(RecapChannel.GithubDiscussion, () => new GithubDiscussionRecapPublisher());
 
+  container.registerInstance('RunnerOptions', {});
   container.registerSingleton<IDiagnosticRunner>('IDiagnosticRunner', DiagnosticRunner);
 
   // ─── Doctor diagnostics (feature 097, phase 3) ──────────────────────
