@@ -10,7 +10,7 @@
  * than rejected promises so the report always populates fully.
  */
 
-import { injectable } from 'tsyringe';
+import { inject, injectable } from 'tsyringe';
 
 import { DiagnosticStatus } from '../../../domain/generated/output.js';
 import type {
