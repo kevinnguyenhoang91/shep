@@ -1735,3 +1735,38 @@ macOS, where 1ms barely clears `exec` and nothing had touched the DB yet.
 When modifying a module's exports (e.g. changing `useAllTurnStatuses` to `useTurnStatusSync`), vitest mocks using `vi.mock()` that return an object missing the expected exports will fail at runtime with `TypeError: (0, ...useTurnStatus) is not a function` or `Error: [vitest] No "useTurnStatusSync" export is defined...`. Vitest strictly verifies that if a module is mocked, any named import actually exists on the mocked object. 
 
 **Rule:** Always search the codebase for `vi.mock('path/to/module')` whenever you rename, add, or remove an exported function from a module, and ensure all test files update their mock returns to match the new signature.
+
+## EventSource Connections Can Stall Without Browser Notification
+
+**Symptom:** The web UI would periodically stop updating without the user's knowledge. Events were being sent by the server, but the browser's EventSource connection had silently stalled. Reloading the page temporarily fixed the issue, but it would recur.
+
+**Root cause:** The browser's EventSource API does not provide timeout detection for connections that are "connected" but no longer receiving messages. A network glitch, proxy timeout, or server issue could leave the connection in an open-but-dead state indefinitely. The `onerror` callback would only fire when the browser detected the connection was actually closed, which could take minutes depending on the OS and network stack.
+
+**Fix pattern (Spec 110):**
+
+Add a client-side heartbeat timeout mechanism to detect stale connections:
+
+1. **After connection opens** (`EventSource.onopen`), set a timeout for N seconds (e.g., 60s)
+2. **When any message arrives** (including heartbeats from the server), reset the timeout
+3. **If the timeout fires** (no message for N seconds), close and reconnect the EventSource
+4. Use exponential backoff for reconnection attempts to avoid hammering the server
+
+**Implementation checklist:**
+- Track `heartbeatTimer` (setTimeout ID) alongside existing reconnection timers
+- Create a `resetHeartbeatTimeout()` function that clears the old timer and sets a new one
+- Call `resetHeartbeatTimeout()` in every event listener (notification, agent_message, supervisor_decision, etc.)
+- Call `resetHeartbeatTimeout()` in `onopen` to start the initial timeout
+- Clear `heartbeatTimer` in `onerror` cleanup to avoid orphaned timers
+- Clear `heartbeatTimer` on unmount/cleanup
+
+**Why this works:**
+- Even if the server is sending heartbeats (comments in SSE that don't trigger event listeners), real events will trigger listeners and reset the timeout
+- If only heartbeats arrive and no real events, the timeout will reconnect, which is correct behavior (no work is happening anyway)
+- The exponential backoff prevents reconnection storms if the connection is truly dead
+
+**Testing pattern:**
+- Mock the EventSource and fake timer (vitest `useFakeTimers`)
+- Verify that opening the connection starts the heartbeat timeout
+- Verify that receiving an event resets the timeout
+- Verify that the timeout expiring triggers a reconnect with backoff
+- Verify that multiple event types all reset the timeout (don't assume only one type does)
