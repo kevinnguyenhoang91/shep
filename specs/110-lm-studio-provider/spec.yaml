@@ -1,0 +1,185 @@
+name: lm-studio-provider
+number: 110
+branch: feat/110-lm-studio-provider
+oneLiner: "Add LM Studio as a local LLM provider option"
+summary: >
+  Extend the agent executor system to support LM Studio, a local LLM runtime with an OpenAI-compatible API.
+  Users can select LM Studio from agent settings to run inference locally without external API keys,
+  extending Shep's existing support for Ollama and LLMProxy.
+phase: Analysis
+sizeEstimate: M
+
+relatedFeatures: []
+
+technologies:
+  - "Vercel AI SDK (@ai-sdk/openai-compatible)"
+  - "TypeSpec for domain model generation"
+  - "OpenAI-compatible API standard"
+  - "tsyringe dependency injection"
+  - "LangGraph state machine"
+
+relatedLinks:
+  - title: "LM Studio Official Documentation"
+    url: "https://lmstudio.ai/"
+  - title: "OpenAI-Compatible API Spec"
+    url: "https://platform.openai.com/docs/api-reference"
+  - title: "Vercel AI SDK OpenAI-Compatible Provider"
+    url: "https://sdk.vercel.ai/docs/reference/ai-sdk-openai-compatible"
+
+openQuestions: []
+
+content: |
+  ## Problem Statement
+
+  Shep currently supports multiple local and remote LLM providers: Ollama, LLMProxy, OpenRouter, Together AI, and various IDE-integrated agents.
+  LM Studio is a popular desktop application for running open-source models locally with an OpenAI-compatible API (defaulting to `http://localhost:8000/v1`).
+  Adding LM Studio as a provider gives users another option for local inference without external API dependencies, complementing the existing Ollama/LLMProxy support.
+
+  ## Codebase Analysis
+
+  ### Project Structure
+
+  **Core Packages**:
+  - `packages/core/src/domain/` — Domain models, business logic (clean architecture inner layer)
+  - `packages/core/src/application/` — Use cases and application ports (clean architecture app layer)
+  - `packages/core/src/infrastructure/` — External services: DB, agents, API clients (clean architecture outer layer)
+  - `src/presentation/` — CLI, TUI, Web UI (presentation layer)
+
+  **Agent System Architecture**:
+  - `packages/core/src/infrastructure/services/agents/common/` — Shared agent infrastructure
+    - `agent-executor-factory.service.ts` — Factory creating executor instances by agent type
+    - `executors/` — Concrete executor implementations (one per agent type)
+    - `agent-model-catalog.ts` — Static model lists per agent type
+    - `model-catalogs/` — Optional dynamic model discovery services
+  - `packages/core/src/application/ports/output/agents/` — Port interfaces defining the agent contract
+  - `tsp/common/enums/agent-config.tsp` — TypeSpec enum defining all supported agent types
+
+  **Dependency Injection**:
+  - `packages/core/src/infrastructure/di/` — DI container setup using tsyringe
+  - `container.ts` — Central registration point for all dependencies
+  - Ports (interfaces) are injected; infrastructure provides concrete implementations
+
+  ### Current Provider Implementations
+
+  **Existing Local Providers** (similar pattern to LM Studio):
+  - **Ollama** — Uses `@ai-sdk/openai-compatible` with `http://localhost:11434/v1`
+  - **LLMProxy** — Uses `@ai-sdk/openai-compatible` with `http://localhost:4000/v1` (configurable)
+
+  **Remote SDK-Based Providers**:
+  - **OpenRouter** — Uses `@ai-sdk/provider` over HTTP with API key
+  - **Together AI** — Uses `@ai-sdk/provider` over HTTP with API key
+
+  **CLI-Based Providers**:
+  - **Claude Code** — Spawns `claude` binary
+  - **Cursor** — Spawns `cursor agent` binary
+  - **Cline** — Spawns `cline` CLI binary
+
+  ### Architecture Patterns
+
+  **Port Interface Pattern** (Clean Architecture):
+  - `IAgentExecutorFactory` — Creates executor instances
+  - `IAgentExecutor` — Executes prompts and returns results
+  - Implementations injectable via tsyringe DI container
+
+  **Executor Hierarchy**:
+  - `AiSdkBaseExecutorService` — Base class for Vercel AI SDK–based executors (Ollama, LLMProxy, OpenRouter, Together AI, LM Studio)
+  - Each subclass implements `createModel(modelId?: string): LanguageModelV3` to instantiate the provider
+  - Base class handles prompt execution, streaming, tool calling, and error handling
+
+  **Model Catalog**:
+  - Static lists in `agent-model-catalog.ts` for each agent type
+  - Used by factory's `getSupportedModels()` for UI dropdowns and type validation
+  - Dynamic catalogs for providers that expose a discovery API (OpenRouter, Together AI)
+
+  **Settings-Driven Resolution** (MANDATORY architectural rule):
+  - All agent type resolution flows through `getSettings().agent.type`
+  - Factory called via `IAgentExecutorProvider.getExecutor()` which resolves from settings
+  - No hardcoding of agent types; config drives behavior
+
+  ## Affected Areas
+
+  | Area | Impact | Reasoning |
+  | ---- | ------ | --------- |
+  | `tsp/common/enums/agent-config.tsp` | High | Add `LmStudio: "lm-studio"` to AgentType enum; regenerate TypeScript types |
+  | `packages/core/src/infrastructure/services/agents/common/executors/` | High | Create `lm-studio-executor.service.ts` extending `AiSdkBaseExecutorService` |
+  | `packages/core/src/infrastructure/services/agents/common/agent-executor-factory.service.ts` | High | Add case for `'lm-studio'` in `createExecutor()` and `getSupportedAgents()` |
+  | `packages/core/src/infrastructure/services/agents/common/agent-model-catalog.ts` | Medium | Add `LM_STUDIO_MODELS` list and export it; update factory's `getSupportedModels()` |
+  | `packages/core/src/infrastructure/di/modules/` | Medium | Add `@injectable()` registration for new executor in DI module if needed |
+  | `packages/core/src/infrastructure/di/container.ts` | Low | If DI registration needed, add factory case in string-token aliases for web routes |
+  | `src/presentation/web/lib/agent-models.ts` and related UI files | Low | Ensure LM Studio appears in agent picker dropdowns (likely automatic via `getSettings()`) |
+  | `tests/unit/infrastructure/services/agents/` | Medium | Add unit tests for `LmStudioExecutorService` (model creation, error handling) |
+  | `tests/integration/infrastructure/services/agents/` | Low | Optional integration test hitting a live LM Studio instance (if available in CI) |
+
+  ## Dependencies
+
+  **External**:
+  - `@ai-sdk/openai-compatible` — Already available (used by Ollama, LLMProxy)
+  - Vercel AI SDK ecosystem — Already established in the project
+
+  **Internal**:
+  - `AiSdkBaseExecutorService` — Base class pattern already proven
+  - `IAgentExecutorFactory` — Port interface already in place
+  - `IAgentExecutor` — Executor contract already stable
+  - Settings service — Reads agent type from config
+  - DI container — Central registration point
+
+  **No new external dependencies required** — LM Studio reuses the OpenAI-compatible adapter layer already proven with Ollama.
+
+  ## Architectural Integration Points
+
+  1. **TypeSpec Domain Model** — `AgentType` enum is the single source of truth for supported agents
+  2. **Factory Pattern** — `AgentExecutorFactory.createExecutor()` is the dispatch point; must handle all agent types
+  3. **Port Interface** — `IAgentExecutor` contract unchanged; implementation adds a new case
+  4. **DI Container** — If registration is needed, `container.ts` is the wiring point
+  5. **Settings** — Agent type read from `settings.agent.type`; no schema changes needed
+  6. **UI Layer** — Agent picker automatically populated from `factory.getSupportedAgents()`
+
+  ## Implementation Strategy
+
+  **Phase 1: Core Executor** (highest priority)
+  - Add `LmStudio` to TypeSpec `AgentType` enum
+  - Run `pnpm tsp:codegen` to regenerate types
+  - Create `LmStudioExecutorService` extending `AiSdkBaseExecutorService`
+  - Register in `AgentExecutorFactory.createExecutor()` switch statement
+  - Add to `getSupportedAgents()` return list
+
+  **Phase 2: Model Catalog**
+  - Define popular LM Studio models (Llama 3.x, Qwen, Mistral, etc.)
+  - Add `LM_STUDIO_MODELS` constant to catalog
+  - Update factory's `getSupportedModels()` to include LM Studio models
+
+  **Phase 3: Testing**
+  - Unit tests for executor instantiation, model creation, config handling
+  - Mock executor test against realistic LM Studio prompts and responses
+
+  **Phase 4: Documentation** (if needed)
+  - AGENTS.md or docs/development/adding-agents.md — Update supported agents list
+  - TypeSpec enum comments already self-document the feature
+
+  ## Success Criteria
+
+  - [ ] `AgentType` enum includes `LmStudio: "lm-studio"` and regenerated TS types reflect it
+  - [ ] `LmStudioExecutorService` instantiates via `createOpenAICompatible({ baseURL: 'http://localhost:8000/v1' })`
+  - [ ] `AgentExecutorFactory.createExecutor('lm-studio', config)` returns a working executor
+  - [ ] `factory.getSupportedModels('lm-studio')` returns the LM Studio model list
+  - [ ] Unit tests pass: executor creation, model selection, error handling
+  - [ ] `pnpm typecheck` and `pnpm test` pass with no regressions
+  - [ ] Settings UI automatically shows LM Studio as an agent option (no UI changes needed if done correctly)
+  - [ ] Can select LM Studio from agent settings and create/run a feature with it
+
+  ## Size Estimate
+
+  **M (medium)** — 2–3 days of implementation effort
+
+  **Justification**:
+  - High confidence — Pattern proven by Ollama/LLMProxy (both SDK-based local providers)
+  - No new external dependencies required
+  - Straightforward enum addition + executor class + factory registration
+  - Tests follow existing patterns
+  - No architectural changes; LM Studio fits cleanly into the existing port/factory model
+  - No UI layer changes needed; settings already support dynamic agent types
+  - Risk is low: isolated to agent infrastructure, no impact on workflow, features, or persistence layers
+
+  ---
+
+  _Analysis complete — ready for research and implementation planning_
