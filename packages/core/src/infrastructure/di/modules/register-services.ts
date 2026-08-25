@@ -120,7 +120,7 @@ import type {
   IDiagnostic,
   IDiagnosticRunner,
 } from '../../../application/ports/output/services/diagnostic.interface.js';
-import { DiagnosticRunner } from '../../services/doctor/diagnostic-runner.service.js';
+import { DiagnosticRunner, RunnerOptions } from '../../services/doctor/diagnostic-runner.service.js';
 import { NodeVersionDiagnostic } from '../../../application/use-cases/doctor/diagnostics/node-version.diagnostic.js';
 import { PnpmInstalledDiagnostic } from '../../../application/use-cases/doctor/diagnostics/pnpm-installed.diagnostic.js';
 import { GitInstalledDiagnostic } from '../../../application/use-cases/doctor/diagnostics/git-installed.diagnostic.js';
@@ -424,6 +424,7 @@ export function registerServices(container: DependencyContainer): void {
   // constructor; instantiate it directly to bypass tsyringe reflection.
   registerRecapPublisher(RecapChannel.GithubDiscussion, () => new GithubDiscussionRecapPublisher());
 
+  container.registerSingleton(RunnerOptions);
   container.registerSingleton<IDiagnosticRunner>('IDiagnosticRunner', DiagnosticRunner);
 
   // ─── Doctor diagnostics (feature 097, phase 3) ──────────────────────

@@ -10,7 +10,7 @@
  * than rejected promises so the report always populates fully.
  */
 
-import { injectable } from 'tsyringe';
+import { injectable, inject } from 'tsyringe';
 
 import { DiagnosticStatus } from '../../../domain/generated/output.js';
 import type {
@@ -22,9 +22,11 @@ import type {
 
 const DEFAULT_TIMEOUT_MS = 3000;
 
-interface RunnerOptions {
-  /** Per-diagnostic timeout in milliseconds. Default: 3000 (NFR-7). */
-  timeoutMs?: number;
+export class RunnerOptions {
+  constructor(
+    /** Per-diagnostic timeout in milliseconds. Default: 3000 (NFR-7). */
+    readonly timeoutMs: number = DEFAULT_TIMEOUT_MS
+  ) {}
 }
 
 function rankOf(status: DiagnosticStatus): number {
@@ -66,8 +68,8 @@ function errorResult(name: string, err: unknown, durationMs: number): Diagnostic
 export class DiagnosticRunner implements IDiagnosticRunner {
   private readonly timeoutMs: number;
 
-  constructor(options: RunnerOptions = {}) {
-    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  constructor(@inject(RunnerOptions) options: RunnerOptions = new RunnerOptions()) {
+    this.timeoutMs = options.timeoutMs;
   }
 
   async runAll(diagnostics: readonly IDiagnostic[]): Promise<DoctorReport> {

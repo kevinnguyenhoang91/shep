@@ -9,7 +9,7 @@
 import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { DiagnosticRunner } from '@/infrastructure/services/doctor/diagnostic-runner.service.js';
+import { DiagnosticRunner, RunnerOptions } from '@/infrastructure/services/doctor/diagnostic-runner.service.js';
 import type {
   IDiagnostic,
   DiagnosticResult,
@@ -64,7 +64,7 @@ describe('DiagnosticRunner', () => {
   });
 
   it('marks a diagnostic that exceeds the 3 s timeout as Warn (non-blocking)', async () => {
-    const runner = new DiagnosticRunner({ timeoutMs: 3000 });
+    const runner = new DiagnosticRunner(new RunnerOptions(3000));
     const promise = runner.runAll([slow('slow', 5000)]);
     await vi.advanceTimersByTimeAsync(3500);
     const report = await promise;
