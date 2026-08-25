@@ -6,7 +6,7 @@ summary: >
   Extend the agent executor system to support LM Studio, a local LLM runtime with an OpenAI-compatible API.
   Users can select LM Studio from agent settings to run inference locally without external API keys,
   extending Shep's existing support for Ollama and LLMProxy.
-phase: Analysis
+phase: Requirements
 sizeEstimate: M
 
 relatedFeatures: []
@@ -26,7 +26,54 @@ relatedLinks:
   - title: "Vercel AI SDK OpenAI-Compatible Provider"
     url: "https://sdk.vercel.ai/docs/reference/ai-sdk-openai-compatible"
 
-openQuestions: []
+openQuestions:
+  - question: "Should LM Studio API endpoint be fixed or configurable?"
+    resolved: true
+    options:
+      - option: "Fixed endpoint"
+        description: "Use only the default http://localhost:8000/v1. Simplest implementation, works for 99% of users who don't customize LM Studio port settings. Reduces configuration surface area and potential for user error."
+        selected: false
+      - option: "Configurable with defaults"
+        description: "Allow users to override the default http://localhost:8000/v1 in settings. Matches existing Ollama/LLMProxy pattern. Supports power users running LM Studio on custom ports or remote machines. Adds minimal complexity since we already read config from settings."
+        selected: true
+    selectionRationale: "Configurable with defaults is recommended because it matches the existing pattern established by Ollama and LLMProxy, provides flexibility for advanced users, and adds negligible complexity since the settings infrastructure is already in place. Users who don't customize get sensible defaults automatically."
+    answer: "Configurable with defaults"
+
+  - question: "How should LM Studio models be discovered and exposed?"
+    resolved: true
+    options:
+      - option: "Static catalog"
+        description: "Maintain a curated list of popular open-source models (Llama 3.x, Mistral, Qwen, etc.) in agent-model-catalog.ts. Fast, reliable, no runtime discovery overhead. Requires manual updates when adding new models."
+        selected: true
+      - option: "Dynamic discovery"
+        description: "Query LM Studio API to discover available models at runtime. More flexible and automatically reflects user's installed models. Requires connectivity to LM Studio instance and adds latency to settings UI."
+        selected: false
+    selectionRationale: "Static catalog is recommended because it matches the existing pattern (used by Ollama, LLMProxy), provides faster UI responsiveness without requiring a running LM Studio instance, and aligns with Shep's model discovery strategy. A carefully curated list of 10-15 popular models covers 95% of use cases."
+    answer: "Static catalog"
+
+  - question: "When should LM Studio connection be validated?"
+    resolved: true
+    options:
+      - option: "Eager validation on agent selection"
+        description: "Ping LM Studio API when user switches to LM Studio agent. Provides immediate feedback if connection fails. Slightly increases UI latency and requires running instance even for configuration."
+        selected: false
+      - option: "Lazy validation on prompt execution"
+        description: "Only validate connection when user first executes a prompt. Faster agent switching, clearer error messages in execution context. User discovers connection issues only when they use the agent."
+        selected: true
+    selectionRationale: "Lazy validation on execution is recommended because it matches existing error handling patterns, keeps agent-switching responsive, and provides clear error context when users actually try to use the agent. Connection failures surface with descriptive messages during execution, which is when users care most."
+    answer: "Lazy validation on prompt execution"
+
+  - question: "Which models should be included in the initial LM Studio catalog?"
+    resolved: true
+    options:
+      - option: "Minimal set (3-5 models)"
+        description: "Include only the most popular: Llama 3, Mistral, Qwen. Keeps catalog lean, fastest to maintain, covers 80% of typical use cases."
+        selected: false
+      - option: "Comprehensive set (10-15 models)"
+        description: "Include Llama 3.1/3.2, Mistral, Mistral-Large, Qwen, Yi, Neural, etc. Covers diverse model families and use cases. Slightly larger maintenance surface, better user choice."
+        selected: true
+    selectionRationale: "Comprehensive set of 10-15 models is recommended because it provides users with meaningful choice across different model families and capabilities (speed vs. quality), matches similar provider catalogs in Shep, and is still maintainable. The list should be curated for popular, well-supported open-source models available in LM Studio."
+    answer: "Comprehensive set (10-15 models)"
 
 content: |
   ## Problem Statement
@@ -34,6 +81,66 @@ content: |
   Shep currently supports multiple local and remote LLM providers: Ollama, LLMProxy, OpenRouter, Together AI, and various IDE-integrated agents.
   LM Studio is a popular desktop application for running open-source models locally with an OpenAI-compatible API (defaulting to `http://localhost:8000/v1`).
   Adding LM Studio as a provider gives users another option for local inference without external API dependencies, complementing the existing Ollama/LLMProxy support.
+
+  LM Studio offers:
+  - Easy GUI-based model management (download, configure, run)
+  - OpenAI-compatible API endpoint (making integration straightforward)
+  - Support for popular open-source models (Llama, Mistral, Qwen, etc.)
+  - Local-first execution with no external API calls or rate limits
+  - Cross-platform support (Windows, macOS, Linux)
+
+  This feature enables users who prefer LM Studio's interface to seamlessly integrate it into their Shep workflows.
+
+  ## Functional Requirements
+
+  - **FR-1**: Add `LmStudio: "lm-studio"` to the `AgentType` enum in TypeSpec (`tsp/common/enums/agent-config.tsp`)
+  - **FR-2**: Regenerate TypeScript types from TypeSpec (via `pnpm tsp:codegen`) to reflect the new agent type
+  - **FR-3**: Create `LmStudioExecutorService` extending `AiSdkBaseExecutorService` that instantiates `createOpenAICompatible()` with the LM Studio endpoint
+  - **FR-4**: Support a configurable API endpoint (default: `http://localhost:8000/v1`) read from settings or environment
+  - **FR-5**: Define a curated catalog of 10–15 popular open-source models available in LM Studio (Llama, Mistral, Qwen, Yi, etc.)
+  - **FR-6**: Register `LmStudioExecutorService` in `AgentExecutorFactory.createExecutor()` switch statement
+  - **FR-7**: Include LM Studio in `factory.getSupportedAgents()` return list
+  - **FR-8**: Ensure `factory.getSupportedModels('lm-studio')` returns the model catalog
+  - **FR-9**: Display LM Studio as an option in agent settings UI (automatic via existing factory/settings integration)
+  - **FR-10**: Handle LM Studio connection failures gracefully with clear, actionable error messages (e.g., "LM Studio is not running on http://localhost:8000/v1 — check that LM Studio is installed and the server is running")
+  - **FR-11**: Support all prompt execution modes: single prompt, streaming, tool calling (inherited from `AiSdkBaseExecutorService` contract)
+
+  ## Non-Functional Requirements
+
+  - **NFR-1**: No new external package dependencies — reuse `@ai-sdk/openai-compatible` (already available)
+  - **NFR-2**: Executor implementation follows the existing `AiSdkBaseExecutorService` pattern for consistency and maintainability
+  - **NFR-3**: Dependency injection wiring uses tsyringe `@injectable()` decorator and DI container registration, consistent with other executors
+  - **NFR-4**: Unit test coverage ≥ 80% for `LmStudioExecutorService` (model creation, endpoint config, error handling)
+  - **NFR-5**: Backward compatible — no breaking changes to existing agent types, factory interface, or settings schema
+  - **NFR-6**: Settings schema unchanged — leverage existing `settings.agent.type` and optional endpoint configuration structure
+  - **NFR-7**: Executor instantiation and model creation complete in < 100ms (matches Ollama/LLMProxy performance)
+  - **NFR-8**: Error handling and logging consistent with existing providers (use shared error types and logging infrastructure)
+  - **NFR-9**: TypeSpec changes and type regeneration cause zero regressions in existing agent types
+
+  ## Success Criteria
+
+  - [ ] `AgentType` enum in TypeSpec includes `LmStudio: "lm-studio"` and regenerated TS types reflect the new type
+  - [ ] `LmStudioExecutorService` exists and extends `AiSdkBaseExecutorService` correctly
+  - [ ] `LmStudioExecutorService.createModel()` instantiates `createOpenAICompatible({ baseURL: 'http://localhost:8000/v1' })` (or configurable endpoint)
+  - [ ] `AgentExecutorFactory.createExecutor('lm-studio', config)` returns a working `LmStudioExecutorService` instance
+  - [ ] `factory.getSupportedAgents()` includes `'lm-studio'` in the returned list
+  - [ ] `factory.getSupportedModels('lm-studio')` returns a list of 10–15 curated models
+  - [ ] LM Studio appears as a selectable option in agent settings UI (no custom UI work required)
+  - [ ] Unit tests pass for executor: instantiation, model creation, endpoint configuration, error handling
+  - [ ] Integration test (optional): executor can execute a simple prompt against a mock or live LM Studio instance
+  - [ ] `pnpm typecheck` passes with no new type errors
+  - [ ] `pnpm test:unit` and `pnpm test:int` pass with zero regressions in existing agent tests
+  - [ ] `pnpm build` completes without errors
+  - [ ] Manual smoke test: select LM Studio from settings, create a feature, execute a workflow (if LM Studio is available locally)
+
+  ## Product Questions & AI Recommendations
+
+  | # | Question | AI Recommendation | Rationale |
+  | - | -------- | ----------------- | --------- |
+  | 1 | Should LM Studio API endpoint be fixed or configurable? | Configurable with defaults | Matches existing Ollama/LLMProxy pattern, supports power users, adds minimal complexity |
+  | 2 | How should LM Studio models be discovered? | Static catalog (10–15 models) | Fast, reliable, no runtime overhead; matches existing strategy; curated list covers 95% of use cases |
+  | 3 | When should LM Studio connection be validated? | Lazy validation on execution | Keeps UI responsive, provides clear error context, matches existing error handling patterns |
+  | 4 | Which models should be in the initial catalog? | Comprehensive set (10–15 models) | Provides user choice, covers diverse model families, still maintainable |
 
   ## Codebase Analysis
 
@@ -156,17 +263,6 @@ content: |
   - AGENTS.md or docs/development/adding-agents.md — Update supported agents list
   - TypeSpec enum comments already self-document the feature
 
-  ## Success Criteria
-
-  - [ ] `AgentType` enum includes `LmStudio: "lm-studio"` and regenerated TS types reflect it
-  - [ ] `LmStudioExecutorService` instantiates via `createOpenAICompatible({ baseURL: 'http://localhost:8000/v1' })`
-  - [ ] `AgentExecutorFactory.createExecutor('lm-studio', config)` returns a working executor
-  - [ ] `factory.getSupportedModels('lm-studio')` returns the LM Studio model list
-  - [ ] Unit tests pass: executor creation, model selection, error handling
-  - [ ] `pnpm typecheck` and `pnpm test` pass with no regressions
-  - [ ] Settings UI automatically shows LM Studio as an agent option (no UI changes needed if done correctly)
-  - [ ] Can select LM Studio from agent settings and create/run a feature with it
-
   ## Size Estimate
 
   **M (medium)** — 2–3 days of implementation effort
@@ -182,4 +278,4 @@ content: |
 
   ---
 
-  _Analysis complete — ready for research and implementation planning_
+  _Requirements phase complete — ready for research and implementation planning_
