@@ -1735,3 +1735,16 @@ macOS, where 1ms barely clears `exec` and nothing had touched the DB yet.
 When modifying a module's exports (e.g. changing `useAllTurnStatuses` to `useTurnStatusSync`), vitest mocks using `vi.mock()` that return an object missing the expected exports will fail at runtime with `TypeError: (0, ...useTurnStatus) is not a function` or `Error: [vitest] No "useTurnStatusSync" export is defined...`. Vitest strictly verifies that if a module is mocked, any named import actually exists on the mocked object. 
 
 **Rule:** Always search the codebase for `vi.mock('path/to/module')` whenever you rename, add, or remove an exported function from a module, and ensure all test files update their mock returns to match the new signature.
+
+## Native Process Spawn Must Validate Pre-Conditions Before Calling
+
+When spawning a native process (PTY, child process, subprocess), always validate the pre-conditions **before** attempting to spawn. Errors like "posix_spawn error" are low-level OS errors with no context about what failed. They fail silently or with unhelpful error messages when the caller hasn't validated inputs first.
+
+**Concrete instance (spec 110):** `node-pty.spawn()` was called with an unvalidated `cwd` parameter from the web UI. When the working directory didn't exist or was inaccessible, node-pty threw `posix_spawn error` with no indication of whether it was a path issue, permission issue, or shell issue. Adding `statSync()` validation before the spawn call provided clear error messages ("Working directory does not exist" vs "Permission denied").
+
+**Rules:**
+
+1. **Always validate file paths before passing to spawn calls.** Use `statSync(cwd)` to check: exists (ENOENT), is correct type (isDirectory), and is accessible (EACCES). Wrap the stat in try/catch and convert OS error codes to user-facing messages.
+2. **Wrap the spawn call itself in error handling.** Even with pre-validation, spawn can fail for other reasons. Catch and re-throw with context: `Failed to spawn terminal: ${originalError.message}`.
+3. **Test the validation layer separately from the spawn behavior.** Add unit tests for invalid paths, non-directory paths, and inaccessible directories before any integration test of spawn success.
+4. **For cross-platform support, normalize and validate paths on Windows too** — a backslash path from a file dialog needs forward-slash normalization before comparison or storage, but the validation itself (does it exist? is it readable?) must work on the actual path the OS will use.
