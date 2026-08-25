@@ -1735,3 +1735,37 @@ macOS, where 1ms barely clears `exec` and nothing had touched the DB yet.
 When modifying a module's exports (e.g. changing `useAllTurnStatuses` to `useTurnStatusSync`), vitest mocks using `vi.mock()` that return an object missing the expected exports will fail at runtime with `TypeError: (0, ...useTurnStatus) is not a function` or `Error: [vitest] No "useTurnStatusSync" export is defined...`. Vitest strictly verifies that if a module is mocked, any named import actually exists on the mocked object. 
 
 **Rule:** Always search the codebase for `vi.mock('path/to/module')` whenever you rename, add, or remove an exported function from a module, and ensure all test files update their mock returns to match the new signature.
+
+## Interface Constructor Parameters Must Be Classes for tsyringe @injectable()
+
+Symptom: "Cannot inject the dependency at position #N of 'X' constructor. Reason: TypeInfo not known for 'Object'".
+
+Root cause: tsyringe uses `reflect-metadata` to introspect constructor parameter types. Interfaces and inline object types (e.g. `options: RunnerOptions`) erase to `Object` at runtime — there is no type information for tsyringe to resolve, so it fails.
+
+Concrete instance: `DiagnosticRunner(options: RunnerOptions = {})` where `RunnerOptions` was an interface. At runtime, the parameter type was `Object`, making tsyringe unable to resolve it.
+
+**Rule:** For any `@injectable()` class constructor parameter that needs DI resolution, the parameter type must be a **class**, not an interface. Convert interfaces to classes:
+
+```typescript
+// WRONG: Interface erases to Object
+interface RunnerOptions {
+  timeoutMs?: number;
+}
+@injectable()
+export class DiagnosticRunner {
+  constructor(options: RunnerOptions = {}) { ... } // FAILS
+}
+
+// CORRECT: Class has runtime type information
+export class RunnerOptions {
+  constructor(readonly timeoutMs: number = 3000) {}
+}
+@injectable()
+export class DiagnosticRunner {
+  constructor(@inject(RunnerOptions) options: RunnerOptions = new RunnerOptions()) { ... }
+}
+```
+
+Register the class as a singleton in the DI container: `container.registerSingleton(RunnerOptions)`.
+
+Why it matters: Without proper type information, tsyringe cannot resolve the dependency chain, causing the entire feature (and dependent features) to fail at runtime with a cryptic "TypeInfo not known" error instead of a clear compilation error.
