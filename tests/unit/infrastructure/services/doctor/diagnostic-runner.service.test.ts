@@ -9,7 +9,10 @@
 import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { DiagnosticRunner, RunnerOptions } from '@/infrastructure/services/doctor/diagnostic-runner.service.js';
+import {
+  DiagnosticRunner,
+  RunnerOptions,
+} from '@/infrastructure/services/doctor/diagnostic-runner.service.js';
 import type {
   IDiagnostic,
   DiagnosticResult,

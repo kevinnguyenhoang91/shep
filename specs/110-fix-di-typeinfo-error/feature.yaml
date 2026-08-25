@@ -1,0 +1,34 @@
+feature:
+  id: "110-fix-di-typeinfo-error"
+  name: "fix-di-typeinfo-error"
+  number: 110
+  branch: "feat/110-fix-di-typeinfo-error"
+  lifecycle: "research"
+  createdAt: "2026-08-25T02:18:51Z"
+status:
+  phase: "research"
+  progress:
+    completed: 0
+    total: 0
+    percentage: 0
+  currentTask: null
+  lastUpdated: "2026-08-25T02:18:51Z"
+  lastUpdatedBy: "feature-agent"
+  completedPhases:
+    - "evidence"
+    - "fast-implement"
+validation:
+  lastRun: null
+  gatesPassed: []
+  autoFixesApplied: []
+tasks:
+  current: null
+  blocked: []
+  failed: []
+checkpoints:
+  - phase: "feature-created"
+    completedAt: "2026-08-25T02:18:51Z"
+    completedBy: "feature-agent"
+errors:
+  current: null
+  history: []
