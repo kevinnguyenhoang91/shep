@@ -11,7 +11,7 @@ summary: >
   LM Studio instance, enabling offline code generation, local model experimentation, and privacy-focused
   development workflows. The implementation follows the established SDK-based executor pattern used by
   Ollama and LLMProxy, leveraging the Vercel AI SDK's OpenAI-compatible provider.
-phase: Analysis
+phase: Requirements
 sizeEstimate: S
 
 relatedFeatures: []
@@ -29,7 +29,105 @@ relatedLinks:
   - title: "Vercel AI SDK OpenAI Compatible Provider"
     url: "https://ai-sdk.dev/providers/ai-sdk-providers/openai-compatible"
 
-openQuestions: []
+openQuestions:
+  - question: "Should the default LM Studio model be hardcoded or left to LM Studio's runtime selection?"
+    resolved: true
+    options:
+      - option: "Use LM Studio default selection"
+        description: "Pass no explicit model name; LM Studio server picks the currently-loaded model. Minimal configuration, respects user's LM Studio setup. Trade-off: user must have a model loaded in LM Studio UI."
+        selected: true
+      - option: "Default to specific model (llama2)"
+        description: "Hardcode a sensible default like 'llama2'. Guarantees explicit behavior. Trade-off: may not match user's preferred model, requires model name to be available."
+        selected: false
+      - option: "Require explicit configuration"
+        description: "Always require user to specify model in settings. Explicit, no surprises. Trade-off: friction for new users, inconsistent with Ollama pattern."
+        selected: false
+    selectionRationale: "Use LM Studio default selection (option 1) mirrors the Ollama pattern where the executor delegates to the server's current state. This respects the user's LM Studio configuration and avoids hardcoding assumptions about available models. Users who want explicit model control can specify it in executor configuration."
+    answer: "Use LM Studio default selection"
+
+  - question: "Should the LM Studio API endpoint be fixed to localhost:1234 or configurable?"
+    resolved: true
+    options:
+      - option: "Fixed endpoint (localhost:1234)"
+        description: "Hardcode http://localhost:1234/v1 as LM Studio's standard default. Simpler implementation, matches LM Studio's documentation. Trade-off: inflexible for custom setups (non-standard ports, remote instances)."
+        selected: false
+      - option: "Configurable via settings"
+        description: "Allow users to override endpoint in agent settings (e.g., lm_studio_endpoint). Flexible, supports custom deployments. Trade-off: adds configuration surface, small risk of misconfiguration."
+        selected: true
+      - option: "Configurable with fallback to default"
+        description: "Check for env var or setting, fall back to localhost:1234. Compromise approach, most flexible."
+        selected: false
+    selectionRationale: "Configurable via settings (option 2) is recommended. LLMProxy already demonstrates this pattern works well in the codebase. Users running LM Studio on non-standard ports or in custom environments (Docker, remote machines) need the flexibility. The small config complexity is offset by the ability to support advanced users without special-casing."
+    answer: "Configurable via settings"
+
+  - question: "Should API key/authentication be required, optional, or unused?"
+    resolved: true
+    options:
+      - option: "No API key (unused)"
+        description: "LM Studio does not require authentication by default. Pass empty string. Simplest, matches LM Studio's design. Trade-off: zero protection if someone misconfigures a remote endpoint."
+        selected: true
+      - option: "Optional API key field"
+        description: "Add optional lm_studio_api_key setting. Future-proof for authentication. Trade-off: unused complexity for default LM Studio installs."
+        selected: false
+      - option: "Required API key"
+        description: "Force users to set an API key. Security-minded but inconsistent with LM Studio's defaults. Trade-off: confusing for standard LM Studio setups."
+        selected: false
+    selectionRationale: "No API key (option 1) is the right choice. LM Studio's local default is unauthenticated, and mirroring that reduces friction. The codebase already handles optional auth in Ollama and LLMProxy; LM Studio should follow the same pattern (pass empty string by default, allow override if needed in future)."
+    answer: "No API key (unused)"
+
+  - question: "Should we validate LM Studio is running when the executor is created, or defer validation to first use?"
+    resolved: true
+    options:
+      - option: "No health check (lazy validation)"
+        description: "Do not validate LM Studio on executor creation. Validation happens on first LLM call. Fast initialization, matches Ollama pattern. Trade-off: errors discovered at first use, not startup."
+        selected: true
+      - option: "Async health check on creation"
+        description: "Spawn non-blocking health check during executor creation. Warns early without blocking startup. Trade-off: complex error handling, user confusion about async startup."
+        selected: false
+      - option: "Sync health check on creation"
+        description: "Validate LM Studio is reachable during executor creation. Catches config errors early. Trade-off: blocks startup, slows down every agent invocation, inconsistent with current pattern."
+        selected: false
+    selectionRationale: "Lazy validation (option 1) is recommended. The existing Ollama and LLMProxy executors follow this pattern—validation happens on first use, not initialization. This keeps startup fast, matches user expectations from the existing codebase, and allows users to start shep even if LM Studio isn't currently running (e.g., they'll start it before invoking an agent)."
+    answer: "No health check (lazy validation)"
+
+  - question: "Should we maintain a hardcoded list of common LM Studio models, or dynamically fetch them?"
+    resolved: true
+    options:
+      - option: "Hardcoded model list"
+        description: "Export LM_STUDIO_MODELS with common models (llama2, deepseek, mistral, codellama, phi). Simple, zero runtime overhead. Trade-off: needs manual updates when new models become popular."
+        selected: true
+      - option: "Dynamically fetch available models"
+        description: "Call /v1/models endpoint to list models. Always current, discovers custom models. Trade-off: runtime cost, error handling if endpoint fails, adds complexity."
+        selected: false
+    selectionRationale: "Hardcoded model list (option 1) is recommended. This matches the Ollama pattern in the codebase and avoids runtime complexity. LM Studio users are typically local developers who know which models they've downloaded; a curated list helps with discoverability and UI selection, while advanced users can still pass custom model names directly."
+    answer: "Hardcoded model list"
+
+  - question: "What error message clarity is required for LM Studio connection failures?"
+    resolved: true
+    options:
+      - option: "Generic error (inherit from base class)"
+        description: "Use base AiSdkBaseExecutorService error handling. Standard messages. Trade-off: not LM Studio-specific, user may not know what to check."
+        selected: false
+      - option: "LM Studio-specific error messages"
+        description: "Provide hints like \"Ensure LM Studio is running at http://localhost:1234\" and \"See https://lmstudio.ai/docs/local-server for setup\". Helpful, teachable. Trade-off: small maintenance burden if endpoints change."
+        selected: true
+      - option: "Detailed diagnostic (auto-detect, suggest fixes)"
+        description: "Try multiple ports, check firewall, suggest solutions. Over-engineered for this scope. Trade-off: complex, brittle, slow."
+        selected: false
+    selectionRationale: "LM Studio-specific error messages (option 2) is recommended. When LM Studio is unavailable, users should know exactly what to check and where to look for help. This small investment in error messaging provides high UX value for a local-development-focused feature. It follows the principle that connection errors should be actionable, not generic."
+    answer: "LM Studio-specific error messages"
+
+  - question: "Should TypeSpec JSDoc include URLs and setup details, or just the provider name?"
+    resolved: true
+    options:
+      - option: "Minimal comment (provider name only)"
+        description: "Just \"LM Studio - Local LLM inference via local server\". Minimal maintenance. Trade-off: users must search for setup docs."
+        selected: false
+      - option: "Detailed comment with links"
+        description: "Include LM Studio documentation URL, note about localhost:1234, mention no auth required. Self-documenting. Trade-off: slight JSDoc verbosity."
+        selected: true
+    selectionRationale: "Detailed comment with links (option 2) is recommended. TypeSpec enums are discovery points for users exploring available agents. Including the LM Studio docs URL and a brief setup note (localhost:1234, no auth) makes the feature immediately discoverable and reduces support friction."
+    answer: "Detailed comment with links"
 
 # Markdown content (the actual spec)
 content: |
@@ -44,6 +142,69 @@ content: |
   - **Model experimentation**: Test multiple local models without switching providers
   - **Privacy**: Keep all inference and proprietary code local to the machine
   - **Custom workflows**: Integrate with existing LM Studio setups that may have custom models or configurations
+
+  ## Success Criteria
+
+  - [ ] LmStudio enum variant added to AgentType in `tsp/common/enums/agent-config.tsp`
+  - [ ] `pnpm tsp:compile` regenerates domain types with LmStudio included in AgentType union
+  - [ ] `LmStudioExecutorService` created at `packages/core/src/infrastructure/services/agents/common/executors/lm-studio-executor.service.ts`
+  - [ ] LmStudioExecutorService extends AiSdkBaseExecutorService and implements createModel() correctly
+  - [ ] AgentExecutorFactory includes case for 'lm-studio' that instantiates LmStudioExecutorService
+  - [ ] getSupportedAgents() method in factory returns array including 'lm-studio'
+  - [ ] `lm-studio-executor.service.ts` is <50 lines of code
+  - [ ] LM_STUDIO_MODELS exported from agent-model-catalog with at least 5 common models
+  - [ ] Unit tests for LmStudioExecutorService (>=80% coverage for LM Studio-specific code)
+  - [ ] Integration test confirms executor can be created and configured
+  - [ ] Error test confirms LM Studio connection failure shows helpful error message
+  - [ ] Streaming mode test confirms executeStream() works correctly
+  - [ ] Non-streaming mode test confirms execute() works correctly
+  - [ ] Agent factory test updated to verify lm-studio case branch
+  - [ ] TypeSpec JSDoc includes LM Studio description and documentation URL
+  - [ ] AGENTS.md documentation updated to list LM Studio as supported provider
+  - [ ] All local tests pass: `pnpm test:unit && pnpm test:int`
+  - [ ] TypeScript compilation succeeds: `pnpm typecheck`
+  - [ ] Linting passes: `pnpm lint:fix`
+  - [ ] Build succeeds: `pnpm build`
+  - [ ] No new dependencies added to package.json
+  - [ ] CI/CD checks pass on remote
+
+  ## Functional Requirements
+
+  - **FR-1**: System must register LmStudio as a supported AgentType, discoverable via `getSupportedAgents()` in AgentExecutorFactory
+  - **FR-2**: System must instantiate LmStudioExecutorService when LmStudio is selected as the active agent
+  - **FR-3**: System must route LLM calls (generateText, streamText, generateObject) through LM Studio via OpenAI-compatible API at configured endpoint
+  - **FR-4**: System must support streaming execution mode through executeStream() method
+  - **FR-5**: System must support non-streaming execution mode through execute() method
+  - **FR-6**: System must accept user-provided model names and pass them through to LM Studio
+  - **FR-7**: System must handle connection failures to LM Studio with clear, actionable error messages including the endpoint and setup documentation URL
+  - **FR-8**: System must respect endpoint configuration from settings, allowing override of default localhost:1234
+  - **FR-9**: System must work offline—no external API calls, all communication local to configured LM Studio instance
+  - **FR-10**: System must follow existing AiSdkBaseExecutorService pattern, requiring only createModel() implementation
+
+  ## Non-Functional Requirements
+
+  - **NFR-1**: LmStudioExecutorService implementation must be <=50 lines of code (excluding tests)
+  - **NFR-2**: No new external dependencies required—must use existing @ai-sdk/openai-compatible provider
+  - **NFR-3**: Code must follow clean architecture: no infrastructure imports in application/presentation layers
+  - **NFR-4**: Unit test coverage for LM Studio-specific code must be >=80%
+  - **NFR-5**: Executor must be stateless and reusable across multiple concurrent agent invocations
+  - **NFR-6**: LM Studio feature must be fully compatible with existing Ollama, LLMProxy, and cloud provider executors
+  - **NFR-7**: Default model behavior must match Ollama pattern (delegate to LM Studio's runtime selection)
+  - **NFR-8**: API compatibility must match OpenAI-compatible standard, requiring no custom formatting or transformations
+  - **NFR-9**: Error messages must include setup documentation URL (https://lmstudio.ai/docs/local-server) to reduce support friction
+  - **NFR-10**: Dependency injection must resolve LmStudioExecutorService via factory pattern, never hardcoded global singletons
+
+  ## Product Questions & Recommendations
+
+  | # | Question | AI Recommendation | Rationale |
+  | - | -------- | ----------------- | --------- |
+  | 1 | Default model selection | Use LM Studio default (no explicit model name) | Mirrors Ollama pattern, respects user's LM Studio setup, minimal configuration friction |
+  | 2 | API endpoint configuration | Configurable via settings | Supports advanced users with non-standard ports or custom deployments, proven pattern (LLMProxy) |
+  | 3 | API key/authentication | No API key required | Matches LM Studio's unauthenticated local default, reduces setup friction |
+  | 4 | Health check strategy | Lazy validation on first use | Fast initialization, consistent with Ollama/LLMProxy, errors discovered during actual use |
+  | 5 | Model list management | Hardcoded curated list | Zero runtime overhead, aids UI discoverability, matches Ollama pattern, easy user override |
+  | 6 | Connection error handling | LM Studio-specific error messages | Actionable errors with setup documentation reduce support burden and improve UX |
+  | 7 | TypeSpec documentation | Detailed comment with links | Self-documenting, aids discoverability in code, includes setup reference |
 
   ## Codebase Analysis
 
@@ -103,19 +264,19 @@ content: |
   - Also passes empty string or provided token as apiKey
   - Supports dynamic model selection
 
-  Both are registered in AgentExecutorFactory's switch statement and getSupportedAgents() method. This is the pattern LM Studio would follow.
+  Both are registered in AgentExecutorFactory's switch statement and getSupportedAgents() method. This is the pattern LM Studio will follow.
 
   ## Affected Areas
 
   | Area | Impact | Reasoning |
   | ---- | ------ | --------- |
-  | `tsp/common/enums/agent-config.tsp` | Low | Add `LmStudio: \"lm-studio\"` to the AgentType enum. Regenerating TypeSpec will auto-update domain types. |
-  | `packages/core/src/domain/generated/output.ts` | Low | Auto-generated from TypeSpec; no manual edits. AgentType enum will include the new variant. |
-  | `packages/core/src/infrastructure/services/agents/common/executors/` | Medium | Create new `lm-studio-executor.service.ts` extending AiSdkBaseExecutorService, implementing `createModel()` to use `@ai-sdk/openai-compatible` with `http://localhost:1234/v1` base URL. |
-  | `packages/core/src/infrastructure/services/agents/common/agent-executor-factory.service.ts` | Low | Add case for `'lm-studio'` in the switch statement of `createExecutor()`, instantiating LmStudioExecutorService. Update `getSupportedAgents()` return array to include the new type. |
-  | `packages/core/src/infrastructure/services/agents/common/agent-model-catalog.ts` | Low | Export `LM_STUDIO_MODELS: string[]` with common open-source models (llama, deepseek, mistral, codellama, etc.). Import and reference in factory. |
-  | Tests | Low | Add unit tests for LmStudioExecutorService constructor and model creation (paralleling existing Ollama tests). Update factory tests to verify the new case branch. |
-  | Docs & Help Text | Low | Update agent-config.tsp JSDoc to list LM Studio as \"Supported\". Update any UI wizard/help text referencing available agents. |
+  | `tsp/common/enums/agent-config.tsp` | Low | Add `LmStudio: "lm-studio"` to the AgentType enum with descriptive JSDoc. Regenerating TypeSpec will auto-update domain types. |
+  | `packages/core/src/domain/generated/output.ts` | Low | Auto-generated from TypeSpec; no manual edits. AgentType enum will include the new LmStudio variant. |
+  | `packages/core/src/infrastructure/services/agents/common/executors/lm-studio-executor.service.ts` | Medium | Create new service extending AiSdkBaseExecutorService, implementing createModel() to use @ai-sdk/openai-compatible with http://localhost:1234/v1 (configurable). Support endpoint and model configuration from settings. |
+  | `packages/core/src/infrastructure/services/agents/common/agent-executor-factory.service.ts` | Low | Add case for 'lm-studio' in createExecutor() switch, instantiating LmStudioExecutorService. Update getSupportedAgents() array to include 'lm-studio'. |
+  | `packages/core/src/infrastructure/services/agents/common/agent-model-catalog.ts` | Low | Export LM_STUDIO_MODELS array with common models (llama2, deepseek, mistral, codellama, phi, neural-chat, etc.). Import and reference in factory. |
+  | Tests | Low | Add unit tests for LmStudioExecutorService (createModel, model configuration, error handling). Add integration test to verify factory creates LM Studio executor. Update factory tests to verify lm-studio case branch. |
+  | Documentation | Low | Update agent-config.tsp JSDoc to describe LM Studio and link to https://lmstudio.ai/docs/local-server. Update AGENTS.md if it lists supported providers. |
 
   ## Dependencies
 
@@ -128,16 +289,16 @@ content: |
 
   ## Size Estimate
 
-  **S (Small hours)** — The implementation closely mirrors spec 109 (llmproxy-support) and follows an established, battle-tested pattern:
+  **S (Small)** — The implementation closely mirrors existing Ollama and LLMProxy support and follows an established, battle-tested pattern:
 
-  - Executor implementation: ~30 lines (subclass AiSdkBaseExecutorService, delegate to createOpenAICompatible)
+  - Executor implementation: ~30 lines (subclass AiSdkBaseExecutorService, implement createModel)
   - Factory wiring: 2–3 lines in switch, 1 line in array
   - Model catalog: ~10 lines of model list
-  - Tests: ~50 lines paralleling existing Ollama tests
-  - TypeSpec enum: 5 lines
+  - Tests: ~80 lines (unit + integration tests paralleling Ollama)
+  - TypeSpec enum: 5 lines + JSDoc
 
-  Zero architectural complexity, zero new dependencies, reuses proven abstractions. The only unknowns are LM Studio's specific model naming conventions and default configuration, which are easily discoverable.
+  Zero architectural complexity, zero new dependencies, reuses proven abstractions. Product decisions above eliminate unknowns around configuration, error handling, and compatibility.
 
   ---
 
-  _Generated by analysis phase — ready for research and planning_
+  _Generated by requirements phase — ready for research and planning_
