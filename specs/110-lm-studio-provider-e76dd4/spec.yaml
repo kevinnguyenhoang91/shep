@@ -1,0 +1,143 @@
+# Feature Specification (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: lm-studio-provider-e76dd4
+number: 110
+branch: feat/110-lm-studio-provider-e76dd4
+oneLiner: Add LM Studio as a local LLM provider option
+summary: >
+  Integrate LM Studio (a desktop application providing local LLM inference via OpenAI-compatible API)
+  as an available AgentType in the system. Users can configure shep to route LLM calls through a local
+  LM Studio instance, enabling offline code generation, local model experimentation, and privacy-focused
+  development workflows. The implementation follows the established SDK-based executor pattern used by
+  Ollama and LLMProxy, leveraging the Vercel AI SDK's OpenAI-compatible provider.
+phase: Analysis
+sizeEstimate: S
+
+relatedFeatures: []
+
+technologies:
+  - "TypeScript"
+  - "TypeSpec"
+  - "Vercel AI SDK (@ai-sdk/openai-compatible)"
+
+relatedLinks:
+  - title: "LM Studio Official Website"
+    url: "https://lmstudio.ai/"
+  - title: "LM Studio OpenAI Compatible API Documentation"
+    url: "https://lmstudio.ai/docs/local-server"
+  - title: "Vercel AI SDK OpenAI Compatible Provider"
+    url: "https://ai-sdk.dev/providers/ai-sdk-providers/openai-compatible"
+
+openQuestions: []
+
+# Markdown content (the actual spec)
+content: |
+  ## Problem Statement
+
+  Users need the ability to run Shep's LLM inference locally using LM Studio, a popular desktop application
+  that provides local inference through an OpenAI-compatible API. Currently, the system supports various agents
+  (Claude Code, Cursor, Cline) and cloud providers (OpenRouter, Together AI) and local alternatives (Ollama,
+  LLMProxy), but lacks explicit support for LM Studio. This limits users who prefer LM Studio for:
+
+  - **Local development**: Run code generation entirely offline without cloud API costs
+  - **Model experimentation**: Test multiple local models without switching providers
+  - **Privacy**: Keep all inference and proprietary code local to the machine
+  - **Custom workflows**: Integrate with existing LM Studio setups that may have custom models or configurations
+
+  ## Codebase Analysis
+
+  ### Project Structure
+
+  The repository is organized as a monorepo with clean architecture principles:
+
+  ```
+  packages/core/src/
+  ├── domain/              # Business logic, TypeSpec-generated types
+  ├── application/         # Use cases, port interfaces (no external deps)
+  ├── infrastructure/      # External services, executor implementations
+  │   └── services/agents/
+  │       └── common/
+  │           ├── executors/          # Agent executor implementations
+  │           ├── agent-executor-factory.service.ts
+  │           └── agent-model-catalog.ts
+  └── presentation/        # CLI, Web UI
+
+  tsp/                      # TypeSpec definitions (source of truth for domain models)
+  └── common/enums/agent-config.tsp
+  ```
+
+  ### Architecture Patterns
+
+  **Agent Executor System**: The codebase uses an extensible executor pattern based on the Vercel AI SDK:
+
+  1. **IAgentExecutor interface**: Abstract interface defining `execute()`, `executeStream()`, and feature detection
+  2. **AiSdkBaseExecutorService**: Abstract base class implementing IAgentExecutor using AI SDK's `generateText`, `streamText`, and `generateObject` functions
+  3. **Concrete executor implementations**: Subclasses (OllamaExecutorService, OpenRouterExecutorService, etc.) extend AiSdkBaseExecutorService and implement only `createModel()` + set `agentType`
+  4. **AgentExecutorFactory**: Factory pattern with switch statement to instantiate executors by AgentType, with per-type caching
+  5. **Settings-driven resolution**: All agent selection flows through `IAgentExecutorProvider.createExecutor()` resolved from settings, never hardcoded
+
+  **TypeSpec Integration**: Domain types are generated from TypeSpec definitions in `tsp/`. The AgentType enum (`tsp/common/enums/agent-config.tsp`) is the single source of truth — editing it triggers `pnpm tsp:compile` to regenerate `packages/core/src/domain/generated/output.ts`.
+
+  **Dependency Injection**: The codebase uses `tsyringe` for DI. The factory is wired in the container and lazily creates executors on demand. No global singletons for providers.
+
+  ### Relevant Technologies
+
+  - **Vercel AI SDK** (`ai` package v6+): Provides unified interface to multiple LLM providers via `generateText()`, `streamText()`, `generateObject()`, and response mapping
+  - **@ai-sdk/openai-compatible**: Community provider enabling OpenAI-compatible endpoints (HTTP APIs conforming to OpenAI's spec)
+  - **TypeSpec**: Declarative schema language for generating TypeScript types, used for domain model definitions and downstream code generation
+  - **tsyringe**: Lightweight IoC container for dependency injection
+
+  ### Existing Similar Implementations
+
+  **OllamaExecutorService** (`infrastructure/services/agents/common/executors/ollama-executor.service.ts`):
+  - Extends AiSdkBaseExecutorService
+  - Uses `@ai-sdk/openai-compatible` to connect to `http://localhost:11434/v1`
+  - Passes empty string as apiKey (Ollama doesn't require auth)
+  - Defines a default model and accepts user-provided model IDs
+  - ~30 lines of implementation
+
+  **LLMProxyExecutorService** (`infrastructure/services/agents/common/executors/llmproxy-executor.service.ts`):
+  - Extends AiSdkBaseExecutorService
+  - Uses `@ai-sdk/openai-compatible` to connect to `http://localhost:4000/v1`
+  - Also passes empty string or provided token as apiKey
+  - Supports dynamic model selection
+
+  Both are registered in AgentExecutorFactory's switch statement and getSupportedAgents() method. This is the pattern LM Studio would follow.
+
+  ## Affected Areas
+
+  | Area | Impact | Reasoning |
+  | ---- | ------ | --------- |
+  | `tsp/common/enums/agent-config.tsp` | Low | Add `LmStudio: \"lm-studio\"` to the AgentType enum. Regenerating TypeSpec will auto-update domain types. |
+  | `packages/core/src/domain/generated/output.ts` | Low | Auto-generated from TypeSpec; no manual edits. AgentType enum will include the new variant. |
+  | `packages/core/src/infrastructure/services/agents/common/executors/` | Medium | Create new `lm-studio-executor.service.ts` extending AiSdkBaseExecutorService, implementing `createModel()` to use `@ai-sdk/openai-compatible` with `http://localhost:1234/v1` base URL. |
+  | `packages/core/src/infrastructure/services/agents/common/agent-executor-factory.service.ts` | Low | Add case for `'lm-studio'` in the switch statement of `createExecutor()`, instantiating LmStudioExecutorService. Update `getSupportedAgents()` return array to include the new type. |
+  | `packages/core/src/infrastructure/services/agents/common/agent-model-catalog.ts` | Low | Export `LM_STUDIO_MODELS: string[]` with common open-source models (llama, deepseek, mistral, codellama, etc.). Import and reference in factory. |
+  | Tests | Low | Add unit tests for LmStudioExecutorService constructor and model creation (paralleling existing Ollama tests). Update factory tests to verify the new case branch. |
+  | Docs & Help Text | Low | Update agent-config.tsp JSDoc to list LM Studio as \"Supported\". Update any UI wizard/help text referencing available agents. |
+
+  ## Dependencies
+
+  **Existing**:
+  - `@ai-sdk/openai-compatible` (already in package.json for Ollama/LLMProxy)
+  - Vercel AI SDK `generateText()`, `streamText()` (already in use)
+  - TypeSpec (already the system for domain model generation)
+
+  **No new dependencies required**. LM Studio uses the OpenAI-compatible API (HTTP), so the same `@ai-sdk/openai-compatible` provider that powers Ollama and LLMProxy can be reused.
+
+  ## Size Estimate
+
+  **S (Small hours)** — The implementation closely mirrors spec 109 (llmproxy-support) and follows an established, battle-tested pattern:
+
+  - Executor implementation: ~30 lines (subclass AiSdkBaseExecutorService, delegate to createOpenAICompatible)
+  - Factory wiring: 2–3 lines in switch, 1 line in array
+  - Model catalog: ~10 lines of model list
+  - Tests: ~50 lines paralleling existing Ollama tests
+  - TypeSpec enum: 5 lines
+
+  Zero architectural complexity, zero new dependencies, reuses proven abstractions. The only unknowns are LM Studio's specific model naming conventions and default configuration, which are easily discoverable.
+
+  ---
+
+  _Generated by analysis phase — ready for research and planning_
