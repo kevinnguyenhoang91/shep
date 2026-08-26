@@ -275,7 +275,8 @@ export function MergeReview({
   chatInput,
   onChatInputChange,
 }: MergeReviewProps) {
-  const { pr, diffSummary, fileDiffs, branch, warning, evidence, hideCiStatus } = data;
+  const { pr, diffSummary, fileDiffs, branch, warning, fileDiffsWarning, evidence, hideCiStatus } =
+    data;
   const hasConflicts = pr?.mergeable === false;
 
   const handleApproveOrResolve =
@@ -415,7 +416,16 @@ export function MergeReview({
         {evidence && evidence.length > 0 ? <EvidenceList evidence={evidence} /> : null}
 
         {/* File diffs */}
-        {fileDiffs && fileDiffs.length > 0 ? <DiffView fileDiffs={fileDiffs} /> : null}
+        {fileDiffs && fileDiffs.length > 0 ? (
+          <DiffView fileDiffs={fileDiffs} />
+        ) : fileDiffsWarning ? (
+          <div className="border-border rounded-lg border">
+            <div className="flex items-center gap-2 px-4 py-3">
+              <AlertTriangle className="text-muted-foreground h-4 w-4 shrink-0" />
+              <span className="text-muted-foreground text-xs">{fileDiffsWarning}</span>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {!readOnly && (

@@ -870,9 +870,11 @@ describe('GitPrService', () => {
 
       expect(mockExec).toHaveBeenNthCalledWith(1, 'git', ['diff', '--stat', 'main...HEAD'], {
         cwd: '/repo',
+        maxBuffer: 100 * 1024 * 1024,
       });
       expect(mockExec).toHaveBeenNthCalledWith(2, 'git', ['log', '--oneline', 'main...HEAD'], {
         cwd: '/repo',
+        maxBuffer: 100 * 1024 * 1024,
       });
       expect(result.filesChanged).toBe(2);
       expect(result.additions).toBe(8);
@@ -919,6 +921,7 @@ describe('GitPrService', () => {
 
       expect(mockExec).toHaveBeenCalledWith('git', ['diff', '--unified=3', 'main...HEAD'], {
         cwd: '/repo',
+        maxBuffer: 100 * 1024 * 1024,
       });
       expect(result).toHaveLength(3);
 
