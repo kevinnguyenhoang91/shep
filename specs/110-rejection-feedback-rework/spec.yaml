@@ -4,7 +4,7 @@
 name: rejection-feedback-rework
 number: 110
 branch: feat/110-rejection-feedback-rework
-oneLiner: When a feature with Fast mode enter Merge Review, then I rejected with a feedback. Then it didn't read my feedback and rework just go on to the merge review. Check log and I see these lines: [2026-08-25T02:45:48.801Z] [fast-implement] [claude-code|claude-haiku-4-5] Starting fast implementation [2026-08-25T02:45:48.803Z] [fast-implement] [claude-code|claude-haiku-4-5] Phase already completed, skipping execution Check why the feedback not being processed.
+oneLiner: "When a feature with Fast mode enter Merge Review, then I rejected with a feedback. Then it didn't read my feedback and rework just go on to the merge review. Check log and I see these lines: [2026-08-25T02:45:48.801Z] [fast-implement] [claude-code|claude-haiku-4-5] Starting fast implementation [2026-08-25T02:45:48.803Z] [fast-implement] [claude-code|claude-haiku-4-5] Phase already completed, skipping execution Check why the feedback not being processed."
 userQuery: >
   When a feature with Fast mode enter Merge Review, then I rejected with a feedback. Then it didn't read my feedback and rework just go on to the merge review. Check log and I see these lines: [2026-08-25T02:45:48.801Z] [fast-implement] [claude-code|claude-haiku-4-5] Starting fast implementation [2026-08-25T02:45:48.803Z] [fast-implement] [claude-code|claude-haiku-4-5] Phase already completed, skipping execution Check why the feedback not being processed.
 summary: >
