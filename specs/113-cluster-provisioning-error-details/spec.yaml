@@ -1,0 +1,178 @@
+# Feature Specification (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: cluster-provisioning-error-details
+number: 113
+branch: feat/113-cluster-provisioning-error-details
+oneLiner: "Surface the real cause when cluster provisioning stalls or fails instead of leaving the cluster stuck in \"Provisioning\" with no explanation"
+summary: >
+  The Cluster entity already has an `errorMessage` field and the web UI already renders it
+  wherever a cluster's status is `Error`. The actual gap is upstream: several failure paths in
+  the cluster-agent worker never transition status to `Error` at all, so the cluster is left in
+  `Provisioning` forever with `errorMessage` unset and nothing in the UI to explain why. This
+  feature closes those gaps — worker crash handling, stuck/dead-process detection, and richer
+  error messages from the provisioning nodes — so every failure mode ends in an actionable,
+  visible `errorMessage`.
+phase: Analysis
+sizeEstimate: M
+
+# Relationships
+relatedFeatures:
+  []
+
+technologies:
+  - "TypeScript"
+  - "TypeSpec (tsp) domain modeling"
+  - "LangGraph (StateGraph) for the cluster-agent provisioning graph"
+  - "Node.js child_process.fork() for the cluster-agent worker"
+  - "SQLite (better-sqlite3) persistence"
+  - "Next.js App Router (API routes, Server Actions)"
+  - "React / Tailwind (web UI components)"
+  - "k3d / kubectl / Docker CLI wrappers (infrastructure services)"
+
+relatedLinks:
+  []
+
+openQuestions:
+  []
+
+content: |
+  ## Problem Statement
+
+  Users report clusters getting "stuck" in `Provisioning` status with no indication of what went
+  wrong. Investigation shows the domain and UI plumbing for error reporting already exist and
+  work correctly *when the cluster-agent graph reaches its error terminal node*:
+
+  - `Cluster.errorMessage` (`tsp/domain/entities/cluster.tsp:139`) is a first-class field.
+  - The graph's `handle-error` node (`packages/core/src/infrastructure/services/agents/cluster-agent/nodes/error.ts`)
+    persists `status: Error` + `errorMessage` whenever any node sets `state.error`.
+  - The web UI already renders `errorMessage` in three places: the cluster list card
+    (`clusters-page-client.tsx:293`), the detail drawer overview tab
+    (`cluster-detail-drawer.tsx:183`), and it flows through `useClusterEvents()`
+    (`hooks/use-cluster-events.ts`), which polls `/api/clusters` every 3s.
+
+  So when a provisioning node fails cleanly (bad k3d binary, Docker not running, health-check
+  timeout, etc.), the user already sees a specific, translated error message. **The bug is that
+  several realistic failure modes never reach that clean path**, leaving the cluster silently
+  parked in `Provisioning`:
+
+  1. **Global crash handlers don't update cluster status.** In
+     `cluster-agent-worker.ts`, `process.on('uncaughtException', ...)` and
+     `process.on('unhandledRejection', ...)` (lines 218-226) log to the worker's log file and call
+     `process.exit(1)` — but never call `clusterRepo.update(..., { status: Error, errorMessage })`.
+     Only the `try/catch` inside `runClusterWorker()` (lines 198-213) does that. Any error that
+     escapes the graph invocation via an unhandled promise rejection (plausible given
+     `k3dService`/`kubectlService`/`argoCdService` shell out to CLIs) leaves the cluster in
+     `Provisioning` forever with no `errorMessage`.
+
+  2. **The spawned worker's PID is discarded, so nothing can detect a dead/hung worker.**
+     `ProvisionClusterUseCase.execute()` (`provision-cluster.use-case.ts:40`) calls
+     `this.processService.spawn(...)` and ignores the returned PID. `IClusterAgentProcessService`
+     already exposes `isAlive(pid)` (`cluster-agent-process-service.interface.ts:38`) — the same
+     primitive the feature-agent side presumably uses for liveness — but for clusters there is no
+     column to store the PID and no code path that ever calls `isAlive()`. A worker killed by
+     SIGKILL/OOM, or one that hangs indefinitely inside a native CLI call with no timeout
+     (`configure-kubectl`/`install-argocd` were not confirmed to have the same timeout discipline as
+     `health-check.ts`'s 120s exponential backoff), leaves `Provisioning` with a heartbeat
+     (`lastHealthCheckAt`) that simply stops advancing — and nothing ever notices.
+
+  3. **No staleness/reconciliation check exists anywhere in the read path.** `GetClusterStatusUseCase`
+     and `ListClustersUseCase` both do a straight `clusterRepo.findById`/`list()` — neither compares
+     `lastHealthCheckAt`/`lastProvisionedAt` against "now" nor checks process liveness. The 3s poll
+     in `useClusterEvents()` is the natural place this reconciliation would surface, but there is
+     currently no use case for it to call.
+
+  ## Codebase Analysis
+
+  ### Project Structure
+  - `tsp/domain/entities/cluster.tsp` + `tsp/common/enums/cluster.tsp` — TypeSpec source of truth
+    for the `Cluster` entity and `ClusterStatus` enum; compiles to
+    `packages/core/src/domain/generated/output.ts` (never hand-edited).
+  - `packages/core/src/application/use-cases/clusters/` — Clean Architecture use cases
+    (`create`, `provision`, `destroy`, `update`, `get`, `get-cluster-status`, `list`, `delete`).
+  - `packages/core/src/application/ports/output/services/cluster-agent-process-service.interface.ts`
+    — port for spawning/probing the worker process (`spawn`, `isAlive`, `kill`).
+  - `packages/core/src/infrastructure/services/agents/cluster-agent/` — the LangGraph-based
+    provisioning agent: `cluster-agent-graph.ts` (node wiring + error routing),
+    `cluster-agent-worker.ts` (forked child-process entry point, heartbeat, signal handling),
+    `cluster-agent-process.service.ts` (fork/isAlive/kill implementation), and per-step `nodes/`
+    (`prerequisite-check`, `provision`, `configure-kubectl`, `install-argocd`, `health-check`,
+    `ready`, `error`).
+  - `packages/core/src/infrastructure/repositories/sqlite-cluster.repository.ts` +
+    `infrastructure/persistence/sqlite/mappers/cluster.mapper.ts` — persistence; migrations under
+    `infrastructure/persistence/sqlite/migrations/125-*` through `128-*`.
+  - `src/presentation/web/components/common/cluster-node/` — `cluster-node.tsx` (canvas card),
+    `cluster-status-badge.tsx`, `cluster-detail-drawer.tsx` (existing `errorMessage` display).
+  - `src/presentation/web/components/features/clusters/clusters-page-client.tsx` — list view
+    (existing `errorMessage` display on cards).
+  - `src/presentation/web/hooks/use-cluster-events.ts` — 3s polling hook backing both surfaces.
+  - `src/presentation/web/app/api/clusters/` — REST-ish API routes consumed by the web client
+    (`route.ts` for list, `[id]/status/route.ts`, `[id]/provision/route.ts`, etc.).
+
+  ### Architecture Patterns
+  - Clean Architecture: presentation (web components/hooks/API routes) → application use cases →
+    domain (generated TypeSpec types) → infrastructure (SQLite repo, LangGraph agent, CLI
+    wrappers). This feature's fixes are almost entirely in infrastructure (worker crash handling,
+    PID capture) and application (a new/extended use case for staleness detection), with the domain
+    model needing one additive field (a PID or "last worker check" concept) and no UI changes to the
+    *display* layer — only to the data it's fed.
+  - The cluster-agent graph follows the same LangGraph `StateGraph` + node-factory pattern as the
+    feature-agent graph (`routeOrError`, terminal `handle-error` node). Any fix to error visibility
+    should preserve that symmetry rather than special-casing clusters.
+  - `IClusterAgentProcessService` is the sanctioned seam for anything process-liveness related
+    (per the "No Direct Infrastructure Imports" rule) — a staleness-detection use case must depend
+    on this port, not reach into `child_process` directly.
+
+  ### Relevant Technologies
+  - LangGraph `StateGraph` (`@langchain/langgraph`) drives the multi-step provisioning flow with a
+    checkpointer (`createCheckpointer`) for resume-after-failure.
+  - `child_process.fork()` with `detached: true` spawns the worker; PID lifecycle and IPC
+    disconnect are already partially handled but not persisted.
+  - SQLite via `better-sqlite3` for the `clusters` table (`errorMessage`, `lastHealthCheckAt`,
+    `lastProvisionedAt` columns already exist per LESSONS.md's "repository INSERT/UPDATE must
+    include all columns" pattern — must re-verify when adding a new column).
+  - Next.js polling (not SSE) is the existing real-time mechanism for cluster state — consistent
+    with `useClusterEvents()`, not the SSE architecture documented for features/repos.
+
+  ## Affected Areas
+
+  | Area | Impact | Reasoning |
+  | ---- | ------ | --------- |
+  | `packages/core/src/infrastructure/services/agents/cluster-agent/cluster-agent-worker.ts` | High | `uncaughtException`/`unhandledRejection` handlers must persist `status: Error` + a real `errorMessage` before exiting, mirroring the existing `catch` block and `SIGTERM` handler. |
+  | `packages/core/src/application/use-cases/clusters/provision-cluster.use-case.ts` | High | Currently discards the PID returned by `processService.spawn()`; must persist it so liveness can later be checked. |
+  | `tsp/domain/entities/cluster.tsp` + regenerated `output.ts` | Medium | Likely needs a new optional field (e.g. `workerPid`) to support liveness detection; requires a migration + mapper + repository INSERT/UPDATE updates per the "settings column" lesson pattern in LESSONS.md. |
+  | `packages/core/src/infrastructure/persistence/sqlite/migrations/`, `mappers/cluster.mapper.ts`, `infrastructure/repositories/sqlite-cluster.repository.ts` | Medium | New column requires migration + mapper (`toDatabase`/`fromDatabase`) + explicit INSERT/UPDATE column lists — all three must stay in sync or writes silently drop the field (documented, recurring failure mode in this codebase). |
+  | New/extended use case (e.g. `GetClusterStatusUseCase` or a new `DetectStuckClusterUseCase`) | High | No existing use case checks worker liveness or heartbeat staleness for clusters stuck in `Provisioning`; this is the core missing capability. Must depend on `IClusterAgentProcessService.isAlive()`, not infrastructure directly, per Clean Architecture rules. |
+  | `src/presentation/web/app/api/clusters/route.ts` (and/or `[id]/status/route.ts`) | Medium | Natural point to invoke the new staleness-detection use case on each poll, since `useClusterEvents()` already hits this route every 3s. |
+  | `packages/core/src/infrastructure/services/agents/cluster-agent/nodes/configure-kubectl.ts`, `install-argocd.ts` | Low-Medium | Need to confirm (and if missing, add) the same bounded-timeout discipline `health-check.ts` already has, so hangs inside these nodes fail fast into the error terminal instead of hanging the whole worker. |
+  | `src/presentation/web/components/common/cluster-node/cluster-detail-drawer.tsx`, `clusters-page-client.tsx` | Low | Display logic for `errorMessage` already exists and needs no structural change — only benefits once the backend reliably populates the field. Consider whether a "stuck" cause (e.g. "worker process is no longer running") should get a distinct visual treatment from a clean provisioning failure. |
+  | CLI surface (`src/presentation/cli/commands/cluster/`) | Low | Should be checked for parity — if `shep cluster status` or similar reads `errorMessage`, it inherits the same fix for free once the use case layer is correct (per "presentation-agnostic core API" rule). |
+
+  ## Dependencies
+
+  - Existing `Cluster.errorMessage` domain field and its persistence plumbing (no changes needed
+    to the field itself).
+  - Existing `IClusterAgentProcessService` port (`isAlive`, `kill`) — reused, not replaced.
+  - Existing LangGraph error-routing pattern (`routeOrError`, `handle-error` node) in
+    `cluster-agent-graph.ts` — the crash-handling fix must stay consistent with this pattern rather
+    than introduce a second error-reporting mechanism.
+  - Existing 3s polling hook `useClusterEvents()` — the delivery mechanism for any new staleness
+    signal to the UI; no new transport (SSE, WebSocket) needed.
+  - TDD/TypeSpec-first workflow: any new persisted field must go through `tsp/` → `pnpm tsp:codegen`
+    → migration → mapper → repository, per project mandatory rules.
+
+  ## Size Estimate
+
+  **M** — This is not a UI feature (display of `errorMessage` already works) but a backend
+  reliability fix spanning three layers: (1) worker-level crash handling for two previously
+  unhandled failure paths, (2) a new persisted field (PID) with full migration/mapper/repository
+  wiring, and (3) a new or extended use case for liveness/staleness detection wired into the
+  existing polling route. Each piece is individually small, but per LESSONS.md's recurring
+  "settings/entity column" failure pattern, the column-wiring alone touches 4+ files that must
+  stay in sync, and correctness requires new integration tests simulating a killed/hung worker
+  process — not just unit tests with mocks. No new UI surfaces or Storybook stories are required.
+  Estimated at low-to-mid single-digit days, not hours (S) and not a multi-week redesign (L/XL).
+
+  ---
+
+  _Generated by feature agent — proceed with research_
