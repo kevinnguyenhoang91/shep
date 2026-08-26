@@ -4,6 +4,7 @@ import {
   COMMIT_CO_AUTHOR,
   applyPrBranding,
   applyCommitBranding,
+  limitCommitSubjectLength,
 } from '@/infrastructure/services/git/pr-branding.js';
 
 describe('PR_BRANDING', () => {
@@ -157,5 +158,73 @@ describe('applyCommitBranding', () => {
   it('should trim trailing whitespace before appending co-author', () => {
     const result = applyCommitBranding('feat(cli): add command   \n\n\n');
     expect(result).toBe(`feat(cli): add command\n\n${COMMIT_CO_AUTHOR}`);
+  });
+});
+
+describe('limitCommitSubjectLength', () => {
+  it('should not modify subjects under 72 characters', () => {
+    const message = 'feat: add new feature';
+    const result = limitCommitSubjectLength(message);
+    expect(result).toBe(message);
+  });
+
+  it('should not modify subjects exactly 72 characters', () => {
+    const subject = 'a'.repeat(72);
+    const result = limitCommitSubjectLength(subject);
+    expect(result).toBe(subject);
+  });
+
+  it('should truncate subjects longer than 72 characters', () => {
+    const message = 'a'.repeat(80);
+    const result = limitCommitSubjectLength(message);
+    expect(result.length).toBe(72);
+    expect(result).toBe('a'.repeat(72));
+  });
+
+  it('should preserve body when truncating subject', () => {
+    const subject = 'a'.repeat(80);
+    const body = 'This is the commit body';
+    const message = `${subject}\n${body}`;
+    const result = limitCommitSubjectLength(message);
+    expect(result.startsWith('a'.repeat(72))).toBe(true);
+    expect(result).toContain('This is the commit body');
+    expect(result).toBe(`${'a'.repeat(72)}\n${body}`);
+  });
+
+  it('should handle multi-line messages with body', () => {
+    const message =
+      'feat: this is a very long subject line that definitely exceeds seventy two characters\n\nThis is the body';
+    const result = limitCommitSubjectLength(message);
+    const lines = result.split('\n');
+    expect(lines[0].length).toBe(72);
+    expect(lines[1]).toBe('');
+    expect(lines[2]).toBe('This is the body');
+  });
+
+  it('should handle squash merge commit format', () => {
+    const branch = 'feat/very-long-feature-branch-name-that-is-quite-lengthy';
+    const baseBranch = 'main';
+    const message = `feat: squash merge ${branch} into ${baseBranch}`;
+    const result = limitCommitSubjectLength(message);
+    expect(result.length).toBe(72);
+    expect(result.startsWith('feat: squash merge')).toBe(true);
+  });
+
+  it('should handle empty body after split', () => {
+    const subject = 'a'.repeat(80);
+    const message = `${subject}\n`;
+    const result = limitCommitSubjectLength(message);
+    expect(result).toBe('a'.repeat(72));
+  });
+
+  it('should preserve multiple body paragraphs', () => {
+    const subject = 'a'.repeat(80);
+    const body = 'First paragraph\n\nSecond paragraph\n\nThird paragraph';
+    const message = `${subject}\n${body}`;
+    const result = limitCommitSubjectLength(message);
+    expect(result).toContain('First paragraph');
+    expect(result).toContain('Second paragraph');
+    expect(result).toContain('Third paragraph');
+    expect(result.startsWith('a'.repeat(72))).toBe(true);
   });
 });
