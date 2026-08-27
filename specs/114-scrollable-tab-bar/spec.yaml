@@ -1,0 +1,183 @@
+name: scrollable-tab-bar
+number: 114
+branch: feat/114-scrollable-tab-bar
+oneLiner: "Enable horizontal scrolling in the feature drawer tab bar when tabs overflow"
+
+summary: >
+  Enable horizontal scrolling for the tab bar in the feature detail drawer when the number of visible tabs exceeds the container width. The feature drawer can display up to 11 different tabs based on the feature lifecycle and state (Overview, Prototype, Activity, Log, Plan, PRD Review, Tech Decisions, Product, Merge Review, Chat, Bedrock), and when multiple tabs are visible, they overflow the fixed container. This change will allow users to scroll horizontally through tabs while maintaining the current VS Code-inspired tab bar styling and keyboard accessibility.
+
+phase: Analysis
+sizeEstimate: M
+
+relatedFeatures: []
+
+technologies:
+  - "React 19.2.4"
+  - "Next.js 16.2.6"
+  - "Radix UI (@radix-ui/tabs)"
+  - "Tailwind CSS 4.1.18"
+  - "TypeScript 5.3.0"
+
+relatedLinks:
+  - title: "Radix UI Tabs Documentation"
+    url: "https://radix-ui.com/docs/primitives/components/tabs"
+  - title: "Tailwind CSS Overflow Classes"
+    url: "https://tailwindcss.com/docs/overflow"
+
+openQuestions: []
+
+content: |
+  ## Problem Statement
+
+  The feature drawer tab bar in the UI can display up to 11 different tabs depending on the feature lifecycle and current state:
+
+  - Overview (always shown)
+  - Prototype (exploration mode only)
+  - Activity (exploration and SDLC modes)
+  - Log (when feature has agent run)
+  - Plan (when feature has plan)
+  - PRD Review (requirements phase, action required)
+  - Tech Decisions (implementation/review/maintain phases, unless fast-mode)
+  - Product Decisions (implementation/review/maintain phases, unless fast-mode)
+  - Merge Review (review phase action-required or after merge in maintain)
+  - Chat (when interactive agent is enabled)
+  - Bedrock Memory (when bedrock integration feature flag is enabled)
+
+  When multiple tabs are simultaneously visible (e.g., during implementation phase with interactive agent enabled), the tabs overflow the container width with no way to access the hidden tabs. The current implementation uses `inline-flex` layout that causes overflow rather than scrolling.
+
+  Currently visible at: `src/presentation/web/components/common/feature-drawer-tabs/feature-drawer-tabs.tsx:498`
+
+  ## Codebase Analysis
+
+  ### Project Structure
+
+  The web UI is organized into four tiers of component dependencies:
+
+  - **Tier 0 (ui/)**: Shadcn/ui primitives managed by CLI — includes tabs primitive at `src/presentation/web/components/ui/tabs.tsx`
+  - **Tier 1 (common/)**: Cross-feature composed components — includes feature-drawer-tabs at `src/presentation/web/components/common/feature-drawer-tabs/`
+  - **Tier 2 (layouts/)**: Page shells and structural wrappers
+  - **Tier 3 (features/)**: Domain-specific UI bound to routes
+
+  Higher tiers import from lower tiers only; reverse imports are not allowed per the architecture rules documented in `docs/ui/architecture.md`.
+
+  ### Architecture Patterns
+
+  #### Tabs Component (Tier 0)
+
+  Located at `src/presentation/web/components/ui/tabs.tsx`:
+  - Wraps Radix UI TabsPrimitive components (Root, List, Trigger, Content)
+  - TabsList (line 10-22) renders with `inline-flex` layout for horizontal arrangement
+  - Current class: `inline-flex h-9 items-center justify-center rounded-lg p-1`
+  - No overflow handling in base component
+
+  #### Feature Drawer Tabs (Tier 1)
+
+  Located at `src/presentation/web/components/common/feature-drawer-tabs/feature-drawer-tabs.tsx`:
+  - Defines ALL_TABS array (lines 78-90): 11 possible tabs with icons and labels
+  - computeVisibleTabs() function (lines 92-151): calculates which tabs to show based on:
+    - Feature lifecycle (exploring, requirements, research, implementation, review, maintain)
+    - Feature state (pending, creating, running, error, action-required, approved, merged, archived)
+    - Feature flags (interactiveAgentEnabled, bedrockIntegration)
+  - TabsList rendering (line 498): maps visibleTabDefs to TabsTrigger components
+  - Tab switching with keyboard navigation and URL synchronization
+
+  #### Scrolling Patterns in Codebase
+
+  The codebase uses Tailwind CSS `overflow-x-auto` class for horizontal scrolling in similar scenarios:
+  - `src/presentation/web/components/pm/table-view/table-view.tsx`
+  - `src/presentation/web/components/pm/board-view/board-view.tsx`
+  - `src/presentation/web/components/pm/timeline-view/timeline-view.tsx`
+  - Other UI components handling overflow
+
+  Standard pattern: apply `overflow-x-auto` with optional `flex w-full` for flex containers and `gap-0` to remove spacing between items.
+
+  ### Relevant Technologies
+
+  - **Radix UI Tabs**: Provides accessible tab primitives with keyboard navigation (Arrow Left/Right for tab selection)
+  - **Tailwind CSS**: Provides `overflow-x-auto`, `overflow-y-hidden`, `flex`, and `w-full` utilities for layout
+  - **React**: Used for component composition and state management in feature-drawer-tabs
+
+  The Radix UI TabsList component already supports keyboard navigation per W3C ARIA standards, so the scrollable implementation must preserve this behavior.
+
+  ## Affected Areas
+
+  | Area | Impact | Reasoning |
+  | ---- | ------ | --------- |
+  | `src/presentation/web/components/ui/tabs.tsx` | High | TabsList component needs scrolling support added (either a new parameter or wrapper component) |
+  | `src/presentation/web/components/common/feature-drawer-tabs/feature-drawer-tabs.tsx` | High | TabsList rendering (line 498) needs to apply scroll styling; may need wrapper for scroll buttons |
+  | `src/presentation/web/components/ui/tabs.stories.tsx` | Medium | Need to add Storybook story demonstrating scrollable tab bar with many tabs |
+  | Tests for feature-drawer-tabs | Low | Existing tests should continue to pass; may need visual regression tests for scroll behavior |
+  | Accessibility | Medium | Must ensure keyboard navigation (Arrow Left/Right) still works with horizontal scroll |
+
+  ## Dependencies
+
+  - **Radix UI (@radix-ui/tabs)**: Already a dependency; no new packages needed
+  - **Tailwind CSS**: Already in use for overflow utilities; no new packages needed
+  - **React**: Already in use; no new hooks or patterns required
+  - **TypeScript**: Type safety for component props
+
+  No backend or API changes required. This is purely a UI enhancement affecting only the presentation layer.
+
+  ## Implementation Considerations
+
+  ### Approach Options
+
+  **Option 1: Add optional scrollable prop to TabsList**
+  - Add boolean prop (e.g., `scrollable?: boolean`)
+  - Apply `overflow-x-auto overflow-y-hidden` classes conditionally
+  - Simplest, least invasive change
+  - Requires only modifying Tier 0 component
+
+  **Option 2: Create separate ScrollableTabsList component**
+  - New component wrapping TabsList with scroll logic
+  - Keeps base TabsList unchanged
+  - More flexible for future enhancements (scroll buttons, snap behavior)
+  - May require wrapper div for layout
+
+  **Option 3: Apply scroll styling directly in feature-drawer-tabs**
+  - Skip modifying Tier 0, apply scroll classes at usage site
+  - Violates separation of concerns — scroll behavior is platform, not feature-specific
+  - Would require duplication if other tabs need scrolling
+
+  **Recommended**: Option 1 (add `scrollable` prop) for minimal impact, or Option 2 if scroll-button indicators are desired for UX.
+
+  ### Accessibility Requirements
+
+  - Keyboard navigation must work: Arrow Left/Right to switch tabs
+  - Tab selection must scroll the active tab into view
+  - Scroll position should be remembered or active tab should always be visible
+  - Scrollbar should be visible on overflow to indicate more tabs exist
+  - Touch scrolling should work on mobile/tablet
+
+  Radix UI Tabs provides keyboard navigation; Tailwind's `overflow-x-auto` handles scroll visibility automatically.
+
+  ### Testing Scope
+
+  1. **Component unit tests**: Verify scrollable prop applies correct classes
+  2. **Integration tests**: Test with 6+ tabs to ensure scroll activates
+  3. **Accessibility tests**: Keyboard navigation with scrolled viewport
+  4. **Visual tests/Storybook**: Visual regression test with many tabs
+  5. **E2E tests** (if applicable): Feature drawer with all tabs visible
+
+  ## Size Estimate
+
+  **M (Medium — 1–3 days)**
+
+  **Justification:**
+  - **High confidence**: Low-risk UI change using existing patterns in codebase
+  - **Scope**: Affects only 2–3 files (tabs.tsx, feature-drawer-tabs.tsx, tabs.stories.tsx)
+  - **Complexity**: No complex state management or business logic
+  - **Testing**: Straightforward unit + visual tests (Storybook)
+  - **No backend changes**: Purely presentation layer
+  - **Proven pattern**: `overflow-x-auto` already used successfully in 10+ places
+  - **One potential enhancement**: Scroll-indicator buttons or snap behavior would add complexity
+
+  Breakdown:
+  - Analysis: 0.5 days (completed)
+  - Implementation: 0.5 days (add prop + apply styling)
+  - Testing + Storybook: 0.5–1 day (unit tests, stories, visual verification)
+  - Documentation/refinement: 0.5 day
+
+  ---
+
+  _Analysis phase complete — proceed to research phase to verify implementation approach and design scroll UX_
