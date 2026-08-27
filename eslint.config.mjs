@@ -66,6 +66,7 @@ export default tseslint.config(
 
       // Claude Code skills (third-party)
       '.claude/skills/**',
+      '.agents/skills/**',
 
       // TypeSpec (handled by tsp linter)
       'tsp/**',
