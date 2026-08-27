@@ -127,14 +127,15 @@ export function useWorkspaces(): UseWorkspacesResult {
   const [state, setState] = useState<WorkspacesState>(INITIAL_STATE);
   const isHydratedRef = useRef(false);
 
-  // Hydrate from localStorage on mount (client-only).
+  // Mark as hydrated immediately to prevent race condition with save effect
   useEffect(() => {
-    const loadedState = loadState();
-    setState(loadedState);
+    const loaded = loadState();
+    setState(loaded);
+    // Set flag AFTER setState so next effect knows hydration happened
     isHydratedRef.current = true;
   }, []);
 
-  // Persist whenever state changes (skip the initial save on mount).
+  // Persist whenever state changes, but only after initial hydration
   useEffect(() => {
     if (isHydratedRef.current) {
       saveState(state);
