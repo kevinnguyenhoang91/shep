@@ -3,23 +3,28 @@ feature:
   name: "investigate-why-the-first-item-in-the-inventory"
   number: 112
   branch: "feat/112-investigate-why-the-first-item-in-the-inventory"
-  lifecycle: "research"
+  lifecycle: "maintain"
   createdAt: "2026-08-26T04:25:35Z"
 status:
-  phase: "research"
+  phase: "maintain"
   progress:
-    completed: 0
-    total: 0
-    percentage: 0
+    completed: 1
+    total: 1
+    percentage: 100
   currentTask: null
-  lastUpdated: "2026-08-26T04:25:35Z"
-  lastUpdatedBy: "feature-agent"
+  lastUpdated: "2026-08-27T09:55:20Z"
+  lastUpdatedBy: "claude-code"
   completedPhases:
     - "evidence"
-    - "fast-implement"
+    - "research"
+    - "implementation"
+    - "review"
 validation:
-  lastRun: null
-  gatesPassed: []
+  lastRun: "2026-08-27T09:55:20Z"
+  gatesPassed:
+    - "build"
+    - "test"
+    - "lint"
   autoFixesApplied: []
 tasks:
   current: null
@@ -29,6 +34,14 @@ checkpoints:
   - phase: "feature-created"
     completedAt: "2026-08-26T04:25:35Z"
     completedBy: "feature-agent"
+  - phase: "research-complete"
+    completedAt: "2026-08-27T09:55:20Z"
+    completedBy: "claude-code"
+    notes: "Root cause identified and fixed: buildGroupedTree was adding _children to all group headers, even empty ones. Tabulator skips expand/collapse buttons for rows with empty _children arrays. Fix: only add _children when sortedChildren.length > 0"
+  - phase: "implementation-complete"
+    completedAt: "2026-08-27T09:55:20Z"
+    completedBy: "claude-code"
+    notes: "Fix applied in feature-tree-table.tsx:478. Groups now only get _children property when they have actual children."
 errors:
   current: null
   history: []
