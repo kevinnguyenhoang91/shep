@@ -6,7 +6,7 @@ summary: >
   The Agent Sessions popup uses inconsistent logic for opening IDEs and terminals compared to the project card.
   The session row hardcodes VSCode via direct window.open() calls, while the project card uses sophisticated server actions
   that support multiple editors and cross-platform terminals. This feature unifies the logic by reusing the same server actions.
-phase: Analysis
+phase: Requirements
 sizeEstimate: M
 
 relatedFeatures: []
@@ -25,8 +25,28 @@ relatedLinks:
     url: "file:///Users/khanh9/.shep/repos/1ba5f4c0213c78c7/wt/feat-unify-session-actions/docs/architecture/clean-architecture.md"
 
 openQuestions:
-  - "Should the resume-in-terminal action in sessions use the same platform-specific terminal opening logic as project cards?"
-  - "Should session actions be extracted into a dedicated hook similar to useRepositoryActions?"
+  - question: "Should we create a new useSessionActions hook or reuse the existing useRepositoryActions hook pattern?"
+    resolved: true
+    options:
+      - option: "Create separate useSessionActions hook"
+        description: "Build a new hook tailored to session-specific concerns (adopt, resume, open IDE). Keeps session logic distinct from repository logic, clearer intent for maintainers, easier to test in isolation. Mirrors the existing useRepositoryActions pattern. Minimal code reuse but maximum clarity."
+        selected: true
+      - option: "Reuse useRepositoryActions hook"
+        description: "Extend the existing hook to handle both repository and session actions. Reduces duplication, single source of truth for action logic. Risk: conflates two different domains (repository cards vs. session rows), may force awkward conditionals or overloading."
+        selected: false
+    selectionRationale: "Create separate useSessionActions hook because session actions (adopt, resume, open IDE) are a distinct concern from repository actions. The separation maintains clean code organization, makes testing easier, and follows the existing pattern established in the codebase. Sessions and repositories have different lifecycle and error handling needs."
+    answer: "Create separate useSessionActions hook"
+  - question: "Should the Resume in Terminal flow call the existing openShell action directly or require a new session-specific wrapper?"
+    resolved: true
+    options:
+      - option: "Call existing openShell action directly"
+        description: "Reuse the proven openShell server action without modification. Leverages existing cross-platform terminal logic, error handling, and path validation. Minimal changes needed. Assumption: openShell API works identically for repository and session resume flows."
+        selected: true
+      - option: "Create new sessionResumeShell action"
+        description: "Build a dedicated action for session resume with session-specific logic (e.g., different terminal behavior, session-specific environment variables, resume-specific error messages). More control, explicit intent, but adds complexity and maintenance burden."
+        selected: false
+    selectionRationale: "Call existing openShell action directly because the action is already proven to handle cross-platform terminal spawning correctly. Session resume and repository open have identical requirements (spawn a shell in a given directory), so code reuse is appropriate and reduces maintenance surface area."
+    answer: "Call existing openShell action directly"
 
 content: |
   ## Problem Statement
@@ -41,117 +61,100 @@ content: |
   - Session actions don't benefit from the editor availability checks and error handling in place for project cards
   - Platform-specific terminal behavior (macOS osascript, Linux x-terminal-emulator, Windows PowerShell) is not leveraged for resume flows
 
-  ## Codebase Analysis
+  ## Success Criteria
 
-  ### Project Structure
+  - [ ] Session row "Open in IDE" button calls openIde server action instead of hardcoded window.open()
+  - [ ] Session row respects user's configured default editor from settings
+  - [ ] Session row supports multiple editors (VSCode, Cursor, Sublime Text, etc.) through LaunchIdeUseCase
+  - [ ] Session row displays appropriate error message if configured IDE is unavailable
+  - [ ] Session row "Resume in Terminal" uses openShell server action for cross-platform terminal spawning
+  - [ ] All IDE/terminal actions display loading state during execution
+  - [ ] All IDE/terminal actions have proper error handling with dismissible error messages
+  - [ ] No hardcoded VSCode URIs remain in session-row.tsx
+  - [ ] useSessionActions hook created and exported from feature-node directory
+  - [ ] Unit tests cover useSessionActions hook (loading/error states, action dispatch)
+  - [ ] Integration tests verify open IDE and resume terminal flows from session row
+  - [ ] Session row behavior matches project card UX patterns for IDE/terminal operations
+  - [ ] Cross-platform testing passes on macOS, Linux, Windows for terminal operations
 
-  **Key Directories:**
-  - `src/presentation/web/components/common/repository-node/` — Project card drawer and actions
-  - `src/presentation/web/components/common/feature-node/` — Agent session row and popup
-  - `src/presentation/web/app/actions/` — Server actions (openIde, openShell, openFolder)
-  - `packages/core/src/application/use-cases/ide/` — IDE launcher use case
-  - `packages/core/src/application/use-cases/agents/` — Agent session use cases (adopt, resume)
-  - `packages/core/src/infrastructure/services/ide-launchers/` — IDE launch implementations
+  ## Functional Requirements
 
-  ### Architecture Patterns
+  - **FR-1**: Session row "Open in IDE" action must validate the repository path is absolute before calling openIde server action
+  - **FR-2**: Session row must retrieve user's configured default editor from settings service and pass it to openIde
+  - **FR-3**: Session row must support all editors that LaunchIdeUseCase supports (VSCode, Cursor, Sublime Text, etc.)
+  - **FR-4**: Session row must display appropriate error message if the configured IDE is not available on the system
+  - **FR-5**: Session row "Resume in Terminal" action must call openShell server action with validated repository path
+  - **FR-6**: Session row must display loading state while IDE/terminal operations are in progress
+  - **FR-7**: Session row must display dismissible error messages for IDE/terminal operation failures
+  - **FR-8**: Session row must clear error messages when the user opens the error message or after a timeout
+  - **FR-9**: useSessionActions hook must manage state for: loading, error, and selected session ID
+  - **FR-10**: useSessionActions hook must provide unified interface for adopt, resume, open IDE, and open folder actions
 
-  **Clean Architecture Layers:**
-  - **Domain:** Core business logic, TypeSpec models
-  - **Application:** Use cases (LaunchIdeUseCase, ResumeAgentSessionUseCase, AdoptAgentSessionUseCase)
-  - **Infrastructure:** IDE launchers, terminal spawning, settings service
-  - **Presentation:** Web UI (Next.js), CLI, TUI
+  ## Non-Functional Requirements
 
-  **Dependency Flow:**
-  - Presentation calls Server Actions (Next.js API boundary)
-  - Server Actions delegate to Use Cases (DI container resolution)
-  - Use Cases orchestrate domain logic and infrastructure
+  - **NFR-1**: Code reuse — no duplication of IDE/terminal logic; must reuse existing openIde and openShell server actions
+  - **NFR-2**: Consistency — session row UI/UX must match project card behavior for IDE/terminal operations
+  - **NFR-3**: Cross-platform — terminal operations must work correctly on macOS (osascript), Linux (x-terminal-emulator), and Windows (PowerShell)
+  - **NFR-4**: Performance — IDE/terminal operations must complete within 5 seconds or display appropriate timeout error
+  - **NFR-5**: Security — repository paths must be validated (absolute paths only) and properly escaped for shell safety
+  - **NFR-6**: Maintainability — follow Clean Architecture patterns; presentation layer remains thin; all business logic stays in use cases
+  - **NFR-7**: Maintainability — useSessionActions hook must be clearly documented with JSDoc comments on exported functions
+  - **NFR-8**: Testing — unit tests must cover all action states (idle, loading, error); integration tests must verify server action calls
+  - **NFR-9**: Error messages — must be user-friendly and actionable (not raw server errors)
 
-  ### Relevant Technologies
+  ## Product Questions & AI Recommendations
 
-  - **Next.js Server Actions** — thin HTTP boundary between client and server (openIde, openShell, openFolder, adoptAgentSession, resumeAgentSession)
-  - **React Hooks** — useRepositoryActions (manages UI state, error handling, loading states)
-  - **Use Cases** — LaunchIdeUseCase, ResumeAgentSessionUseCase (business logic, editor resolution, cross-platform terminal logic)
-  - **Settings Service** — getSettings() provides user preferences (defaultEditor, terminalPreference, shellPreference)
-  - **Process Spawning** — spawn() for terminal commands with platform-specific handling (macOS osascript, Linux x-terminal-emulator, Windows PowerShell)
-
-  ## Current Implementation Comparison
-
-  ### Project Card (Correct Pattern)
-  **File:** `repository-drawer.tsx` → `use-repository-actions.ts` → server actions `open-ide.ts`, `open-shell.ts`
-
-  - `openIde` action:
-    - Validates absolute paths
-    - Gets user's configured editor from settings
-    - Delegates to `LaunchIdeUseCase` which resolves IDE availability
-    - Supports VSCode, Cursor, Sublime, etc.
-    - Returns editor name and worktree path
-
-  - `openShell` action:
-    - Validates absolute paths
-    - Gets user's terminal preference from settings
-    - Handles branch/worktree path computation
-    - Platform-specific terminal spawning: osascript (macOS), x-terminal-emulator (Linux), PowerShell (Windows)
-    - Graceful fallback to system terminal
-    - Proper escaping for shell metacharacters
-
-  ### Agent Sessions Popup (Current Problem)
-  **File:** `session-row.tsx` — hardcoded VSCode URI
-
-  - `Open in IDE` (line 202-207):
-    ```tsx
-    window.open(`vscode://file${repositoryPath}`, '_blank');
-    ```
-    - Hardcoded to VSCode
-    - No editor preference check
-    - No availability validation
-    - Client-side only, no server action
-
-  - `Resume in Terminal` (line 89-104):
-    - Uses `resumeAgentSession` server action
-    - Delegates to `ResumeAgentSessionUseCase`
-    - This is correctly implemented, but the terminal opening itself doesn't use the project card's sophisticated terminal logic
+  See `openQuestions` section above for structured product decisions already resolved.
 
   ## Affected Areas
 
   | Area | Impact | Reasoning |
   | ---- | ------ | --------- |
   | `src/presentation/web/components/common/feature-node/session-row.tsx` | High | Contains hardcoded VSCode open and inline terminal resume logic; primary target for refactoring |
-  | `src/presentation/web/app/actions/adopt-agent-session.ts` | Medium | May need new server actions or modifications to leverage openIde/openShell for sessions |
-  | `src/presentation/web/components/common/feature-node/` | Medium | Session popup structure; may create a session-specific actions hook |
-  | `useRepositoryActions` hook | Low | Model for a potential `useSessionActions` hook |
-  | `open-ide.ts`, `open-shell.ts` server actions | Low | No changes needed; reused by session row |
+  | `src/presentation/web/components/common/feature-node/use-session-actions.ts` (NEW) | High | New hook to be created, mirrors useRepositoryActions pattern; manages state for session actions |
+  | `src/presentation/web/app/actions/open-ide.ts` | Medium | No changes needed; will be called from session row via useSessionActions hook |
+  | `src/presentation/web/app/actions/open-shell.ts` | Medium | No changes needed; will be called from session row via useSessionActions hook for Resume in Terminal |
+  | `src/presentation/web/components/common/feature-node/` | Low | Session popup structure may need minor adjustments to accommodate new hook; error display may be enhanced |
+  | `useRepositoryActions` hook | Low | Model for useSessionActions; no changes needed |
 
   ## Dependencies
 
   **Existing Code Reused:**
-  - `openIde` server action — already exists, fully implements IDE resolution
-  - `openShell` server action — already exists, handles cross-platform terminal spawning
-  - `LaunchIdeUseCase` — resolves IDE availability and launches
-  - `ResumeAgentSessionUseCase` — already integrated with session row
-  - `useRepositoryActions` hook — can be extracted into a shared pattern
+  - `openIde` server action — already exists at `src/presentation/web/app/actions/open-ide.ts`; fully implements IDE resolution and launching
+  - `openShell` server action — already exists at `src/presentation/web/app/actions/open-shell.ts`; handles cross-platform terminal spawning
+  - `LaunchIdeUseCase` — resolves IDE availability and launches via `packages/core/src/application/use-cases/ide/launch-ide.use-case.ts`
+  - `ResumeAgentSessionUseCase` — already integrated with session row; no changes needed
+  - `useRepositoryActions` hook — template for useSessionActions hook structure and patterns
 
   **No New Dependencies:**
-  - No new libraries required
-  - No domain model changes
+  - No new npm packages required
+  - No domain model changes (TypeSpec)
   - No database schema changes
+  - No new infrastructure services
 
   ## Implementation Strategy
 
-  **Phase 1: Extract Session Actions Hook**
-  - Create `useSessionActions` hook (parallel to `useRepositoryActions`)
-  - Manages UI state for adopt, resume, and open actions
-  - Handles loading/error states, error clearing timers
+  **Phase 1: Create useSessionActions Hook**
+  - Create `src/presentation/web/components/common/feature-node/use-session-actions.ts`
+  - Model structure after `useRepositoryActions` hook
+  - Manage state: loading (boolean), error (Error | null), selectedSessionId (string | null)
+  - Implement handlers: onAdopt, onResume, onOpenIde, onOpenFolder
+  - Add error clearing with 5-second timeout
 
-  **Phase 2: Integrate Server Actions**
-  - Update `session-row.tsx` to call `openIde` server action for "Open in IDE"
-  - Evaluate whether `openShell` logic fits "Resume in Terminal" flow or create dedicated action
-  - Remove hardcoded `window.open()` call
+  **Phase 2: Integrate Server Actions into Session Row**
+  - Update `session-row.tsx` to use useSessionActions hook
+  - Replace `window.open('vscode://file...')` with `onOpenIde` handler
+  - Update "Open in IDE" button to show loading state and error messages
+  - Verify "Resume in Terminal" properly calls `onResume` (may already be correct)
+  - Remove all hardcoded VSCode URI logic
 
   **Phase 3: Test & Verification**
-  - Unit tests for session action hook
+  - Unit tests for useSessionActions hook (state transitions, action dispatch)
   - Integration tests for open IDE/terminal flows from sessions
+  - Verify openIde respects configured editor preference
   - Cross-platform terminal testing (macOS, Linux, Windows)
-  - Editor preference testing (VSCode, Cursor, etc.)
+  - Error state testing (IDE unavailable, invalid paths, etc.)
+  - UI testing: verify loading states, error messages, and dismissal behavior
 
   ## Size Estimate
 
@@ -171,4 +174,4 @@ content: |
 
   ---
 
-  _Analysis complete — ready for research phase_
+  _Requirements complete — ready for research phase_
