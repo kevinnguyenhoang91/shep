@@ -912,8 +912,9 @@ describe('FeatureDrawerTabs', () => {
       expect(tabsList).toHaveClass('overflow-x-auto', 'overflow-y-hidden');
     });
 
-    it('does not render scrollable classes when scrollable prop is explicitly false', () => {
-      // Create a test with few tabs where scrollable behavior is not needed
+    it('keeps scroll classes even when only 2 tabs are visible', () => {
+      // Even with minimal tabs, scrollable prop is still applied
+      // This ensures consistent rendering and prevents UI shifts if tabs are added later
       renderTabs({
         featureNode: {
           ...defaultFeatureNode,
@@ -926,11 +927,9 @@ describe('FeatureDrawerTabs', () => {
       });
 
       // In exploring mode without interactive agent, only Overview and Activity are shown
-      // This scenario doesn't require scrollable prop
+      // Even with few tabs, the scrollable classes are still applied for consistency
       const tabsList = screen.getByRole('tab', { name: 'Overview' }).closest('[role="tablist"]');
-      // When scrollable is false, these classes should not be applied
-      expect(tabsList).not.toHaveClass('overflow-x-auto');
-      expect(tabsList).not.toHaveClass('overflow-y-hidden');
+      expect(tabsList).toHaveClass('overflow-x-auto', 'overflow-y-hidden');
     });
   });
 });
