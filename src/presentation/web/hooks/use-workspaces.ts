@@ -37,7 +37,7 @@
  * type defined here MUST NOT be imported from any non-prototype code.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const STORAGE_KEY = 'shep:workspaces:v1';
 export const DEFAULT_WORKSPACE_ID = 'default';
@@ -125,15 +125,20 @@ export interface UseWorkspacesResult {
 
 export function useWorkspaces(): UseWorkspacesResult {
   const [state, setState] = useState<WorkspacesState>(INITIAL_STATE);
+  const isHydratedRef = useRef(false);
 
   // Hydrate from localStorage on mount (client-only).
   useEffect(() => {
-    setState(loadState());
+    const loadedState = loadState();
+    setState(loadedState);
+    isHydratedRef.current = true;
   }, []);
 
-  // Persist whenever state changes (after hydration).
+  // Persist whenever state changes (skip the initial save on mount).
   useEffect(() => {
-    saveState(state);
+    if (isHydratedRef.current) {
+      saveState(state);
+    }
   }, [state]);
 
   const setActiveWorkspace = useCallback((id: string) => {
