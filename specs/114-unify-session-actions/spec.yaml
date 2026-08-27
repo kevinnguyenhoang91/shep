@@ -1,0 +1,174 @@
+name: unify-session-actions
+number: 114
+branch: feat/114-unify-session-actions
+oneLiner: "Unify session action handlers (Open in IDE, Resume in Terminal) to use project card logic"
+summary: >
+  The Agent Sessions popup uses inconsistent logic for opening IDEs and terminals compared to the project card.
+  The session row hardcodes VSCode via direct window.open() calls, while the project card uses sophisticated server actions
+  that support multiple editors and cross-platform terminals. This feature unifies the logic by reusing the same server actions.
+phase: Analysis
+sizeEstimate: M
+
+relatedFeatures: []
+
+technologies:
+  - "TypeScript"
+  - "Next.js (Server Actions)"
+  - "React"
+  - "Clean Architecture (Use Cases)"
+  - "shadcn/ui"
+
+relatedLinks:
+  - title: "Web UI Architecture"
+    url: "file:///Users/khanh9/.shep/repos/1ba5f4c0213c78c7/wt/feat-unify-session-actions/docs/ui/architecture.md"
+  - title: "Clean Architecture Documentation"
+    url: "file:///Users/khanh9/.shep/repos/1ba5f4c0213c78c7/wt/feat-unify-session-actions/docs/architecture/clean-architecture.md"
+
+openQuestions:
+  - "Should the resume-in-terminal action in sessions use the same platform-specific terminal opening logic as project cards?"
+  - "Should session actions be extracted into a dedicated hook similar to useRepositoryActions?"
+
+content: |
+  ## Problem Statement
+
+  In the Agent Sessions popup (session-row.tsx), the `Open in IDE` action uses a hardcoded VSCode deep-link (`window.open('vscode://file{path}')`),
+  while the project card (repository-drawer.tsx) uses a sophisticated server action that respects the user's configured default editor and supports multiple editor types (VSCode, Cursor, etc.).
+
+  Similarly, the `Resume in Terminal` action in the session popup could benefit from the cross-platform terminal handling logic already in the project card's `openShell` server action.
+
+  This inconsistency means:
+  - Session users are forced to use VSCode, ignoring their editor preferences
+  - Session actions don't benefit from the editor availability checks and error handling in place for project cards
+  - Platform-specific terminal behavior (macOS osascript, Linux x-terminal-emulator, Windows PowerShell) is not leveraged for resume flows
+
+  ## Codebase Analysis
+
+  ### Project Structure
+
+  **Key Directories:**
+  - `src/presentation/web/components/common/repository-node/` — Project card drawer and actions
+  - `src/presentation/web/components/common/feature-node/` — Agent session row and popup
+  - `src/presentation/web/app/actions/` — Server actions (openIde, openShell, openFolder)
+  - `packages/core/src/application/use-cases/ide/` — IDE launcher use case
+  - `packages/core/src/application/use-cases/agents/` — Agent session use cases (adopt, resume)
+  - `packages/core/src/infrastructure/services/ide-launchers/` — IDE launch implementations
+
+  ### Architecture Patterns
+
+  **Clean Architecture Layers:**
+  - **Domain:** Core business logic, TypeSpec models
+  - **Application:** Use cases (LaunchIdeUseCase, ResumeAgentSessionUseCase, AdoptAgentSessionUseCase)
+  - **Infrastructure:** IDE launchers, terminal spawning, settings service
+  - **Presentation:** Web UI (Next.js), CLI, TUI
+
+  **Dependency Flow:**
+  - Presentation calls Server Actions (Next.js API boundary)
+  - Server Actions delegate to Use Cases (DI container resolution)
+  - Use Cases orchestrate domain logic and infrastructure
+
+  ### Relevant Technologies
+
+  - **Next.js Server Actions** — thin HTTP boundary between client and server (openIde, openShell, openFolder, adoptAgentSession, resumeAgentSession)
+  - **React Hooks** — useRepositoryActions (manages UI state, error handling, loading states)
+  - **Use Cases** — LaunchIdeUseCase, ResumeAgentSessionUseCase (business logic, editor resolution, cross-platform terminal logic)
+  - **Settings Service** — getSettings() provides user preferences (defaultEditor, terminalPreference, shellPreference)
+  - **Process Spawning** — spawn() for terminal commands with platform-specific handling (macOS osascript, Linux x-terminal-emulator, Windows PowerShell)
+
+  ## Current Implementation Comparison
+
+  ### Project Card (Correct Pattern)
+  **File:** `repository-drawer.tsx` → `use-repository-actions.ts` → server actions `open-ide.ts`, `open-shell.ts`
+
+  - `openIde` action:
+    - Validates absolute paths
+    - Gets user's configured editor from settings
+    - Delegates to `LaunchIdeUseCase` which resolves IDE availability
+    - Supports VSCode, Cursor, Sublime, etc.
+    - Returns editor name and worktree path
+
+  - `openShell` action:
+    - Validates absolute paths
+    - Gets user's terminal preference from settings
+    - Handles branch/worktree path computation
+    - Platform-specific terminal spawning: osascript (macOS), x-terminal-emulator (Linux), PowerShell (Windows)
+    - Graceful fallback to system terminal
+    - Proper escaping for shell metacharacters
+
+  ### Agent Sessions Popup (Current Problem)
+  **File:** `session-row.tsx` — hardcoded VSCode URI
+
+  - `Open in IDE` (line 202-207):
+    ```tsx
+    window.open(`vscode://file${repositoryPath}`, '_blank');
+    ```
+    - Hardcoded to VSCode
+    - No editor preference check
+    - No availability validation
+    - Client-side only, no server action
+
+  - `Resume in Terminal` (line 89-104):
+    - Uses `resumeAgentSession` server action
+    - Delegates to `ResumeAgentSessionUseCase`
+    - This is correctly implemented, but the terminal opening itself doesn't use the project card's sophisticated terminal logic
+
+  ## Affected Areas
+
+  | Area | Impact | Reasoning |
+  | ---- | ------ | --------- |
+  | `src/presentation/web/components/common/feature-node/session-row.tsx` | High | Contains hardcoded VSCode open and inline terminal resume logic; primary target for refactoring |
+  | `src/presentation/web/app/actions/adopt-agent-session.ts` | Medium | May need new server actions or modifications to leverage openIde/openShell for sessions |
+  | `src/presentation/web/components/common/feature-node/` | Medium | Session popup structure; may create a session-specific actions hook |
+  | `useRepositoryActions` hook | Low | Model for a potential `useSessionActions` hook |
+  | `open-ide.ts`, `open-shell.ts` server actions | Low | No changes needed; reused by session row |
+
+  ## Dependencies
+
+  **Existing Code Reused:**
+  - `openIde` server action — already exists, fully implements IDE resolution
+  - `openShell` server action — already exists, handles cross-platform terminal spawning
+  - `LaunchIdeUseCase` — resolves IDE availability and launches
+  - `ResumeAgentSessionUseCase` — already integrated with session row
+  - `useRepositoryActions` hook — can be extracted into a shared pattern
+
+  **No New Dependencies:**
+  - No new libraries required
+  - No domain model changes
+  - No database schema changes
+
+  ## Implementation Strategy
+
+  **Phase 1: Extract Session Actions Hook**
+  - Create `useSessionActions` hook (parallel to `useRepositoryActions`)
+  - Manages UI state for adopt, resume, and open actions
+  - Handles loading/error states, error clearing timers
+
+  **Phase 2: Integrate Server Actions**
+  - Update `session-row.tsx` to call `openIde` server action for "Open in IDE"
+  - Evaluate whether `openShell` logic fits "Resume in Terminal" flow or create dedicated action
+  - Remove hardcoded `window.open()` call
+
+  **Phase 3: Test & Verification**
+  - Unit tests for session action hook
+  - Integration tests for open IDE/terminal flows from sessions
+  - Cross-platform terminal testing (macOS, Linux, Windows)
+  - Editor preference testing (VSCode, Cursor, etc.)
+
+  ## Size Estimate
+
+  **M** (Medium — 2-3 days) — Justified by:
+
+  - **Straightforward refactoring:** Reusing proven server actions rather than building new logic
+  - **Limited scope:** Changes isolated to session row component and new actions hook
+  - **No architectural changes:** Follows existing Clean Architecture patterns (Use Cases → Server Actions)
+  - **Testing required:** Cross-platform terminal and multi-editor testing adds complexity
+  - **Low risk:** Server actions already tested; session row is presentation layer
+
+  **Not L/XL because:**
+  - No new use cases needed
+  - No database or domain changes
+  - Existing infrastructure (IDE launchers, terminal spawning) is proven
+  - Changes are primarily in presentation layer
+
+  ---
+
+  _Analysis complete — ready for research phase_
