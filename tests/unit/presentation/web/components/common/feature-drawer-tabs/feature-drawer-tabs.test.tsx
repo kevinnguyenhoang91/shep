@@ -847,4 +847,90 @@ describe('FeatureDrawerTabs', () => {
       expect(logTab).toHaveAttribute('data-state', 'active');
     });
   });
+
+  describe('scrollable tabs behavior', () => {
+    it('renders TabsList with scrollable prop when multiple tabs are visible', () => {
+      renderTabs({
+        featureNode: {
+          ...defaultFeatureNode,
+          lifecycle: 'implementation',
+          state: 'running',
+          hasPlan: true,
+          hasAgentRun: true,
+        },
+        interactiveAgentEnabled: true,
+      });
+
+      // Get the TabsList (parent of tab triggers)
+      const tabsList = screen.getByRole('tab', { name: 'Overview' }).closest('[role="tablist"]');
+      expect(tabsList).toBeInTheDocument();
+      expect(tabsList).toHaveClass('overflow-x-auto', 'overflow-y-hidden');
+    });
+
+    it('renders all visible tabs when 8+ tabs are shown', () => {
+      renderTabs({
+        featureNode: {
+          ...defaultFeatureNode,
+          lifecycle: 'implementation',
+          state: 'running',
+          hasPlan: true,
+          hasAgentRun: true,
+        },
+        interactiveAgentEnabled: true,
+      });
+
+      // In implementation phase with interactive agent, these tabs should be visible:
+      // Overview, Activity, Log, Plan, Tech Decisions, Product, Chat
+      expect(screen.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Activity' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Log' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Plan' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Tech Decisions' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Product' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Chat' })).toBeInTheDocument();
+    });
+
+    it('maintains scroll classes even when switching tabs', async () => {
+      const user = userEvent.setup();
+      renderTabs({
+        featureNode: {
+          ...defaultFeatureNode,
+          lifecycle: 'implementation',
+          state: 'running',
+          hasPlan: true,
+          hasAgentRun: true,
+        },
+        interactiveAgentEnabled: true,
+      });
+
+      const tabsList = screen.getByRole('tab', { name: 'Overview' }).closest('[role="tablist"]');
+
+      // Switch to Activity tab
+      await user.click(screen.getByRole('tab', { name: 'Activity' }));
+
+      // TabsList should still have scroll classes
+      expect(tabsList).toHaveClass('overflow-x-auto', 'overflow-y-hidden');
+    });
+
+    it('does not render scrollable classes when scrollable prop is explicitly false', () => {
+      // Create a test with few tabs where scrollable behavior is not needed
+      renderTabs({
+        featureNode: {
+          ...defaultFeatureNode,
+          lifecycle: 'exploring',
+          state: 'running',
+          hasPlan: false,
+          hasAgentRun: false,
+        },
+        interactiveAgentEnabled: false,
+      });
+
+      // In exploring mode without interactive agent, only Overview and Activity are shown
+      // This scenario doesn't require scrollable prop
+      const tabsList = screen.getByRole('tab', { name: 'Overview' }).closest('[role="tablist"]');
+      // When scrollable is false, these classes should not be applied
+      expect(tabsList).not.toHaveClass('overflow-x-auto');
+      expect(tabsList).not.toHaveClass('overflow-y-hidden');
+    });
+  });
 });

@@ -1,0 +1,37 @@
+feature:
+  id: "114-scrollable-tab-bar"
+  name: "scrollable-tab-bar"
+  number: 114
+  branch: "feat/114-scrollable-tab-bar"
+  lifecycle: "research"
+  createdAt: "2026-08-27T02:47:54Z"
+status:
+  phase: "implementing-phase-2"
+  progress:
+    completed: 1
+    total: 6
+    percentage: 17
+  currentTask: "task-2"
+  lastUpdated: "2026-08-27T03:21:27.009Z"
+  lastUpdatedBy: "feature-agent:implement"
+  completedPhases:
+    - "analyze"
+    - "requirements"
+    - "research"
+    - "plan"
+    - "phase-1"
+validation:
+  lastRun: null
+  gatesPassed: []
+  autoFixesApplied: []
+tasks:
+  current: null
+  blocked: []
+  failed: []
+checkpoints:
+  - phase: "feature-created"
+    completedAt: "2026-08-27T02:47:54Z"
+    completedBy: "feature-agent"
+errors:
+  current: null
+  history: []
