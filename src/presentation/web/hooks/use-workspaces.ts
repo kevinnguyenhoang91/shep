@@ -70,12 +70,27 @@ const INITIAL_STATE: WorkspacesState = {
 };
 
 function loadState(): WorkspacesState {
-  if (typeof window === 'undefined') return INITIAL_STATE;
+  if (typeof window === 'undefined') {
+    return {
+      workspaces: INITIAL_STATE.workspaces,
+      activeWorkspaceId: INITIAL_STATE.activeWorkspaceId,
+    };
+  }
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return INITIAL_STATE;
+    if (!raw) {
+      return {
+        workspaces: INITIAL_STATE.workspaces,
+        activeWorkspaceId: INITIAL_STATE.activeWorkspaceId,
+      };
+    }
     const parsed = JSON.parse(raw) as Partial<WorkspacesState>;
-    if (!parsed.workspaces || !Array.isArray(parsed.workspaces)) return INITIAL_STATE;
+    if (!parsed.workspaces || !Array.isArray(parsed.workspaces)) {
+      return {
+        workspaces: INITIAL_STATE.workspaces,
+        activeWorkspaceId: INITIAL_STATE.activeWorkspaceId,
+      };
+    }
     // Make sure default workspace always exists
     const hasDefault = parsed.workspaces.some((w) => w.id === DEFAULT_WORKSPACE_ID);
     const workspaces = hasDefault
@@ -86,7 +101,10 @@ function loadState(): WorkspacesState {
       activeWorkspaceId: parsed.activeWorkspaceId ?? DEFAULT_WORKSPACE_ID,
     };
   } catch {
-    return INITIAL_STATE;
+    return {
+      workspaces: INITIAL_STATE.workspaces,
+      activeWorkspaceId: INITIAL_STATE.activeWorkspaceId,
+    };
   }
 }
 
@@ -127,19 +145,19 @@ export function useWorkspaces(): UseWorkspacesResult {
   const [state, setState] = useState<WorkspacesState>(INITIAL_STATE);
   const isHydratedRef = useRef(false);
 
-  // Mark as hydrated immediately to prevent race condition with save effect
+  // Hydrate from localStorage on mount
   useEffect(() => {
     const loaded = loadState();
     setState(loaded);
-    // Set flag AFTER setState so next effect knows hydration happened
     isHydratedRef.current = true;
   }, []);
 
   // Persist whenever state changes, but only after initial hydration
+  // This effect runs after hydration is complete, so isHydratedRef.current
+  // should be true and state will be saved to localStorage on any change.
   useEffect(() => {
-    if (isHydratedRef.current) {
-      saveState(state);
-    }
+    if (!isHydratedRef.current) return;
+    saveState(state);
   }, [state]);
 
   const setActiveWorkspace = useCallback((id: string) => {

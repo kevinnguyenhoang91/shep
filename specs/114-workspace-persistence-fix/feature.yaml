@@ -16,7 +16,6 @@ status:
   lastUpdatedBy: "feature-agent"
   completedPhases:
     - "evidence"
-    - "fast-implement"
 validation:
   lastRun: null
   gatesPassed: []
