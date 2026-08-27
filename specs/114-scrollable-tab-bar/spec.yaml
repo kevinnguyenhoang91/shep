@@ -6,7 +6,7 @@ oneLiner: "Enable horizontal scrolling in the feature drawer tab bar when tabs o
 summary: >
   Enable horizontal scrolling for the tab bar in the feature detail drawer when the number of visible tabs exceeds the container width. The feature drawer can display up to 11 different tabs based on the feature lifecycle and state (Overview, Prototype, Activity, Log, Plan, PRD Review, Tech Decisions, Product, Merge Review, Chat, Bedrock), and when multiple tabs are visible, they overflow the fixed container. This change will allow users to scroll horizontally through tabs while maintaining the current VS Code-inspired tab bar styling and keyboard accessibility.
 
-phase: Analysis
+phase: Requirements
 sizeEstimate: M
 
 relatedFeatures: []
@@ -24,7 +24,57 @@ relatedLinks:
   - title: "Tailwind CSS Overflow Classes"
     url: "https://tailwindcss.com/docs/overflow"
 
-openQuestions: []
+openQuestions:
+  - question: "Should we implement scrolling via a new prop on TabsList or a separate ScrollableTabsList component?"
+    resolved: true
+    options:
+      - option: "Add scrollable prop to TabsList"
+        description: "Add a boolean `scrollable?: boolean` prop to the existing TabsList component that conditionally applies `overflow-x-auto overflow-y-hidden` classes. Minimal, non-invasive change; reuses existing component; simplest testing and maintenance. Best if no scroll indicators are needed."
+        selected: true
+      - option: "Create new ScrollableTabsList component"
+        description: "Create a new component that wraps TabsList with scroll logic and styling. Keeps base TabsList unchanged; enables future enhancements (scroll buttons, snap behavior) without modifying Tier 0. Adds more code/complexity but provides better flexibility."
+        selected: false
+      - option: "Apply scroll styling in feature-drawer-tabs"
+        description: "Skip modifying Tier 0; apply scroll classes directly at the usage site in feature-drawer-tabs.tsx. Violates separation of concerns and requires duplication if other tabs components need scrolling in the future."
+        selected: false
+    selectionRationale: "Option 1 (add scrollable prop) is recommended because it is the simplest, least invasive change that fits the established codebase patterns. It leverages the existing TabsList component, requires minimal modifications to Tier 0, and solves the immediate problem without over-engineering. The Tailwind overflow utilities already used elsewhere in the codebase provide robust scrollbar handling, eliminating the need for custom scroll indicators in the MVP. If scroll buttons become necessary later, a wrapper component can be introduced without breaking the prop API."
+    answer: "Add scrollable prop to TabsList"
+
+  - question: "Should the active tab auto-scroll into view when using keyboard navigation?"
+    resolved: true
+    options:
+      - option: "Yes, always auto-scroll"
+        description: "Use Radix UI's scroll-into-view behavior or implement native Element.scrollIntoView() when the active tab changes via keyboard. Ensures active tab is always visible; provides better UX for keyboard-heavy workflows."
+        selected: true
+      - option: "No, let user scroll manually"
+        description: "Let the browser's native scroll behavior handle visibility. User scrolls to see the active tab if needed. Simpler implementation; respects user scroll position."
+        selected: false
+    selectionRationale: "Yes is recommended because keyboard navigation is a core accessibility feature in Radix UI Tabs (Arrow Left/Right), and users navigating via keyboard expect the focused tab to be visible. Auto-scrolling active tab into view is standard in modern tab implementations (e.g., browser tabs, VS Code). Radix UI provides built-in support for this via scroll-into-view, making it trivial to implement."
+    answer: "Yes, always auto-scroll"
+
+  - question: "Should the horizontal scrollbar be always visible or only appear on hover/when needed?"
+    resolved: true
+    options:
+      - option: "Always visible when overflow exists"
+        description: "Use `overflow-x-auto` with default scrollbar behavior (visible when needed, hidden otherwise). Consistent with the rest of the codebase; users immediately see that more tabs exist."
+        selected: true
+      - option: "Only appear on hover"
+        description: "Hide scrollbar by default, show on hover with CSS classes. Cleaner visual appearance; requires custom CSS implementation and testing across browsers."
+        selected: false
+    selectionRationale: "Always visible is recommended because it matches the proven pattern used in 10+ existing components (table-view, board-view, timeline-view, etc.) in the codebase. The standard `overflow-x-auto` class provides clear visual feedback that tabs are scrollable, improving discoverability. Hover-based scrollbars require custom CSS and have inconsistent behavior across browsers and operating systems."
+    answer: "Always visible when overflow exists"
+
+  - question: "Should we add visual scroll indicators (arrow buttons) to signal more tabs exist?"
+    resolved: true
+    options:
+      - option: "No, rely on scrollbar"
+        description: "Use only the native scrollbar to indicate scrollability. The scrollbar is sufficient UX feedback; arrow buttons add UI complexity without clear benefit for this use case."
+        selected: true
+      - option: "Yes, add left/right arrow buttons"
+        description: "Add chevron buttons at the edges of the tab bar that allow clicking to scroll. Provides alternative input method; useful on touch devices; improves discoverability."
+        selected: false
+    selectionRationale: "No is recommended for MVP because the native scrollbar provides clear visual feedback that tabs are scrollable, matching the established pattern in the codebase. Arrow buttons add complexity (state management, styling, touch/click handlers) without solving a critical problem—users can already scroll via mouse, trackpad, or keyboard. This can be added in a future enhancement if usability testing shows it's needed."
+    answer: "No, rely on scrollbar"
 
 content: |
   ## Problem Statement
@@ -46,6 +96,55 @@ content: |
   When multiple tabs are simultaneously visible (e.g., during implementation phase with interactive agent enabled), the tabs overflow the container width with no way to access the hidden tabs. The current implementation uses `inline-flex` layout that causes overflow rather than scrolling.
 
   Currently visible at: `src/presentation/web/components/common/feature-drawer-tabs/feature-drawer-tabs.tsx:498`
+
+  ## Success Criteria
+
+  - [ ] Tabs scroll horizontally when total tab width exceeds container width
+  - [ ] All 11 possible tabs are accessible via scrolling (can access any tab regardless of position)
+  - [ ] Keyboard navigation (Arrow Left/Right) works correctly with scrolled viewport
+  - [ ] Active tab scrolls into view automatically when selected via keyboard
+  - [ ] Scrollbar is visible on overflow to indicate more tabs exist
+  - [ ] Native scrolling works (mouse wheel, trackpad, click-and-drag)
+  - [ ] VS Code-inspired styling is preserved (tab appearance, colors, hover states)
+  - [ ] Touch scrolling works on mobile/tablet devices
+  - [ ] No visual regressions in existing tab styling or layout
+  - [ ] Storybook story demonstrates scrollable tab bar with 8+ tabs
+  - [ ] Unit tests verify scrollable prop applies correct Tailwind classes
+  - [ ] Integration tests confirm scroll behavior with 6+ visible tabs
+  - [ ] Accessibility audit passes (WCAG 2.1 Level AA)
+  - [ ] All existing tests pass without modification
+
+  ## Functional Requirements
+
+  - **FR-1**: When total width of tabs exceeds container width, render horizontal scrollbar
+  - **FR-2**: Support mouse scrolling (wheel and click-drag) on tab bar
+  - **FR-3**: Support native keyboard navigation (Arrow Left/Right to switch tabs) with automatic scroll-into-view
+  - **FR-4**: Apply `overflow-x-auto overflow-y-hidden` Tailwind classes to enable scrolling
+  - **FR-5**: Maintain full accessibility of all 11 tab options (no tabs should be permanently hidden)
+  - **FR-6**: Preserve existing tab styling, icons, labels, and hover states during scroll
+  - **FR-7**: Support responsive behavior across viewport sizes (mobile, tablet, desktop)
+  - **FR-8**: Ensure tab selection (click or keyboard) works correctly when tabs are scrolled
+  - **FR-9**: Maintain URL synchronization for tab switching (tab selection updates URL)
+
+  ## Non-Functional Requirements
+
+  - **NFR-1**: Performance — no noticeable lag or jank when scrolling tab bar (60fps target)
+  - **NFR-2**: Accessibility — WCAG 2.1 Level AA compliance (keyboard navigation, screen reader support, color contrast)
+  - **NFR-3**: Consistency — use existing `overflow-x-auto` pattern already used in 10+ components (table-view, board-view, timeline-view)
+  - **NFR-4**: Maintainability — changes localized to Tier 0 TabsList component and Tier 1 feature-drawer-tabs usage
+  - **NFR-5**: Browser compatibility — works on all modern browsers (Chrome, Firefox, Safari, Edge) and their mobile equivalents
+  - **NFR-6**: Touch support — scrolling works on iOS Safari, Chrome Mobile, and other touch browsers
+  - **NFR-7**: Code quality — no duplication; reuses existing utility classes; no new dependencies added
+  - **NFR-8**: Testing — unit tests, integration tests, and visual regression tests (Storybook); no manual testing required
+
+  ## Product Questions & AI Recommendations
+
+  | # | Question | AI Recommendation | Rationale |
+  | - | -------- | ----------------- | --------- |
+  | 1 | Implementation approach (prop vs component)? | Add `scrollable` prop to TabsList | Minimal, non-invasive change; simplest testing; matches codebase patterns; MVP-focused |
+  | 2 | Auto-scroll active tab into view? | Yes, always auto-scroll | Standard UX for keyboard navigation; Radix UI provides native support; improves accessibility |
+  | 3 | Scrollbar visibility? | Always visible when overflow exists | Matches 10+ existing components; clear visual feedback; no browser inconsistency issues |
+  | 4 | Add visual scroll indicators (arrow buttons)? | No, rely on scrollbar | MVP scope; native scrollbar sufficient; arrow buttons can be added in future enhancement |
 
   ## Codebase Analysis
 
@@ -103,11 +202,12 @@ content: |
 
   | Area | Impact | Reasoning |
   | ---- | ------ | --------- |
-  | `src/presentation/web/components/ui/tabs.tsx` | High | TabsList component needs scrolling support added (either a new parameter or wrapper component) |
-  | `src/presentation/web/components/common/feature-drawer-tabs/feature-drawer-tabs.tsx` | High | TabsList rendering (line 498) needs to apply scroll styling; may need wrapper for scroll buttons |
-  | `src/presentation/web/components/ui/tabs.stories.tsx` | Medium | Need to add Storybook story demonstrating scrollable tab bar with many tabs |
-  | Tests for feature-drawer-tabs | Low | Existing tests should continue to pass; may need visual regression tests for scroll behavior |
-  | Accessibility | Medium | Must ensure keyboard navigation (Arrow Left/Right) still works with horizontal scroll |
+  | `src/presentation/web/components/ui/tabs.tsx` | High | TabsList component needs scrollable prop that conditionally applies scroll classes |
+  | `src/presentation/web/components/common/feature-drawer-tabs/feature-drawer-tabs.tsx` | High | TabsList rendering (line 498) needs to pass scrollable={true} prop |
+  | `src/presentation/web/components/ui/tabs.stories.tsx` | Medium | Add Storybook story demonstrating scrollable tab bar with 8+ tabs |
+  | Tests for tabs.tsx | Low | Add unit test for scrollable prop and class application |
+  | Tests for feature-drawer-tabs | Low | Existing tests should pass; may add visual regression tests for scroll behavior |
+  | Accessibility testing | Medium | Verify keyboard navigation (Arrow Left/Right) works in scrolled state; ensure screen readers announce all tabs |
 
   ## Dependencies
 
@@ -118,46 +218,27 @@ content: |
 
   No backend or API changes required. This is purely a UI enhancement affecting only the presentation layer.
 
-  ## Implementation Considerations
+  ## Implementation Approach
 
-  ### Approach Options
+  Based on product decisions above:
 
-  **Option 1: Add optional scrollable prop to TabsList**
-  - Add boolean prop (e.g., `scrollable?: boolean`)
-  - Apply `overflow-x-auto overflow-y-hidden` classes conditionally
-  - Simplest, least invasive change
-  - Requires only modifying Tier 0 component
+  1. **Modify TabsList** (Tier 0): Add `scrollable?: boolean` prop
+     - When `scrollable={true}`, apply `overflow-x-auto overflow-y-hidden` classes
+     - Maintain backward compatibility (default `scrollable={false}`)
 
-  **Option 2: Create separate ScrollableTabsList component**
-  - New component wrapping TabsList with scroll logic
-  - Keeps base TabsList unchanged
-  - More flexible for future enhancements (scroll buttons, snap behavior)
-  - May require wrapper div for layout
+  2. **Update feature-drawer-tabs** (Tier 1): Pass prop to TabsList
+     - Set `scrollable={true}` on the TabsList render at line 498
+     - Leverage Radix UI's native scroll-into-view behavior for keyboard navigation
 
-  **Option 3: Apply scroll styling directly in feature-drawer-tabs**
-  - Skip modifying Tier 0, apply scroll classes at usage site
-  - Violates separation of concerns — scroll behavior is platform, not feature-specific
-  - Would require duplication if other tabs need scrolling
+  3. **Add Storybook story**: Demonstrate scrollable tabs
+     - Create story with 8+ tabs to trigger overflow
+     - Test scroll behavior, keyboard navigation, and styling
 
-  **Recommended**: Option 1 (add `scrollable` prop) for minimal impact, or Option 2 if scroll-button indicators are desired for UX.
-
-  ### Accessibility Requirements
-
-  - Keyboard navigation must work: Arrow Left/Right to switch tabs
-  - Tab selection must scroll the active tab into view
-  - Scroll position should be remembered or active tab should always be visible
-  - Scrollbar should be visible on overflow to indicate more tabs exist
-  - Touch scrolling should work on mobile/tablet
-
-  Radix UI Tabs provides keyboard navigation; Tailwind's `overflow-x-auto` handles scroll visibility automatically.
-
-  ### Testing Scope
-
-  1. **Component unit tests**: Verify scrollable prop applies correct classes
-  2. **Integration tests**: Test with 6+ tabs to ensure scroll activates
-  3. **Accessibility tests**: Keyboard navigation with scrolled viewport
-  4. **Visual tests/Storybook**: Visual regression test with many tabs
-  5. **E2E tests** (if applicable): Feature drawer with all tabs visible
+  4. **Testing**:
+     - Unit test: verify prop applies correct classes
+     - Integration test: verify scroll with 6+ visible tabs
+     - Accessibility test: keyboard navigation in scrolled viewport
+     - Visual regression test: Storybook snapshot
 
   ## Size Estimate
 
@@ -170,14 +251,14 @@ content: |
   - **Testing**: Straightforward unit + visual tests (Storybook)
   - **No backend changes**: Purely presentation layer
   - **Proven pattern**: `overflow-x-auto` already used successfully in 10+ places
-  - **One potential enhancement**: Scroll-indicator buttons or snap behavior would add complexity
+  - **MVP focus**: No scroll buttons or advanced features needed for MVP
 
   Breakdown:
-  - Analysis: 0.5 days (completed)
+  - Requirements: 0 days (completed)
   - Implementation: 0.5 days (add prop + apply styling)
   - Testing + Storybook: 0.5–1 day (unit tests, stories, visual verification)
   - Documentation/refinement: 0.5 day
 
   ---
 
-  _Analysis phase complete — proceed to research phase to verify implementation approach and design scroll UX_
+  _Requirements phase complete — ready for research and implementation planning_
