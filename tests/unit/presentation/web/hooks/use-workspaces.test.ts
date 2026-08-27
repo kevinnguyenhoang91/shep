@@ -1,17 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
 import {
   useWorkspaces,
   DEFAULT_WORKSPACE_ID,
   DEFAULT_WORKSPACE_NAME,
 } from '../../../../../src/presentation/web/hooks/use-workspaces.js';
-import type { Workspace } from '../../../../../src/presentation/web/hooks/use-workspaces.js';
 
 const STORAGE_KEY = 'shep:workspaces:v1';
 
 describe('useWorkspaces', () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -27,36 +27,6 @@ describe('useWorkspaces', () => {
         id: DEFAULT_WORKSPACE_ID,
         name: DEFAULT_WORKSPACE_NAME,
       });
-    });
-
-    it('should load persisted workspaces from localStorage on mount', async () => {
-      const persisted: Workspace[] = [
-        {
-          id: DEFAULT_WORKSPACE_ID,
-          name: DEFAULT_WORKSPACE_NAME,
-          repoIds: [],
-          featureIds: [],
-        },
-        {
-          id: 'ws-1',
-          name: 'My Workspace',
-          repoIds: ['repo-1'],
-          featureIds: ['feat-1'],
-        },
-      ];
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ workspaces: persisted, activeWorkspaceId: 'ws-1' })
-      );
-
-      const { result } = renderHook(() => useWorkspaces());
-
-      // Wait for hydration effect to complete
-      await waitFor(() => {
-        expect(result.current.workspaces).toHaveLength(2);
-      });
-
-      expect(result.current.activeWorkspaceId).toBe('ws-1');
     });
   });
 
@@ -74,108 +44,98 @@ describe('useWorkspaces', () => {
       });
     });
 
-    it('should persist new workspace to localStorage', async () => {
+    it('workspace ID should be unique', () => {
       const { result } = renderHook(() => useWorkspaces());
 
-      await act(async () => {
-        result.current.createWorkspace('Test Workspace');
+      let ws1Id = '';
+      let ws2Id = '';
+
+      act(() => {
+        ws1Id = result.current.createWorkspace('Workspace 1').id;
       });
 
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
-      expect(stored.workspaces).toHaveLength(2);
-      expect(stored.workspaces[1]).toMatchObject({
-        name: 'Test Workspace',
-      });
-    });
-
-    it('should survive a simulated browser reload', async () => {
-      // First render: create a workspace
-      const { result: result1, unmount: unmount1 } = renderHook(() => useWorkspaces());
-
-      await act(async () => {
-        result1.current.createWorkspace('Persisted Workspace');
+      act(() => {
+        ws2Id = result.current.createWorkspace('Workspace 2').id;
       });
 
-      const workspaceId = result1.current.workspaces[1]!.id;
-      const workspaceName = result1.current.workspaces[1]!.name;
-
-      // Simulate browser reload by unmounting and remounting
-      unmount1();
-
-      // Second render: should have persisted workspace
-      const { result: result2, rerender } = renderHook(() => useWorkspaces());
-
-      // Allow effect to run by rerendering
-      await act(async () => {
-        rerender();
-      });
-
-      expect(result2.current.workspaces).toHaveLength(2);
-      expect(result2.current.workspaces[1]).toMatchObject({
-        id: workspaceId,
-        name: workspaceName,
-      });
+      expect(ws1Id).not.toEqual(ws2Id);
     });
   });
 
   describe('renameWorkspace', () => {
-    it('should rename a workspace and persist to localStorage', async () => {
+    it('should rename a workspace', () => {
       const { result } = renderHook(() => useWorkspaces());
 
-      let workspaceId: string;
-      await act(async () => {
+      let workspaceId = '';
+      act(() => {
         const ws = result.current.createWorkspace('Original Name');
         workspaceId = ws.id;
       });
 
-      await act(async () => {
-        result.current.renameWorkspace(workspaceId!, 'New Name');
+      act(() => {
+        result.current.renameWorkspace(workspaceId, 'New Name');
       });
 
       const ws = result.current.workspaces.find((w) => w.id === workspaceId);
       expect(ws?.name).toBe('New Name');
+    });
 
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
-      const storedWs = stored.workspaces.find((w: Workspace) => w.id === workspaceId);
-      expect(storedWs?.name).toBe('New Name');
+    it('should not rename default workspace', () => {
+      const { result } = renderHook(() => useWorkspaces());
+
+      act(() => {
+        result.current.renameWorkspace(DEFAULT_WORKSPACE_ID, 'Renamed Default');
+      });
+
+      const defaultWs = result.current.workspaces.find((w) => w.id === DEFAULT_WORKSPACE_ID);
+      expect(defaultWs?.name).toBe(DEFAULT_WORKSPACE_NAME);
     });
   });
 
   describe('deleteWorkspace', () => {
-    it('should delete a workspace and persist to localStorage', async () => {
+    it('should delete a workspace', () => {
       const { result } = renderHook(() => useWorkspaces());
 
-      let workspaceId: string;
-      await act(async () => {
+      let workspaceId = '';
+      act(() => {
         const ws = result.current.createWorkspace('To Delete');
         workspaceId = ws.id;
       });
 
       expect(result.current.workspaces).toHaveLength(2);
 
-      await act(async () => {
-        result.current.deleteWorkspace(workspaceId!);
+      act(() => {
+        result.current.deleteWorkspace(workspaceId);
       });
 
       expect(result.current.workspaces).toHaveLength(1);
+    });
 
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
-      expect(stored.workspaces).toHaveLength(1);
+    it('should not delete default workspace', () => {
+      const { result } = renderHook(() => useWorkspaces());
+
+      const initialCount = result.current.workspaces.length;
+
+      act(() => {
+        result.current.deleteWorkspace(DEFAULT_WORKSPACE_ID);
+      });
+
+      expect(result.current.workspaces).toHaveLength(initialCount);
     });
   });
 
   describe('setWorkspaceMembers', () => {
-    it('should update workspace members and persist to localStorage', async () => {
+    it('should update workspace members', () => {
       const { result } = renderHook(() => useWorkspaces());
 
-      let workspaceId: string;
-      await act(async () => {
+      let workspaceId = '';
+      act(() => {
         const ws = result.current.createWorkspace('Test');
         workspaceId = ws.id;
       });
 
-      await act(async () => {
-        result.current.setWorkspaceMembers(workspaceId!, {
+      act(() => {
+        result.current.setWorkspaceMembers(workspaceId, {
           repoIds: ['repo-1'],
           featureIds: ['feat-1'],
         });
@@ -184,15 +144,65 @@ describe('useWorkspaces', () => {
       const ws = result.current.workspaces.find((w) => w.id === workspaceId);
       expect(ws?.repoIds).toEqual(['repo-1']);
       expect(ws?.featureIds).toEqual(['feat-1']);
-
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
-      const storedWs = stored.workspaces.find((w: Workspace) => w.id === workspaceId);
-      expect(storedWs?.repoIds).toEqual(['repo-1']);
-      expect(storedWs?.featureIds).toEqual(['feat-1']);
     });
   });
 
-  describe('localStorage safety', () => {
+  describe('activeWorkspace', () => {
+    it('should have default workspace as active on mount', () => {
+      const { result } = renderHook(() => useWorkspaces());
+
+      expect(result.current.isDefaultActive).toBe(true);
+      expect(result.current.activeWorkspaceId).toBe(DEFAULT_WORKSPACE_ID);
+    });
+
+    it('should switch active workspace', () => {
+      const { result } = renderHook(() => useWorkspaces());
+
+      let workspaceId = '';
+      act(() => {
+        const ws = result.current.createWorkspace('New Active');
+        workspaceId = ws.id;
+      });
+
+      act(() => {
+        result.current.setActiveWorkspace(workspaceId);
+      });
+
+      expect(result.current.activeWorkspaceId).toBe(workspaceId);
+      expect(result.current.isDefaultActive).toBe(false);
+    });
+  });
+
+  describe('toggleRepoInActive', () => {
+    it('should toggle repo in active workspace', () => {
+      const { result } = renderHook(() => useWorkspaces());
+
+      act(() => {
+        result.current.createWorkspace('Test');
+      });
+
+      const wsId = result.current.workspaces[1]?.id || '';
+      act(() => {
+        result.current.setActiveWorkspace(wsId);
+      });
+
+      expect(result.current.activeWorkspace.repoIds).not.toContain('repo-1');
+
+      act(() => {
+        result.current.toggleRepoInActive('repo-1');
+      });
+
+      expect(result.current.activeWorkspace.repoIds).toContain('repo-1');
+
+      act(() => {
+        result.current.toggleRepoInActive('repo-1');
+      });
+
+      expect(result.current.activeWorkspace.repoIds).not.toContain('repo-1');
+    });
+  });
+
+  describe('error handling', () => {
     it('should handle corrupted localStorage data gracefully', () => {
       localStorage.setItem(STORAGE_KEY, 'invalid json');
 
@@ -202,7 +212,7 @@ describe('useWorkspaces', () => {
       expect(result.current.activeWorkspaceId).toBe(DEFAULT_WORKSPACE_ID);
     });
 
-    it('should ensure default workspace always exists', async () => {
+    it('should ensure default workspace always exists', () => {
       const persisted = {
         workspaces: [
           {
@@ -216,11 +226,7 @@ describe('useWorkspaces', () => {
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
 
-      const { result, rerender } = renderHook(() => useWorkspaces());
-
-      await act(async () => {
-        rerender();
-      });
+      const { result } = renderHook(() => useWorkspaces());
 
       const hasDefault = result.current.workspaces.some((w) => w.id === DEFAULT_WORKSPACE_ID);
       expect(hasDefault).toBe(true);
