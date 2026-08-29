@@ -1735,3 +1735,17 @@ macOS, where 1ms barely clears `exec` and nothing had touched the DB yet.
 When modifying a module's exports (e.g. changing `useAllTurnStatuses` to `useTurnStatusSync`), vitest mocks using `vi.mock()` that return an object missing the expected exports will fail at runtime with `TypeError: (0, ...useTurnStatus) is not a function` or `Error: [vitest] No "useTurnStatusSync" export is defined...`. Vitest strictly verifies that if a module is mocked, any named import actually exists on the mocked object. 
 
 **Rule:** Always search the codebase for `vi.mock('path/to/module')` whenever you rename, add, or remove an exported function from a module, and ensure all test files update their mock returns to match the new signature.
+
+## Fast Mode Rejection Feedback — Must Clear Completed Phases on Merge Rejection
+
+When a feature in fast mode is rejected with feedback during merge review, the `fast-implement` phase was marked as completed but needed to re-run with the feedback. However, on worker resume, `fast-implement` checked `completedPhases.includes('fast-implement')` and skipped execution entirely, ignoring the user's rejection feedback.
+
+**Root cause:** The LangGraph routes `merge` rejection back to `fast-implement` (via `routeReexecution('fast-implement', ...)`) for fresh implementation with the feedback. But `completedPhases` persists from the initial run, and the node-level guard `if (completedPhases.includes('fast-implement')) { skip(); }` prevents re-execution.
+
+**Rule:** When rejection happens with feedback in fast mode, `RejectAgentRunUseCase.execute()` must call `clearCompletedPhase(specDir, 'fast-implement')` when:
+- Feature is in fast mode (`feature.fast === true`)
+- Rejection happened at merge phase (`rejectedPhase === 'merge'`)
+
+The `rejectedPhase` is derived from `run.result?.startsWith('node:')`, so determine it before the try-catch so it's available after spec.yaml is updated.
+
+Without this, feedback on merge rejection is silently dropped and the feature proceeds with stale implementation.
