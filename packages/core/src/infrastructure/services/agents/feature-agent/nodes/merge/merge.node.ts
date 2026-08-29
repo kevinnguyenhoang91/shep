@@ -43,6 +43,7 @@ import {
   GitPrError,
   GitPrErrorCode,
 } from '@/application/ports/output/services/git-pr-service.interface.js';
+import { limitCommitSubjectLength } from '@/infrastructure/services/git/pr-branding.js';
 import { parseCommitHash, parsePrUrl } from './merge-output-parser.js';
 import { runCiWatchFixLoop } from './ci-watch-fix-loop.js';
 import { getSettings } from '@/infrastructure/services/settings.service.js';
@@ -426,7 +427,8 @@ export function createMergeNode(deps: MergeNodeDeps) {
           // On MERGE_CONFLICT, falls back to agent-based merge for conflict resolution.
           log.info('Programmatic local squash merge (no agent needed)');
 
-          const commitMsg = `feat: squash merge ${branch} into ${baseBranch}`;
+          const rawCommitMsg = `feat: squash merge ${branch} into ${baseBranch}`;
+          const commitMsg = limitCommitSubjectLength(rawCommitMsg);
           try {
             await deps.localMergeSquash(
               state.repositoryPath,

@@ -75,3 +75,29 @@ export function applyCommitBranding(message: string): string {
 
   return cleaned;
 }
+
+/**
+ * Limit a commit message subject line to 72 characters.
+ *
+ * Commits with subjects longer than 72 characters may violate repository
+ * restrictions or display issues in tools (git log, GitHub, etc.).
+ *
+ * Splits the message on first newline. If the subject is longer than
+ * 72 characters, truncates it, preserving the body if present.
+ *
+ * @param message - Full commit message (subject + optional body)
+ * @returns Message with subject limited to 72 characters
+ */
+export function limitCommitSubjectLength(message: string): string {
+  const lines = message.split('\n');
+  const subject = lines[0];
+
+  if (subject.length <= 72) {
+    return message;
+  }
+
+  const truncatedSubject = subject.slice(0, 72);
+  const body = lines.slice(1).join('\n');
+
+  return body ? `${truncatedSubject}\n${body}` : truncatedSubject;
+}
