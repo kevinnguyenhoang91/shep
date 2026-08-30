@@ -1,0 +1,36 @@
+feature:
+  id: '110-lane-labeler-claude-cli'
+  name: 'lane-labeler-claude-cli'
+  number: 110
+  branch: 'feat/110-lane-labeler-claude-cli'
+  lifecycle: 'research'
+  createdAt: '2026-08-30T10:08:29Z'
+
+status:
+  phase: 'research'
+  progress:
+    completed: 0
+    total: 0
+    percentage: 0
+  currentTask: null
+  lastUpdated: '2026-08-30T10:08:29Z'
+  lastUpdatedBy: 'feature-agent'
+
+validation:
+  lastRun: null
+  gatesPassed: []
+  autoFixesApplied: []
+
+tasks:
+  current: null
+  blocked: []
+  failed: []
+
+checkpoints:
+  - phase: 'feature-created'
+    completedAt: '2026-08-30T10:08:29Z'
+    completedBy: 'feature-agent'
+
+errors:
+  current: null
+  history: []

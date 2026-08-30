@@ -47,4 +47,5 @@ jobs:
       - name: Run groom-issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHEP_MOCK_EXECUTOR: '1'
         run: pnpm dev:cli contributors groom-issue

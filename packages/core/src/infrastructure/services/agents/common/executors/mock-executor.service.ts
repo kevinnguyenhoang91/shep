@@ -37,10 +37,29 @@ function extractUserInput(prompt: string): string | null {
   return match ? match[1] : null;
 }
 
+function getDefaultBySchema(schema: Record<string, unknown>): unknown {
+  const props = schema.properties as Record<string, unknown>;
+  if (!props) return {};
+  const result: Record<string, unknown> = {};
+  for (const [key, prop] of Object.entries(props)) {
+    const propSchema = prop as Record<string, unknown>;
+    if (propSchema.type === 'array') {
+      result[key] = [];
+    } else if (propSchema.type === 'string') {
+      result[key] = '';
+    } else if (propSchema.type === 'object') {
+      result[key] = {};
+    } else {
+      result[key] = null;
+    }
+  }
+  return result;
+}
+
 export class MockAgentExecutorService implements IAgentExecutor {
   readonly agentType: AgentType = 'claude-code' as AgentType;
 
-  async execute(prompt: string, _options?: AgentExecutionOptions): Promise<AgentExecutionResult> {
+  async execute(prompt: string, options?: AgentExecutionOptions): Promise<AgentExecutionResult> {
     const userInput = extractUserInput(prompt);
 
     if (userInput) {
@@ -51,8 +70,35 @@ export class MockAgentExecutorService implements IAgentExecutor {
       };
     }
 
+    // Check for acceptance criteria request (contains "acceptance criteria")
+    if (prompt.toLowerCase().includes('acceptance criteria')) {
+      return {
+        result: JSON.stringify({
+          criteria: ['- [ ] Implement the requested feature', '- [ ] Add tests', '- [ ] Update documentation'],
+        }),
+      };
+    }
+
+    // Check for lane classification request (contains "Classify the GitHub issue")
+    if (prompt.toLowerCase().includes('classify the github issue') || prompt.toLowerCase().includes('contributor lane')) {
+      const laneMatch = prompt.toLowerCase().match(/title:\s*(.+?)(?:\n|$)/);
+      const title = laneMatch ? laneMatch[1].trim() : 'unknown';
+      let lane = 'infra';
+      if (title.toLowerCase().includes('docs')) lane = 'docs';
+      else if (title.toLowerCase().includes('ui') || title.toLowerCase().includes('web')) lane = 'ui';
+      else if (title.toLowerCase().includes('cli') || title.toLowerCase().includes('command')) lane = 'cli';
+      else if (title.toLowerCase().includes('agent') || title.toLowerCase().includes('llm')) lane = 'agents';
+      return {
+        result: JSON.stringify({
+          lane,
+          rationale: `Classified based on title keywords into the ${lane} lane.`,
+        }),
+      };
+    }
+
     // Default fallback for any other prompt
-    return { result: '{}' };
+    const schema = options?.outputSchema as Record<string, unknown> | undefined;
+    return { result: JSON.stringify(schema?.properties ? getDefaultBySchema(schema) : {}) };
   }
 
   async *executeStream(
