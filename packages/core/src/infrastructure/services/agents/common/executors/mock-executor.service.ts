@@ -74,20 +74,30 @@ export class MockAgentExecutorService implements IAgentExecutor {
     if (prompt.toLowerCase().includes('acceptance criteria')) {
       return {
         result: JSON.stringify({
-          criteria: ['- [ ] Implement the requested feature', '- [ ] Add tests', '- [ ] Update documentation'],
+          criteria: [
+            '- [ ] Implement the requested feature',
+            '- [ ] Add tests',
+            '- [ ] Update documentation',
+          ],
         }),
       };
     }
 
     // Check for lane classification request (contains "Classify the GitHub issue")
-    if (prompt.toLowerCase().includes('classify the github issue') || prompt.toLowerCase().includes('contributor lane')) {
+    if (
+      prompt.toLowerCase().includes('classify the github issue') ||
+      prompt.toLowerCase().includes('contributor lane')
+    ) {
       const laneMatch = prompt.toLowerCase().match(/title:\s*(.+?)(?:\n|$)/);
       const title = laneMatch ? laneMatch[1].trim() : 'unknown';
       let lane = 'infra';
       if (title.toLowerCase().includes('docs')) lane = 'docs';
-      else if (title.toLowerCase().includes('ui') || title.toLowerCase().includes('web')) lane = 'ui';
-      else if (title.toLowerCase().includes('cli') || title.toLowerCase().includes('command')) lane = 'cli';
-      else if (title.toLowerCase().includes('agent') || title.toLowerCase().includes('llm')) lane = 'agents';
+      else if (title.toLowerCase().includes('ui') || title.toLowerCase().includes('web'))
+        lane = 'ui';
+      else if (title.toLowerCase().includes('cli') || title.toLowerCase().includes('command'))
+        lane = 'cli';
+      else if (title.toLowerCase().includes('agent') || title.toLowerCase().includes('llm'))
+        lane = 'agents';
       return {
         result: JSON.stringify({
           lane,
