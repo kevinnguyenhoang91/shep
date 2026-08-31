@@ -30,23 +30,38 @@ leave prototype status.
 
 **Options considered:**
 
-1. Merge hydrate and persist into a single combined `useEffect`.
-2. Rewrite the hook around `useSyncExternalStore`.
-3. Debounce/delay the persist effect.
-4. `useRef`-based hydration guard + fresh-object `loadState()` returns.
+1. `useRef`-based hydration guard gating a separate hydrate-then-persist effect pair.
+2. Merge hydrate and persist into a single combined `useEffect`.
+3. Rewrite the hook around `useSyncExternalStore`.
+4. Debounce/delay the persist effect.
+5. Lazy `useState(loadState)` initializer, dropping the hydrate effect entirely.
 
-**Decision:** `useRef`-based hydration guard + fresh-object `loadState()` returns.
+**Decision:** Lazy `useState(loadState)` initializer, dropping the hydrate effect entirely.
 
-**Rationale:** A `useRef` flag set synchronously inside the hydration effect
-and read by the persist effect gives a deterministic guard with no timing
-assumptions — the persist effect simply returns early until hydration has
-run once. This mirrors a previously validated fix for this exact bug
-(commit `ebff256d25fb`, spec 114, on an unmerged branch) that was correct
-but never landed on `main` for unrelated scope-hygiene reasons (it bundled
-unrelated skill files). Every `loadState()` branch is also changed to
-construct a fresh object instead of returning the shared `INITIAL_STATE`
-reference, since React's `setState` bails out on referential equality and
-would otherwise silently skip the hydration re-render.
+**Rationale:** A RED test asserting that no `localStorage.setItem` call
+during/after mount may ever contain fewer workspaces than what was already
+persisted proved that the two-effect pattern (hydrate effect + persist
+effect) always fires the persist effect's first invocation with the
+un-hydrated default, because both effects run in the same initial
+passive-effect flush using the same pre-hydration render closure — it only
+"self-corrects" on the next render, which is not a guaranteed win against a
+real browser closing or another tab reading storage in that window. The
+originally-planned `useRef` hydration guard (set *inside* the hydrate
+effect) does not actually prevent this either: both effects run in one
+synchronous pass in source order, so the ref is already `true` by the time
+the persist effect checks it — the guard never gets to skip that first
+stale write. Switching to a lazy `useState` initializer removes the race by
+construction: `loadState()` runs once, synchronously, during the first
+render, before any effect can run, so there is no "pre-hydration" render
+for the persist effect to ever observe. This also mirrors the existing
+sibling hook in the same directory, `use-viewport-persistence.ts`, which
+already reads its localStorage default synchronously
+(`useRef(readViewport()).current`) rather than through a mount effect.
+Every `loadState()` branch is also changed to construct a fresh object via
+a `freshInitialState()` helper instead of returning the shared
+`INITIAL_STATE` reference — retained as a correctness improvement even
+though it is no longer load-bearing for the primary race once the lazy
+initializer removes the hydrate effect.
 
 ## Library Analysis
 

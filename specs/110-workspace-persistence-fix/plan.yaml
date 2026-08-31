@@ -52,29 +52,37 @@ content: |
            └─▶ effect B (persist): saveState(state)        ──▶ runs with STALE
                                                                  pre-hydration
                                                                  `state` closure
-           loadState() branches 1/2/4 `return INITIAL_STATE` (shared reference)
-           ──▶ setState() bails out on referential equality ──▶ effect A's
-               re-render never happens ──▶ effect B never re-fires with the
-               real hydrated data ──▶ localStorage stays clobbered.
+           Both effects run in the SAME initial passive-effect flush, using
+           the SAME pre-hydration render closure — effect B's first write is
+           deterministically the un-hydrated default, clobbering whatever was
+           already saved. It only "self-corrects" on the NEXT render once
+           effect A's setState commits — not a guaranteed win against a real
+           browser closing, or another tab reading storage, in that window.
+           (A useRef guard set inside effect A does not fix this either: both
+           effects run in one synchronous pass in source order, so the ref is
+           already `true` by the time effect B checks it.)
 
   After (fixed):
-    mount ─▶ effect A (hydrate): const loaded = loadState()  [always a FRESH
-              object]; setState(loaded); isHydratedRef.current = true
-           ─▶ effect B (persist): if (!isHydratedRef.current) return;
-              saveState(state)
-           ──▶ effect B is a guaranteed no-op on the mount pass, and fires
-               correctly on every subsequent state change once hydration has
-               set the ref.
+    mount ─▶ state = useState(loadState)  [lazy initializer: loadState() runs
+              ONCE, synchronously, during the FIRST render — before any
+              effect exists to race against it]
+           ─▶ effect (persist): saveState(state)  ──▶ `state` is ALREADY the
+              hydrated value on this very first run; there is no
+              "pre-hydration" render left for it to observe.
   ```
 
   ## Implementation Strategy
 
   **MANDATORY TDD**: Both code-change phases follow RED-GREEN-REFACTOR.
 
-  Phase 1 fixes `useWorkspaces` and locks the fix in with unit tests written
-  first (RED), covering the exact failure modes: the persist effect firing
-  before hydration, and `loadState()` returning a referentially-stable
-  `INITIAL_STATE` that suppresses the hydration re-render. Task 2 extends
+  Phase 1 fixes `useWorkspaces` and locks the fix in with a unit test written
+  first (RED): asserting that no `localStorage.setItem` call during/after
+  mount may ever contain fewer workspaces than what was already persisted.
+  That RED test empirically proved the originally-planned `useRef` guard
+  would not have worked (both effects run in one synchronous pass, so the
+  ref is already flipped before the persist effect's guard checks it) and
+  led to switching the fix to a lazy `useState(loadState)` initializer,
+  which removes the hydrate effect — and the race — entirely. Task 2 extends
   coverage to the end-to-end scenario the user actually reported — creating
   multiple workspaces, then simulating a browser close/reopen via a hook
   remount, and asserting all workspaces and the active selection survive.
@@ -100,7 +108,7 @@ content: |
 
   | File | Changes |
   | ---- | ------- |
-  | `src/presentation/web/hooks/use-workspaces.ts` | Add `isHydratedRef` guard around the persist effect; make every `loadState()` branch return a freshly constructed object instead of the shared `INITIAL_STATE` reference. |
+  | `src/presentation/web/hooks/use-workspaces.ts` | Replace the hydrate-effect + `useState(INITIAL_STATE)` pattern with a lazy `useState(loadState)` initializer (no separate hydrate effect); make every `loadState()` branch return a freshly constructed object instead of the shared `INITIAL_STATE` reference. |
   | `LESSONS.md` | Add an entry documenting the hydrate/persist race + referential-identity pattern for future hooks that mix `useEffect`-based localStorage hydration and persistence. |
 
   ## Testing Strategy (TDD: Tests FIRST)
@@ -109,9 +117,9 @@ content: |
 
   ### Unit Tests (RED -> GREEN -> REFACTOR)
 
-  - `loadState()` returns a new object reference on every branch (undefined `window`, missing key, malformed JSON, non-array `workspaces`, valid data) — asserted with `not.toBe(INITIAL_STATE)`.
-  - The persist effect does not call `localStorage.setItem` until after the hydration effect has run and `isHydratedRef.current` is `true`.
-  - Creating a workspace immediately after mount does not get overwritten by a stale pre-hydration persist write.
+  - No `localStorage.setItem` call during/after mount ever contains fewer workspaces than what was already persisted (the direct regression test for the reported bug).
+  - A newly created workspace is persisted to `localStorage` immediately.
+  - `loadState()`'s fallback branches (empty storage, malformed JSON, non-array `workspaces`) each return a workspaces list matching the default shape.
 
   ### Integration Tests
 
@@ -123,7 +131,7 @@ content: |
   | Risk | Mitigation |
   | ---- | ---------- |
   | Fix changes effect ordering/timing in a way that breaks another consumer of `useWorkspaces()` | Full existing Control Center test suite (`use-control-center-state`, `control-center`, `control-center-empty-state`, `control-center-integration`) is run unmodified as a regression gate. |
-  | `isHydratedRef` guard accidentally suppresses a legitimate persist write | Test explicitly asserts persistence resumes normally for every state change *after* the hydration effect has run. |
+  | Lazy `useState(loadState)` initializer reads `localStorage` during a server-rendered pass and crashes | `loadState()` already guards `typeof window === 'undefined'`; the sibling hook `use-viewport-persistence.ts` in the same directory already reads localStorage synchronously the same way with no reported SSR issue. |
   | localStorage unavailable (private browsing) | Existing try/catch in `saveState`/`loadState` is preserved as-is; not in scope for this fix. |
 
   ---

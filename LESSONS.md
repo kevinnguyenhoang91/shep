@@ -1735,3 +1735,49 @@ macOS, where 1ms barely clears `exec` and nothing had touched the DB yet.
 When modifying a module's exports (e.g. changing `useAllTurnStatuses` to `useTurnStatusSync`), vitest mocks using `vi.mock()` that return an object missing the expected exports will fail at runtime with `TypeError: (0, ...useTurnStatus) is not a function` or `Error: [vitest] No "useTurnStatusSync" export is defined...`. Vitest strictly verifies that if a module is mocked, any named import actually exists on the mocked object. 
 
 **Rule:** Always search the codebase for `vi.mock('path/to/module')` whenever you rename, add, or remove an exported function from a module, and ensure all test files update their mock returns to match the new signature.
+
+## A `useEffect`-pair "hydrate then persist" localStorage hook races itself on mount
+
+`useWorkspaces` (`src/presentation/web/hooks/use-workspaces.ts`) lost newly
+created Control Center workspaces after closing and reopening the browser.
+The hook had a hydrate effect (`useEffect(() => setState(loadState()), [])`)
+and a persist effect (`useEffect(() => saveState(state), [state])`). Both run
+in the **same initial passive-effect flush**, using the **same pre-hydration
+render closure** — so the persist effect's first invocation always fires with
+the un-hydrated default `state`, deterministically overwriting whatever was
+already in `localStorage` with just the default workspace. It "self-corrects"
+on the *next* render once the hydrate effect's `setState` commits, but that
+is not a guaranteed win against a real browser closing (or another tab
+reading storage) in that window — and a synchronous `renderHook()` test that
+only checks the *final* state after `act()` settles won't catch it, since the
+test environment's `act()` flush happens to complete the self-correction
+before the test can observe the intermediate clobber.
+
+A `useRef` guard set *inside* the hydrate effect
+(`isHydratedRef.current = true`) does **not** fix this: because both effects
+run in one synchronous pass in source order, the ref is already flipped to
+`true` by the time the persist effect's `if (!isHydratedRef.current) return`
+check runs — the guard never gets a chance to skip that first stale write.
+
+**Rules:**
+
+1. **Test the *every write*, not just the *final* state.** The regression
+   test that actually caught this asserted that no `localStorage.setItem`
+   call made during/after mount may ever contain less data than what was
+   already persisted — not just that `result.current` looks right after
+   `act()` settles. A "final state" assertion passes even when a real,
+   harmful transient write happened in between.
+2. **Prefer a lazy `useState` initializer over a hydrate-effect for
+   synchronous localStorage reads.** `useState<T>(loadState)` runs
+   `loadState()` once, synchronously, during the first render — before any
+   effect (including a persist effect) exists to race against it. This
+   removes the entire race by construction instead of patching around it
+   with ref-based guards whose correctness depends on effect execution
+   order. The sibling hook `use-viewport-persistence.ts` in the same
+   directory already uses this pattern (`useRef(readViewport()).current`);
+   follow that precedent rather than reintroducing the two-effect version.
+3. **`loadState()`-style functions must never return a shared default
+   object by reference** (e.g. `return INITIAL_STATE`) — return a freshly
+   constructed object on every branch. React's `setState` bails out on
+   referential equality, so returning the same reference silently skips a
+   re-render that downstream effects may depend on.

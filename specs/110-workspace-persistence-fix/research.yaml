@@ -30,29 +30,48 @@ decisions:
       single-responsibility scope of this spec. sessionStorage would make the
       bug worse, not better, since it is cleared on tab close by design.
   - title: Race-condition fix strategy in useWorkspaces
-    chosen: useRef-based hydration guard gating the persist effect, plus fresh-object returns from every loadState() branch
+    chosen: Lazy useState(loadState) initializer that hydrates synchronously on the first render, eliminating the separate hydrate effect entirely, plus fresh-object returns from every loadState() branch
     rejected:
+      - useRef-based hydration guard gating a separate hydrate-then-persist effect pair
       - Merge hydrate and persist into a single combined useEffect
       - Rewrite the hook around useSyncExternalStore
       - Debounce/delay the persist effect
     rationale: >
-      A useRef flag (isHydratedRef) is set synchronously inside the hydration
-      effect and read by the persist effect on the same render pass, so the
-      persist effect is a guaranteed no-op until hydration has actually run —
-      no timing assumption needed. Combining the effects into one would work
-      but couples two concerns (read-on-mount vs. write-on-change) that are
-      naturally separate follow-up effects; keeping them separate with an
-      explicit guard is more readable and mirrors the previously validated fix
-      for this exact bug (commit ebff256d25fb on the now-superseded
-      feat/workspace-persistence-fix branch, spec 114, which was correct but
-      never merged for unrelated scope-hygiene reasons). useSyncExternalStore
-      is a bigger rewrite than the bug warrants. Debouncing treats a symptom
-      (extra writes) without fixing the actual defect (writing stale data).
-      Separately, every loadState() branch must return a fresh object
-      (`{ workspaces: INITIAL_STATE.workspaces, activeWorkspaceId: ... }`
-      rather than `return INITIAL_STATE`), because React's setState bails out
-      on referential equality — returning the literal INITIAL_STATE reference
-      silently skips the hydration re-render entirely.
+      Empirically verified with a RED test asserting no localStorage.setItem
+      call during/after mount may ever contain fewer workspaces than what was
+      already persisted: the two-effect pattern (a `useEffect(() =>
+      setState(loadState()), [])` hydrate effect plus a `useEffect(() =>
+      saveState(state), [state])` persist effect) has both effects run in the
+      same initial passive-effect flush using the SAME pre-hydration render
+      closure — so the persist effect's first invocation always fires with
+      the un-hydrated default state, is captured by the test as a stale
+      write to localStorage, and only "self-corrects" on the next render once
+      hydration's setState commits. That self-correction is not guaranteed to
+      win every race in a real browser (e.g. another tab reading storage in
+      that window, or a fast close). The initially-planned useRef hydration
+      guard set *inside* the hydrate effect does not actually prevent this:
+      because both effects run in one synchronous pass in source order, the
+      ref is already flipped to true by the time the persist effect's guard
+      checks it, so the guard does not skip that first stale write either.
+      Switching to a lazy `useState` initializer (`useState<WorkspacesState>
+      (loadState)`) removes the race by construction: `loadState()` runs
+      once, synchronously, during the component's first render — before any
+      effect (including the persist effect) can run — so `state` is already
+      the hydrated value from the very first render, and there is no
+      "pre-hydration" render for the persist effect to ever observe. This
+      also mirrors the existing sibling hook in the same directory,
+      `use-viewport-persistence.ts`, which already reads its localStorage
+      default synchronously via `useRef(readViewport()).current` rather than
+      through a mount effect — so this fix follows established precedent in
+      this exact component tree rather than introducing a new pattern.
+      useSyncExternalStore is a bigger rewrite than the bug warrants.
+      Debouncing treats a symptom (extra writes) without fixing the actual
+      defect (writing stale data). Separately, every loadState() branch is
+      changed to return a freshly constructed object (via a `freshInitialState()`
+      helper) rather than the shared `INITIAL_STATE` reference, since React's
+      setState bails out on referential equality — this is retained as a
+      correctness improvement even though it is no longer load-bearing for
+      the primary race once the lazy initializer removes the hydrate effect.
 
 # Open questions (should be resolved by end of research)
 openQuestions:
@@ -92,23 +111,38 @@ content: |
 
   **Options considered:**
 
-  1. Merge hydrate and persist into a single combined `useEffect`.
-  2. Rewrite the hook around `useSyncExternalStore`.
-  3. Debounce/delay the persist effect.
-  4. `useRef`-based hydration guard + fresh-object `loadState()` returns.
+  1. `useRef`-based hydration guard gating a separate hydrate-then-persist effect pair.
+  2. Merge hydrate and persist into a single combined `useEffect`.
+  3. Rewrite the hook around `useSyncExternalStore`.
+  4. Debounce/delay the persist effect.
+  5. Lazy `useState(loadState)` initializer, dropping the hydrate effect entirely.
 
-  **Decision:** `useRef`-based hydration guard + fresh-object `loadState()` returns.
+  **Decision:** Lazy `useState(loadState)` initializer, dropping the hydrate effect entirely.
 
-  **Rationale:** A `useRef` flag set synchronously inside the hydration effect
-  and read by the persist effect gives a deterministic guard with no timing
-  assumptions — the persist effect simply returns early until hydration has
-  run once. This mirrors a previously validated fix for this exact bug
-  (commit `ebff256d25fb`, spec 114, on an unmerged branch) that was correct
-  but never landed on `main` for unrelated scope-hygiene reasons (it bundled
-  unrelated skill files). Every `loadState()` branch is also changed to
-  construct a fresh object instead of returning the shared `INITIAL_STATE`
-  reference, since React's `setState` bails out on referential equality and
-  would otherwise silently skip the hydration re-render.
+  **Rationale:** A RED test asserting that no `localStorage.setItem` call
+  during/after mount may ever contain fewer workspaces than what was already
+  persisted proved that the two-effect pattern (hydrate effect + persist
+  effect) always fires the persist effect's first invocation with the
+  un-hydrated default, because both effects run in the same initial
+  passive-effect flush using the same pre-hydration render closure — it only
+  "self-corrects" on the next render, which is not a guaranteed win against a
+  real browser closing or another tab reading storage in that window. The
+  originally-planned `useRef` hydration guard (set *inside* the hydrate
+  effect) does not actually prevent this either: both effects run in one
+  synchronous pass in source order, so the ref is already `true` by the time
+  the persist effect checks it — the guard never gets to skip that first
+  stale write. Switching to a lazy `useState` initializer removes the race by
+  construction: `loadState()` runs once, synchronously, during the first
+  render, before any effect can run, so there is no "pre-hydration" render
+  for the persist effect to ever observe. This also mirrors the existing
+  sibling hook in the same directory, `use-viewport-persistence.ts`, which
+  already reads its localStorage default synchronously
+  (`useRef(readViewport()).current`) rather than through a mount effect.
+  Every `loadState()` branch is also changed to construct a fresh object via
+  a `freshInitialState()` helper instead of returning the shared
+  `INITIAL_STATE` reference — retained as a correctness improvement even
+  though it is no longer load-bearing for the primary race once the lazy
+  initializer removes the hydrate effect.
 
   ## Library Analysis
 

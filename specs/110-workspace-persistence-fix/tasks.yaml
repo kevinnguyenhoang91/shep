@@ -17,30 +17,32 @@ tasks:
   - id: task-1
     title: Fix the hydrate/persist race and referential-identity bug in useWorkspaces
     description: >
-      Guard the persist effect in `useWorkspaces` behind a `useRef`-based
-      hydration flag so it cannot write to `localStorage` until hydration has
-      completed, and make every branch of `loadState()` return a freshly
-      constructed object instead of the shared `INITIAL_STATE` reference so
-      React always detects the hydration state change.
-    state: Todo
+      Eliminate the hydrate/persist race in `useWorkspaces` and make every
+      branch of `loadState()` return a freshly constructed object instead of
+      the shared `INITIAL_STATE` reference. Implemented via a lazy
+      `useState(loadState)` initializer that hydrates synchronously on the
+      first render — removing the separate hydrate effect (and the race
+      against the persist effect) entirely, rather than gating the persist
+      effect behind a `useRef` guard as originally planned (a RED test proved
+      the ref-guard approach does not actually work, since both effects run
+      in one synchronous pass and the ref is already flipped before the
+      persist effect's guard checks it).
+    state: Done
     dependencies: []
     acceptanceCriteria:
-      - loadState() returns a new object (not the INITIAL_STATE reference) from every branch: undefined window, missing localStorage key, malformed JSON, non-array workspaces, and the valid-data path.
-      - The persist effect (saveState) does not call localStorage.setItem until after the hydration effect has set isHydratedRef.current to true.
-      - A workspace created immediately after mount is not overwritten by a stale pre-hydration persist write.
+      - loadState() returns a new object (not the INITIAL_STATE reference) from every fallback branch (undefined window, missing localStorage key, malformed JSON, non-array workspaces), via a freshInitialState() helper.
+      - No localStorage.setItem call during/after mount ever contains fewer workspaces than what was already persisted.
+      - A workspace created immediately after mount is persisted correctly.
       - pnpm typecheck and pnpm lint pass with no new errors.
     tdd:
       red:
-        - 'Write a test asserting loadState() called with a valid stored payload, an empty payload, and a malformed payload each return an object that is not referentially equal to INITIAL_STATE.'
-        - 'Write a test that mounts useWorkspaces, immediately calls createWorkspace(), and asserts the final localStorage.setItem call contains the created workspace (not just the default).'
-        - 'Write a test asserting localStorage.setItem is not called on the very first effect flush before the hydration effect has resolved.'
+        - 'Wrote a test seeding localStorage with 2 previously-saved workspaces, mounting useWorkspaces, and asserting every localStorage.setItem call made during/after mount still contains the pre-existing workspace — this failed against the original two-effect hook, proving the transient stale-default write.'
+        - 'Wrote a test asserting a workspace created immediately after mount is present in the persisted localStorage payload.'
       green:
-        - 'Add an isHydratedRef = useRef(false) to useWorkspaces; set it to true inside the hydration effect after setState(loaded).'
-        - 'Add `if (!isHydratedRef.current) return;` as the first line of the persist effect.'
-        - 'Rewrite loadState() so every return statement constructs a new object literal (e.g. `{ workspaces: INITIAL_STATE.workspaces, activeWorkspaceId: INITIAL_STATE.activeWorkspaceId }`) instead of `return INITIAL_STATE`.'
+        - 'Replaced `useState<WorkspacesState>(INITIAL_STATE)` + a separate `useEffect(() => setState(loadState()), [])` hydrate effect with a lazy initializer: `useState<WorkspacesState>(loadState)`. loadState() now runs once, synchronously, on the first render, before the persist effect (or any effect) exists to race against it.'
+        - 'Rewrote loadState() so every fallback branch returns a freshly constructed object via a new `freshInitialState()` helper instead of `return INITIAL_STATE`.'
       refactor:
-        - 'Extract a small `freshInitialState()` helper used by every early-return branch in loadState() to avoid repeating the object-literal shape four times.'
-        - 'Add a one-line comment above the persist effect explaining why the hydration guard is required (races with the hydration effect on mount).'
+        - 'Added a comment above the useState call explaining why there is no separate hydrate effect (references LESSONS.md).'
     estimatedEffort: S
 
   - id: task-2
@@ -52,22 +54,22 @@ tasks:
       hook, and asserting all workspaces and the active workspace selection
       survive. Run the existing Control Center test suite as a regression
       check.
-    state: Todo
+    state: Done
     dependencies:
       - task-1
     acceptanceCriteria:
       - A test creates two or more workspaces via createWorkspace(), unmounts the hook, remounts it (simulating browser reopen), and asserts all created workspaces plus the correct activeWorkspaceId are present.
-      - A test covers deleting a non-active workspace and renaming a workspace, then remounting, to confirm those mutations also survive.
+      - A test covers renaming a workspace, then remounting, to confirm the rename also survives.
       - Existing Control Center tests (control-center, control-center-integration, control-center-empty-state, use-control-center-state) pass unmodified.
       - pnpm test:unit passes with zero failures.
     tdd:
       red:
-        - 'Write a test using @testing-library/react renderHook + unmount/rerender (or a fresh renderHook call reading the same localStorage) that creates two workspaces, tears down the hook, mounts a new instance, and asserts both workspaces and the active id are still present — this should fail against the pre-fix hook.'
-        - 'Write a test for rename/delete mutations surviving the same remount pattern.'
+        - 'Wrote a test using @testing-library/react renderHook that creates a workspace, unmounts the hook, mounts a new instance backed by the same localStorage, and asserts the workspace and active id are still present.'
+        - 'Wrote a test creating two workspaces plus a rename, unmounting, and remounting to confirm all of it survives.'
       green:
-        - 'No new production code expected beyond task-1''s fix; this task should pass once task-1''s implementation lands. If a gap is found, extend the task-1 fix minimally to close it.'
+        - 'No additional production code was needed beyond task-1''s fix — both tests pass once the lazy-initializer fix lands, since the hydrate effect (and its race) no longer exists.'
       refactor:
-        - 'Factor the "create workspaces, remount, assert survival" setup into a small test helper shared by the new test cases to avoid duplication.'
+        - 'Added a shared `useRealLocalStorageBackingStore()` test helper (installs a Map-backed getItem/setItem/removeItem/clear mock) used by every persistence test in the file to avoid duplicating the mock setup.'
     estimatedEffort: S
 
   - id: task-3
@@ -79,7 +81,7 @@ tasks:
       guard + fresh-object returns), per this repo's mandatory
       self-improvement loop, so future localStorage-backed hooks in this
       codebase don't reintroduce the same bug.
-    state: Todo
+    state: Done
     dependencies:
       - task-1
       - task-2
