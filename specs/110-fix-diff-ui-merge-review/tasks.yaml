@@ -20,7 +20,7 @@ tasks:
       the `execFile('git', ['diff', '--unified=3', ...], { cwd })` call in
       `GitPrService.getFileDiffs` so large diffs no longer throw a
       maxBuffer-exceeded error.
-    state: Todo
+    state: Done
     dependencies: []
     acceptanceCriteria:
       - "getFileDiffs invokes execFile with a maxBuffer option of at least 10MB"
@@ -42,7 +42,7 @@ tasks:
       `get-merge-review-data.ts` so a rejection also produces a `warning`
       message on the returned `MergeReviewData`, instead of only returning
       `fileDiffs: undefined` with no indication to the user.
-    state: Todo
+    state: Done
     dependencies:
       - task-1
     acceptanceCriteria:
