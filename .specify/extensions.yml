@@ -1,0 +1,141 @@
+installed:
+- memory-md
+- scope
+- speckit-utils
+- squad
+- tinyspec
+- verify-tasks
+- wiki
+- wireframe
+- worktrees
+settings:
+  auto_execute_hooks: true
+hooks:
+  after_specify:
+  - extension: worktrees
+    command: speckit.worktrees.create
+    enabled: true
+    optional: false
+    priority: 10
+    prompt: Execute speckit.worktrees.create?
+    description: Auto-spawn a worktree after a new feature is specified
+    condition: null
+  - extension: wireframe
+    command: speckit.wireframe.generate
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Generate wireframes for this feature now?
+    description: Offer wireframe generation after spec creation
+    condition: null
+  - extension: squad
+    command: speckit.squad.generate
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Spec updated — regenerate Squad agent definitions?
+    description: Keeps Squad agents aligned as the spec evolves
+    condition: null
+  - extension: scope
+    command: speckit.scope.estimate
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Estimate effort for this spec?
+    description: Auto-generate effort estimate after spec is written
+    condition: null
+  - extension: speckit-utils
+    command: speckit.speckit-utils.doctor
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Run project health check?
+    description: Validate project health after specification generation
+    condition: null
+  before_plan:
+  - extension: wireframe
+    command: speckit.wireframe.review
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Review and sign off wireframes before planning? (signed-off wireframes
+      become spec constraints)
+    description: Ensure wireframes are reviewed and signed off before plan is written
+    condition: null
+  - extension: memory-md
+    command: speckit.memory-md.plan-with-memory
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Would you like to synthesize project memory before planning?
+    description: ''
+    condition: null
+  after_implement:
+  - extension: wireframe
+    command: speckit.wireframe.screenshots
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Capture implementation screenshots and compare to signed-off wireframes?
+    description: 'Regression check: compare implementation to approved wireframes'
+    condition: null
+  - extension: wiki
+    command: speckit.wiki.ingest
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Record what this implementation taught into the project wiki?
+    description: Capture implementation learnings into the wiki after implementation
+    condition: null
+  - extension: verify-tasks
+    command: speckit.verify-tasks.run
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Run verify-tasks in a fresh session to check for phantom completions
+    description: Post-implementation phantom completion detector
+    condition: null
+  - extension: memory-md
+    command: speckit.memory-md.capture-from-diff
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Would you like to capture durable lessons from this implementation to
+      project memory?
+    description: ''
+    condition: null
+  after_plan:
+  - extension: wiki
+    command: speckit.wiki.ingest
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Ingest this feature's research and plan decisions into the project wiki?
+    description: Compound the feature's verified research into the wiki after planning
+    condition: null
+  - extension: speckit-utils
+    command: speckit.speckit-utils.validate
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Validate spec-to-task traceability?
+    description: Verify requirements map to planned tasks after planning
+    condition: null
+  after_tasks:
+  - extension: squad
+    command: speckit.squad.route
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Tasks generated — route them to Squad agents?
+    description: Distributes new tasks to the right agents automatically
+    condition: null
+  before_specify:
+  - extension: tinyspec
+    command: speckit.tinyspec.classify
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Check if this task is small enough for the lightweight tinyspec workflow?
+    description: Auto-classify task complexity before starting the full SDD workflow
+    condition: null

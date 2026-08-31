@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "presets": {
+    "a11y-governance": {
+      "version": "0.4.3",
+      "source": "local",
+      "manifest_hash": "sha256:abed4e64a34853417674c8403a660daa8b97606b42782be404f0d5faa3347c10",
+      "enabled": false,
+      "priority": 10,
+      "registered_commands": {
+        "opencode": [
+          "speckit.specify",
+          "speckit.plan",
+          "speckit.tasks"
+        ]
+      },
+      "registered_skills": {},
+      "installed_at": "2026-08-31T11:33:48.278079+00:00"
+    }
+  }
+}

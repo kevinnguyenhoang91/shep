@@ -1,0 +1,162 @@
+{
+  "schema_version": "1.0",
+  "extensions": {
+    "worktrees": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:99fab0dbac58df0b0dad7803f2d2abe070cfe2e84b0c2d23f2cecad184d9708e",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "opencode": [
+          "speckit.worktrees.create",
+          "speckit.worktrees.list",
+          "speckit.worktrees.clean"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-08-31T11:46:01.439938+00:00"
+    },
+    "wireframe": {
+      "version": "0.1.1",
+      "source": "local",
+      "manifest_hash": "sha256:246ce4f535c9149c28fa28d38fb7642034b17c44a62d13a59474a2272b753172",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "opencode": [
+          "speckit.wireframe.generate",
+          "speckit.wireframe.prep",
+          "speckit.wireframe.review",
+          "speckit.wireframe.inspect",
+          "speckit.wireframe.screenshots",
+          "speckit.wireframe.view"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-08-31T11:47:24.449873+00:00"
+    },
+    "wiki": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:0b4b9b3b306ccd3cbf9094d93cada6f5b10cafcc79e330867356cda0a53e137a",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "opencode": [
+          "speckit.wiki.init",
+          "speckit.wiki.ingest",
+          "speckit.wiki.query",
+          "speckit.wiki.lint",
+          "speckit.wiki.status"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-08-31T11:47:32.053876+00:00"
+    },
+    "verify-tasks": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:6428b6dccaa3daa8aa5d72a73001cd3f82b9908e8c67bedd84697dd7547c96e8",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "opencode": [
+          "speckit.verify-tasks.run",
+          "speckit.verify-tasks"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-08-31T11:48:13.935748+00:00"
+    },
+    "memory-md": {
+      "version": "0.8.5",
+      "source": "local",
+      "manifest_hash": "sha256:b0368e6d1d4d3eb0e2662d68fed547210f0647466b0162ff1f78d6fa39d281af",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "opencode": [
+          "speckit.memory-md.init",
+          "speckit.memory-md.plan-with-memory",
+          "speckit.memory-md.capture",
+          "speckit.memory-md.capture-from-diff",
+          "speckit.memory-md.audit",
+          "speckit.memory-md.log-finding",
+          "speckit.memory-md.token-report"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-08-31T11:48:35.817110+00:00"
+    },
+    "squad": {
+      "version": "1.3.0",
+      "source": "local",
+      "manifest_hash": "sha256:391e942e7465e2bd4ea2fd0040c29d3524855efeb708fbc35f24ed60594207a4",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "opencode": [
+          "speckit.squad.init",
+          "speckit.squad.generate",
+          "speckit.squad.route",
+          "speckit.squad.status"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-08-31T11:48:59.247941+00:00"
+    },
+    "tinyspec": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:a78c4ede6a5e07f1430e187be0269b910dcef3e75f4e0609588e58fbce48b742",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "opencode": [
+          "speckit.tinyspec.tinyspec",
+          "speckit.tinyspec.implement",
+          "speckit.tinyspec.classify"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-08-31T11:49:16.760010+00:00"
+    },
+    "scope": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:553f7b3acada294231f8e4790e057463a10372391ab91d168664714bde8a0dc3",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "opencode": [
+          "speckit.scope.estimate",
+          "speckit.scope.compare",
+          "speckit.scope.creep",
+          "speckit.scope.budget"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-08-31T11:49:44.880758+00:00"
+    },
+    "speckit-utils": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:e4970a3d868ad26c27c2b7b57cec58a017b0f6d31e1186dd64ca30c8e8da7721",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "opencode": [
+          "speckit.speckit-utils.resume",
+          "speckit.resume",
+          "speckit.speckit-utils.doctor",
+          "speckit.doctor",
+          "speckit.speckit-utils.validate",
+          "speckit.validate"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-08-31T11:50:15.971088+00:00"
+    }
+  }
+}

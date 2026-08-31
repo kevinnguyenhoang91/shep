@@ -1,0 +1,11 @@
+catalogs:
+- name: community-writable
+  url: https://raw.githubusercontent.com/github/spec-kit/main/extensions/catalog.community.json
+  priority: 1
+  install_allowed: true
+  description: Community-contributed extensions
+- name: default
+  url: https://raw.githubusercontent.com/github/spec-kit/main/extensions/catalog.json
+  priority: 1
+  install_allowed: true
+  description: Defaul extensions

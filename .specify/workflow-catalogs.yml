@@ -1,0 +1,11 @@
+catalogs:
+- name: community-writable
+  url: https://raw.githubusercontent.com/github/spec-kit/main/workflows/catalog.community.json
+  priority: 1
+  install_allowed: true
+  description: ''
+- name: default
+  url: https://raw.githubusercontent.com/github/spec-kit/main/workflows/catalog.json
+  priority: 2
+  install_allowed: true
+  description: ''
