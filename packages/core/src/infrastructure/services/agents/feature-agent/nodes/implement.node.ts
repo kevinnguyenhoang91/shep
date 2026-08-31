@@ -24,6 +24,7 @@ import {
   getCompletedPhases,
   markPhaseComplete,
   applyMemorySelection,
+  getPhaseRejectionFeedback,
   type MemorySelector,
 } from './node-helpers.js';
 import { reportNodeStart } from '../heartbeat.js';
@@ -41,6 +42,7 @@ import {
 } from '../sdlc-board-context.js';
 import {
   buildImplementPhasePrompt,
+  buildImplementRejectionFixPrompt,
   type PlanPhase,
   type PlanYaml,
   type PhaseTask,
@@ -141,6 +143,40 @@ export function createImplementNode(executor: IAgentExecutor, selectMemory?: Mem
 
       // --- Check for completed phases (skip on resume) ---
       const completedPhaseIds = getCompletedPhases(state.specDir);
+
+      // --- Merge-rejection redo: implementation already fully completed once,
+      // but the user rejected the merge with feedback. Every phase below would
+      // just skip (already in completedPhaseIds), silently discarding the
+      // feedback. Run one focused pass to address it instead. ---
+      if (state._needsReexecution) {
+        const specContent = readSpecFile(state.specDir, 'spec.yaml');
+        const rejectionSection = getPhaseRejectionFeedback(specContent ?? '', 'merge');
+        if (rejectionSection) {
+          log.info('Addressing merge rejection feedback');
+          const options = buildExecutorOptions(state, undefined, 'implement');
+          const prompt = buildImplementRejectionFixPrompt(stateForPrompt, rejectionSection);
+          await updatePhasePrompt(implementTimingId, prompt);
+          const result = await retryExecute(executor, prompt, options, { logger: log });
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          log.info(`Rejection feedback addressed (${result.result.length} chars, ${elapsed}s)`);
+          await recordPhaseEnd(implementTimingId, Date.now() - startTime, {
+            inputTokens: result.usage?.inputTokens,
+            outputTokens: result.usage?.outputTokens,
+            costUsd: result.usage?.costUsd,
+            numTurns: result.usage?.numTurns,
+            durationApiMs: result.usage?.durationApiMs,
+            exitCode: 'success',
+          });
+          return {
+            currentNode: 'implement',
+            messages: [`[implement] Addressed merge rejection feedback (${elapsed}s)`],
+            _needsReexecution: false,
+          };
+        }
+        log.info(
+          '_needsReexecution set but no merge rejection feedback found in spec.yaml — continuing normally'
+        );
+      }
 
       // --- Seed SDLC board: idempotent upsert of all phases as Tasks
       //     and their tasks.yaml entries as SubTasks (best-effort). ---
