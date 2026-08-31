@@ -1,0 +1,136 @@
+# Research Artifact (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: workspace-persistence-fix
+summary: Root-cause analysis of the workspace persistence race and the minimal client-only fix
+
+# Relationships
+relatedFeatures:
+  - '016-control-center'
+technologies:
+  - React
+relatedLinks: []
+
+# Structured technology decisions
+decisions:
+  - title: Keep workspaces client-only (localStorage) rather than promoting to backend persistence
+    chosen: Fix the localStorage race in useWorkspaces(); leave the prototype boundary in place
+    rejected:
+      - Promote Workspace to a full Clean Architecture entity (tsp model, domain, use cases, SQLite repository/migration)
+      - Move persistence to sessionStorage
+    rationale: >
+      use-workspaces.ts explicitly documents itself as a prototype boundary with
+      no backend, domain model, or infrastructure adapter. The reported bug is a
+      client-side race condition, not a missing backend — grepping
+      packages/core/src/domain, application/use-cases, infrastructure/persistence
+      and tsp/ confirms there is no existing Workspace persistence layer to wire
+      up. Promoting workspaces to backend-persisted entities is a materially
+      larger feature (new tsp model, migration, repository, use cases, server
+      actions) that is out of scope for a bug fix and would violate the
+      single-responsibility scope of this spec. sessionStorage would make the
+      bug worse, not better, since it is cleared on tab close by design.
+  - title: Race-condition fix strategy in useWorkspaces
+    chosen: useRef-based hydration guard gating the persist effect, plus fresh-object returns from every loadState() branch
+    rejected:
+      - Merge hydrate and persist into a single combined useEffect
+      - Rewrite the hook around useSyncExternalStore
+      - Debounce/delay the persist effect
+    rationale: >
+      A useRef flag (isHydratedRef) is set synchronously inside the hydration
+      effect and read by the persist effect on the same render pass, so the
+      persist effect is a guaranteed no-op until hydration has actually run —
+      no timing assumption needed. Combining the effects into one would work
+      but couples two concerns (read-on-mount vs. write-on-change) that are
+      naturally separate follow-up effects; keeping them separate with an
+      explicit guard is more readable and mirrors the previously validated fix
+      for this exact bug (commit ebff256d25fb on the now-superseded
+      feat/workspace-persistence-fix branch, spec 114, which was correct but
+      never merged for unrelated scope-hygiene reasons). useSyncExternalStore
+      is a bigger rewrite than the bug warrants. Debouncing treats a symptom
+      (extra writes) without fixing the actual defect (writing stale data).
+      Separately, every loadState() branch must return a fresh object
+      (`{ workspaces: INITIAL_STATE.workspaces, activeWorkspaceId: ... }`
+      rather than `return INITIAL_STATE`), because React's setState bails out
+      on referential equality — returning the literal INITIAL_STATE reference
+      silently skips the hydration re-render entirely.
+
+# Open questions (should be resolved by end of research)
+openQuestions:
+  []
+
+# Markdown content (the full research document)
+content: |
+  ## Status
+
+  - **Phase:** Research
+  - **Updated:** 2026-08-31
+
+  ## Technology Decisions
+
+  ### Keep workspaces client-only (localStorage) rather than promoting to backend persistence
+
+  **Options considered:**
+
+  1. Promote `Workspace` to a full Clean Architecture entity (tsp model,
+     domain, use cases, SQLite repository/migration).
+  2. Move persistence to `sessionStorage`.
+  3. Fix the existing `localStorage`-based hook in place.
+
+  **Decision:** Fix the existing `localStorage`-based hook in place.
+
+  **Rationale:** The hook is an explicitly documented prototype boundary with
+  zero backend touchpoints today (confirmed via grep across
+  `packages/core/src/domain`, `application/use-cases`,
+  `infrastructure/persistence/sqlite/migrations`, and `tsp/` — none reference
+  "workspace"). The bug reported by the user is data loss on browser
+  close/reopen, which is a race condition in the hook's effects, not a missing
+  persistence layer. Promoting to backend storage is a separate, larger
+  feature that should be scoped and planned on its own if/when workspaces
+  leave prototype status.
+
+  ### Race-condition fix strategy in useWorkspaces
+
+  **Options considered:**
+
+  1. Merge hydrate and persist into a single combined `useEffect`.
+  2. Rewrite the hook around `useSyncExternalStore`.
+  3. Debounce/delay the persist effect.
+  4. `useRef`-based hydration guard + fresh-object `loadState()` returns.
+
+  **Decision:** `useRef`-based hydration guard + fresh-object `loadState()` returns.
+
+  **Rationale:** A `useRef` flag set synchronously inside the hydration effect
+  and read by the persist effect gives a deterministic guard with no timing
+  assumptions — the persist effect simply returns early until hydration has
+  run once. This mirrors a previously validated fix for this exact bug
+  (commit `ebff256d25fb`, spec 114, on an unmerged branch) that was correct
+  but never landed on `main` for unrelated scope-hygiene reasons (it bundled
+  unrelated skill files). Every `loadState()` branch is also changed to
+  construct a fresh object instead of returning the shared `INITIAL_STATE`
+  reference, since React's `setState` bails out on referential equality and
+  would otherwise silently skip the hydration re-render.
+
+  ## Library Analysis
+
+  No new libraries. The fix uses `useRef`, already imported from `react`
+  elsewhere in this codebase, and the existing `window.localStorage` API
+  already used by this hook.
+
+  ## Security Considerations
+
+  No security implications identified. `localStorage` access is unchanged;
+  no new data is written or read beyond what the hook already handles.
+
+  ## Performance Implications
+
+  No performance implications identified. The fix adds one `useRef` check
+  (O(1)) and avoids a redundant/incorrect `localStorage.setItem` write on
+  mount — if anything, a marginal improvement.
+
+  ## Open Questions
+
+  All questions resolved.
+
+  ---
+
+  _Updated by `/shep-kit:new-feature-fast` — proceed with `/shep-kit:implement`_

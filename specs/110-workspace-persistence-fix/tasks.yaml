@@ -1,0 +1,121 @@
+# Task Breakdown (YAML)
+# This is the source of truth. Markdown is auto-generated from this file.
+
+name: workspace-persistence-fix
+summary: Task breakdown for 110-workspace-persistence-fix
+
+# Relationships
+relatedFeatures:
+  - '016-control-center'
+technologies:
+  - React
+relatedLinks: []
+
+# Structured task list — this is the single source of truth for tasks.
+# The content field below is a summary only; it does NOT duplicate task details.
+tasks:
+  - id: task-1
+    title: Fix the hydrate/persist race and referential-identity bug in useWorkspaces
+    description: >
+      Guard the persist effect in `useWorkspaces` behind a `useRef`-based
+      hydration flag so it cannot write to `localStorage` until hydration has
+      completed, and make every branch of `loadState()` return a freshly
+      constructed object instead of the shared `INITIAL_STATE` reference so
+      React always detects the hydration state change.
+    state: Todo
+    dependencies: []
+    acceptanceCriteria:
+      - loadState() returns a new object (not the INITIAL_STATE reference) from every branch: undefined window, missing localStorage key, malformed JSON, non-array workspaces, and the valid-data path.
+      - The persist effect (saveState) does not call localStorage.setItem until after the hydration effect has set isHydratedRef.current to true.
+      - A workspace created immediately after mount is not overwritten by a stale pre-hydration persist write.
+      - pnpm typecheck and pnpm lint pass with no new errors.
+    tdd:
+      red:
+        - 'Write a test asserting loadState() called with a valid stored payload, an empty payload, and a malformed payload each return an object that is not referentially equal to INITIAL_STATE.'
+        - 'Write a test that mounts useWorkspaces, immediately calls createWorkspace(), and asserts the final localStorage.setItem call contains the created workspace (not just the default).'
+        - 'Write a test asserting localStorage.setItem is not called on the very first effect flush before the hydration effect has resolved.'
+      green:
+        - 'Add an isHydratedRef = useRef(false) to useWorkspaces; set it to true inside the hydration effect after setState(loaded).'
+        - 'Add `if (!isHydratedRef.current) return;` as the first line of the persist effect.'
+        - 'Rewrite loadState() so every return statement constructs a new object literal (e.g. `{ workspaces: INITIAL_STATE.workspaces, activeWorkspaceId: INITIAL_STATE.activeWorkspaceId }`) instead of `return INITIAL_STATE`.'
+      refactor:
+        - 'Extract a small `freshInitialState()` helper used by every early-return branch in loadState() to avoid repeating the object-literal shape four times.'
+        - 'Add a one-line comment above the persist effect explaining why the hydration guard is required (races with the hydration effect on mount).'
+    estimatedEffort: S
+
+  - id: task-2
+    title: Add regression coverage for multi-workspace persistence across a simulated browser reopen
+    description: >
+      Extend the test suite for `useWorkspaces` to cover the exact end-to-end
+      scenario the user reported: creating multiple workspaces, then
+      simulating a browser close/reopen by unmounting and remounting the
+      hook, and asserting all workspaces and the active workspace selection
+      survive. Run the existing Control Center test suite as a regression
+      check.
+    state: Todo
+    dependencies:
+      - task-1
+    acceptanceCriteria:
+      - A test creates two or more workspaces via createWorkspace(), unmounts the hook, remounts it (simulating browser reopen), and asserts all created workspaces plus the correct activeWorkspaceId are present.
+      - A test covers deleting a non-active workspace and renaming a workspace, then remounting, to confirm those mutations also survive.
+      - Existing Control Center tests (control-center, control-center-integration, control-center-empty-state, use-control-center-state) pass unmodified.
+      - pnpm test:unit passes with zero failures.
+    tdd:
+      red:
+        - 'Write a test using @testing-library/react renderHook + unmount/rerender (or a fresh renderHook call reading the same localStorage) that creates two workspaces, tears down the hook, mounts a new instance, and asserts both workspaces and the active id are still present — this should fail against the pre-fix hook.'
+        - 'Write a test for rename/delete mutations surviving the same remount pattern.'
+      green:
+        - 'No new production code expected beyond task-1''s fix; this task should pass once task-1''s implementation lands. If a gap is found, extend the task-1 fix minimally to close it.'
+      refactor:
+        - 'Factor the "create workspaces, remount, assert survival" setup into a small test helper shared by the new test cases to avoid duplication.'
+    estimatedEffort: S
+
+  - id: task-3
+    title: Record the hydrate/persist race pattern in LESSONS.md
+    description: >
+      Append an entry to LESSONS.md documenting the confirmed root cause
+      (persist effect racing hydration, plus loadState() returning a
+      referentially-stable default) and the fix pattern (useRef hydration
+      guard + fresh-object returns), per this repo's mandatory
+      self-improvement loop, so future localStorage-backed hooks in this
+      codebase don't reintroduce the same bug.
+    state: Todo
+    dependencies:
+      - task-1
+      - task-2
+    acceptanceCriteria:
+      - LESSONS.md contains a new section describing the two stacked bugs and the rule for any future hook pairing a hydration effect with a persistence effect.
+      - The entry references the concrete file (src/presentation/web/hooks/use-workspaces.ts) and the symptom (workspaces lost after browser close/reopen).
+    tdd: null # Documentation task, no executable code
+    estimatedEffort: S
+
+# Total effort estimate
+totalEstimate: S
+
+# Open questions
+openQuestions: []
+
+# Markdown content — summary and acceptance checklist only.
+# Individual task details live in the tasks[] array above (no duplication).
+content: |
+  ## Summary
+
+  Fix a client-side race condition and a referential-identity bug in the
+  Control Center's `useWorkspaces` hook that silently drop newly created
+  workspaces from `localStorage` on browser close/reopen — 3 tasks across
+  2 phases.
+
+  ## Acceptance Checklist
+
+  Before marking feature complete:
+
+  - [ ] All tasks completed
+  - [ ] Tests passing (`pnpm test`)
+  - [ ] Linting clean (`pnpm lint`)
+  - [ ] Types valid (`pnpm typecheck`)
+  - [ ] LESSONS.md updated with the confirmed root cause and fix pattern
+  - [ ] PR created and reviewed
+
+  ---
+
+  _Task details are in the tasks[] array of tasks.yaml_

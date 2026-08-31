@@ -1,0 +1,42 @@
+feature:
+  id: '110-workspace-persistence-fix'
+  name: 'workspace-persistence-fix'
+  number: 110
+  branch: 'feat/110-workspace-persistence-fix'
+  lifecycle: 'implementation'
+  createdAt: '2026-08-31T02:55:04Z'
+
+status:
+  phase: 'ready-to-implement'
+  progress:
+    completed: 0
+    total: 3
+    percentage: 0
+  currentTask: null
+  lastUpdated: '2026-08-31T02:57:12Z'
+  lastUpdatedBy: 'shep-kit:new-feature-fast'
+
+validation:
+  lastRun: null
+  gatesPassed: []
+  autoFixesApplied: []
+
+tasks:
+  current: null
+  blocked: []
+  failed: []
+
+checkpoints:
+  - phase: 'feature-created'
+    completedAt: '2026-08-31T02:55:04Z'
+    completedBy: 'shep-kit:new-feature-fast'
+  - phase: 'research-complete'
+    completedAt: '2026-08-31T02:57:12Z'
+    completedBy: 'shep-kit:new-feature-fast'
+  - phase: 'plan-complete'
+    completedAt: '2026-08-31T02:57:12Z'
+    completedBy: 'shep-kit:new-feature-fast'
+
+errors:
+  current: null
+  history: []
