@@ -1,4 +1,6 @@
 installed:
+- assess
+- bug
 - memory-md
 - scope
 - speckit-utils
