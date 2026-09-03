@@ -147,3 +147,63 @@ ${cwd}
 - Do NOT skip writing tests for tasks that have TDD guidance
 - Keep changes focused and minimal — avoid unnecessary refactoring beyond what the tasks specify`;
 }
+
+/**
+ * Build the prompt used when re-entering `implement` after the user rejected
+ * the merge with feedback. All phases are already implemented at this point,
+ * so this is a single focused pass to address the feedback rather than a
+ * replay of the full per-phase plan.
+ */
+export function buildImplementRejectionFixPrompt(
+  state: FeatureAgentState,
+  rejectionSection: string
+): string {
+  const specContent = readSpecFile(state.specDir, 'spec.yaml');
+  const researchContent = readSpecFile(state.specDir, 'research.yaml');
+  const planContent = readSpecFile(state.specDir, 'plan.yaml');
+  const cwd = state.worktreePath || state.repositoryPath;
+
+  return `You are a senior software engineer performing autonomous implementation.
+Implementation of this feature previously completed, but the user rejected it at the merge review stage.
+${rejectionSection}
+${buildProjectMemorySection(state)}## Feature Specification
+
+\`\`\`yaml
+${specContent}
+\`\`\`
+
+## Research Decisions
+
+\`\`\`yaml
+${researchContent}
+\`\`\`
+
+## Implementation Plan
+
+\`\`\`yaml
+${planContent}
+\`\`\`
+
+## Instructions
+
+1. Address the rejection feedback above by modifying the existing implementation
+2. Follow existing codebase conventions for file placement, naming patterns, and architecture layers
+3. Run the test suite, linter, and type checker — all must pass
+   - Discover the correct commands by inspecting package.json or the project's build tooling
+   - Fix any issues before finishing
+4. Commit your work with descriptive conventional commit messages and include the Shep Bot co-author trailer:
+   - e.g. \`git commit -m "fix(scope): description" -m "" -m "${COMMIT_CO_AUTHOR}"\`
+   - Do NOT include any other Co-Authored-By trailer (e.g. Claude) — only the Shep Bot trailer above
+   - It is CRITICAL that all changes are committed before this phase ends
+
+## Working Directory
+
+${cwd}
+
+## Constraints
+
+- Address ONLY the rejection feedback above — do not work ahead or make unrelated changes
+- Follow existing codebase conventions and architecture patterns
+- Do NOT modify any spec YAML files (spec.yaml, research.yaml, plan.yaml, tasks.yaml, feature.yaml)
+- Keep changes focused and minimal — avoid unnecessary refactoring beyond what the feedback requires`;
+}

@@ -9,50 +9,11 @@
  * GitPrService.mergePr() and GitPrService.localMergeSquash() — not via agent prompts.
  */
 
-import yaml from 'js-yaml';
 import { EvidenceType, type Evidence } from '@/domain/generated/output.js';
-import { readSpecFile, buildResumeContext } from '../node-helpers.js';
+import { readSpecFile, buildResumeContext, getPhaseRejectionFeedback } from '../node-helpers.js';
 import { buildProjectMemorySection, renderProjectMemoryBlock } from './project-memory-section.js';
 import type { FeatureAgentState } from '../../state.js';
 import { PR_BRANDING, COMMIT_CO_AUTHOR } from './pr-branding.js';
-
-/**
- * Extract merge-phase rejection feedback from spec.yaml.
- */
-function getMergeRejectionFeedback(specContent: string): string {
-  try {
-    const specData = yaml.load(specContent) as Record<string, unknown> | null;
-    const rejectionFeedback = specData?.rejectionFeedback as
-      | { iteration: number; message: string; phase?: string; timestamp: string }[]
-      | undefined;
-    if (rejectionFeedback && rejectionFeedback.length > 0) {
-      const mergeRejections = rejectionFeedback.filter((e) => e.phase === 'merge');
-      if (mergeRejections.length > 0) {
-        const latest = mergeRejections[mergeRejections.length - 1];
-        const older = mergeRejections.slice(0, -1);
-        const olderSection =
-          older.length > 0
-            ? `\n### Earlier feedback (for context only)\n${older.map((e) => `- Iteration ${e.iteration}: ${e.message}`).join('\n')}\n`
-            : '';
-        return `
-## ⚠️ CRITICAL — User Rejection Feedback (MUST ADDRESS)
-
-**YOUR PRIMARY TASK: The user rejected the previous result and gave this feedback. You MUST act on it:**
-
-> ${latest.message}
-
-(Iteration ${latest.iteration}, ${latest.timestamp})
-
-Do NOT just record this feedback — you must actually make the changes the user requested.
-${olderSection}
-`;
-      }
-    }
-  } catch {
-    // Continue without rejection feedback
-  }
-  return '';
-}
 
 /**
  * Parse a GitHub remote URL (HTTPS or SSH) into owner/repo.
@@ -144,7 +105,7 @@ export function buildCommitPushPrPrompt(
   const specContent = readSpecFile(state.specDir, 'spec.yaml');
   const cwd = state.worktreePath || state.repositoryPath;
   const shouldPush = state.push || state.openPr;
-  const rejectionSection = getMergeRejectionFeedback(specContent);
+  const rejectionSection = getPhaseRejectionFeedback(specContent, 'merge');
   // Only include evidence in the PR body when commitEvidence is enabled
   const evidenceSection = state.evidence?.length
     ? formatEvidenceSection(state.evidence, branch, repoUrl)

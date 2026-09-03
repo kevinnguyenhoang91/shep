@@ -375,6 +375,49 @@ export function markPhaseComplete(specDir: string, phaseId: string, log?: NodeLo
 }
 
 /**
+ * Extract and format the latest rejection feedback for a given phase
+ * (e.g. 'merge') from spec.yaml content. Returns a markdown section
+ * instructing the agent to address it, or '' when there is none.
+ *
+ * Shared by every prompt builder that needs to surface rejection feedback
+ * (merge, fast-implement, implement) so the wording and iteration/older-
+ * feedback handling stay in sync across them.
+ */
+export function getPhaseRejectionFeedback(specContent: string, phase: string): string {
+  try {
+    const specData = yaml.load(specContent) as Record<string, unknown> | null;
+    const rejectionFeedback = specData?.rejectionFeedback as
+      | { iteration: number; message: string; phase?: string; timestamp: string }[]
+      | undefined;
+    if (!rejectionFeedback?.length) return '';
+
+    const matching = rejectionFeedback.filter((e) => e.phase === phase);
+    if (matching.length === 0) return '';
+
+    const latest = matching[matching.length - 1];
+    const older = matching.slice(0, -1);
+    const olderSection =
+      older.length > 0
+        ? `\n### Earlier feedback (for context only)\n${older.map((e) => `- Iteration ${e.iteration}: ${e.message}`).join('\n')}\n`
+        : '';
+
+    return `
+## ⚠️ CRITICAL — User Rejection Feedback (MUST ADDRESS)
+
+**YOUR PRIMARY TASK: The user rejected the previous result and gave this feedback. You MUST act on it:**
+
+> ${latest.message}
+
+(Iteration ${latest.iteration}, ${latest.timestamp})
+
+Do NOT just record this feedback — you must actually make the changes the user requested.
+${olderSection}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Write a spec file atomically using temp-file-then-rename pattern.
  * Prevents corruption on crash mid-write.
  */
