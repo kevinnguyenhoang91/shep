@@ -14,6 +14,7 @@ import { readSpecFile, buildResumeContext, getPhaseRejectionFeedback } from '../
 import { buildProjectMemorySection, renderProjectMemoryBlock } from './project-memory-section.js';
 import type { FeatureAgentState } from '../../state.js';
 import { PR_BRANDING, COMMIT_CO_AUTHOR } from './pr-branding.js';
+import type { PrTarget } from '@/application/services/pr-target-resolution.js';
 
 /**
  * Parse a GitHub remote URL (HTTPS or SSH) into owner/repo.
@@ -100,7 +101,8 @@ export function buildCommitPushPrPrompt(
   state: FeatureAgentState,
   branch: string,
   baseBranch: string,
-  repoUrl?: string
+  repoUrl?: string,
+  prTarget?: PrTarget | null
 ): string {
   const specContent = readSpecFile(state.specDir, 'spec.yaml');
   const cwd = state.worktreePath || state.repositoryPath;
@@ -139,8 +141,11 @@ export function buildCommitPushPrPrompt(
 
   // Step 3: PR creation (conditional)
   if (state.openPr) {
+    const prCreateCmd = prTarget
+      ? `gh pr create --repo ${prTarget.targetRepo} --base ${prTarget.baseBranch} --head ${prTarget.headRef} --title "<title>" --body "<body>"`
+      : `gh pr create --base ${baseBranch} --head ${branch} --title "<title>" --body "<body>"`;
     steps.push(`${shouldPush ? '6' : '4'}. Create a pull request:
-   - Run \`gh pr create --base ${baseBranch} --head ${branch} --title "<title>" --body "<body>"\`
+   - Run \`${prCreateCmd}\`
    - Write a descriptive PR title using conventional commit format
    - Write a rich PR body that summarizes the changes using the spec context below
    - The PR body MUST end with this exact branding line (on its own line): \`${PR_BRANDING}\`
@@ -178,7 +183,8 @@ ${rejectionSection ? '- You MUST modify source code files to address the rejecti
 ${!state.commitSpecs ? '- Do NOT commit the `specs/` directory — it must stay untracked. If you accidentally staged it, run `git reset -- specs/` before committing' : ''}
 - Do NOT amend existing commits
 - Do NOT run \`git pull\`, \`git rebase\`, or \`git merge\` — this is a fresh branch, push it directly
-- If there are no changes to commit, skip the commit step and report that no changes were found`;
+- If there are no changes to commit, skip the commit step and report that no changes were found
+${prTarget ? `- The PR MUST be created on \`${prTarget.targetRepo}\` (upstream), NOT on the origin/fork repository — use the exact \`gh pr create\` command provided above` : ''}`;
 }
 
 /**
