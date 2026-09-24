@@ -2274,6 +2274,24 @@ check runs — the guard never gets a chance to skip that first stale write.
    referential equality, so returning the same reference silently skips a
    re-render that downstream effects may depend on.
 
+## A missing CI run URL is not proof of CI success
+
+When a repository has no GitHub Actions runs, `getCiStatus()` can still report
+pending or failed external PR checks. The CI watch loop must preserve that
+status; treating every URL-less result as success turns unresolved branch
+protection checks into a false green.
+
+**Rule:** Only the explicit no-workflow/no-checks case may complete without a
+CI verdict. Do not manufacture `Success`; record no status when no CI exists,
+and use `Indeterminate` when CI is configured but no run was observed. Pending
+or failed PR checks must remain non-success through the merge-node path.
+
+## CI evidence is tied to the PR merge base
+
+A PR check can be green or red for an old synthetic merge ref while upstream
+`main` has already advanced. Before making a release decision, compare the PR's
+`baseRefOid` with the live upstream default branch and inspect the check's
+`headSha`; stale results must be refreshed by rebasing and rerunning.
 ## A Next.js server action must resolve core use cases by token, not by import
 
 The fleet web action imported `GetFleetOverviewUseCase` as a value and passed the class to

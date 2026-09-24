@@ -339,6 +339,19 @@ describe('createMergeNode — CI watch/fix loop', () => {
       expect(result.ciStatus).toBeNull();
     });
 
+    it('should return Indeterminate when external PR checks fail without a CI run', async () => {
+      deps.gitPrService.getCiStatus = vi.fn().mockResolvedValue({ status: 'failure' });
+      deps.gitPrService.getMergeableStatus = vi.fn().mockResolvedValue(true);
+      const node = createMergeNode(deps);
+      const state = baseState({ push: true, openPr: true, worktreePath: repoWithCi });
+      state.prNumber = 42;
+      const result = await node(state);
+
+      expect(result.ciStatus).toBe('Indeterminate');
+      expect(result.merged).not.toBe(true);
+      expect(mockParseCiWatchResult).not.toHaveBeenCalled();
+    });
+
     it('should return NO ciStatus when no CI run, no CI configured and getMergeableStatus fails', async () => {
       deps.gitPrService.getCiStatus = vi.fn().mockResolvedValue({ status: 'pending' });
       deps.gitPrService.getMergeableStatus = vi.fn().mockRejectedValue(new Error('API error'));
