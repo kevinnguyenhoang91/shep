@@ -4,6 +4,45 @@
   </a>
 </p>
 
+# 🚀 Shep [v1.229.6](/compare/v1.229.5...v1.229.6) · _2026-09-24_
+
+> Your organization does not have access to Claude. Please login again or contact your administrator.
+
+
+
+### 🐛 Bug Fixes
+
+* **domain:** reject a NaN page limit before it reaches SQLite ([#892](https://github.com/shep-ai/shep/issues/892)) ([67ed2e2](https://github.com/shep-ai/shep/commit/67ed2e2845aa56b51ad50fd21dc05de20a19348b))
+
+* **web:** reject a non-finite page limit before it reaches SQLite ([#893](https://github.com/shep-ai/shep/issues/893)) ([1f527f8](https://github.com/shep-ai/shep/commit/1f527f884a92555fe8299670cb4e3c81f1b14898))
+
+* **ci:** treat missing PR checks as neutral ([#864](https://github.com/shep-ai/shep/issues/864)) ([98f7dbc](https://github.com/shep-ai/shep/commit/98f7dbc98bb57e769e327048e391294c18aea4e0)), closes [#837](https://github.com/shep-ai/shep/issues/837)
+
+
+## 📦 Install or update
+
+```bash
+# upgrade an existing install
+npm i -g @shepai/cli@1.229.6
+
+# or run instantly without installing
+npx @shepai/cli@latest
+```
+
+## 💬 Join the community
+
+[💬 **Discord**](https://discord.gg/ES6tdVFfur) · [📖 **Docs**](https://github.com/shep-ai/shep#readme) · [⭐ **Star on GitHub**](https://github.com/shep-ai/shep) · [🐛 **Report an issue**](https://github.com/shep-ai/shep/issues)
+
+---
+
+<sub>🤖 Released autonomously by Shep — built by parallel AI agents working in isolated git worktrees. Try it: `npx @shepai/cli`</sub>
+
+<p align="center">
+  <a href="https://github.com/shep-ai/shep">
+    <img src="https://raw.githubusercontent.com/shep-ai/shep/main/docs/screenshots/shep-card.jpg" alt="Shep — run multiple AI agents in parallel" width="720" />
+  </a>
+</p>
+
 # 🚀 Shep [v1.229.5](/compare/v1.229.4...v1.229.5) · _2026-09-23_
 
 > Your organization does not have access to Claude. Please login again or contact your administrator.
