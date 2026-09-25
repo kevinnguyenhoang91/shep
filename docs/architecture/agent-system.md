@@ -357,16 +357,17 @@ records which CLI agents support session resume.
 
 The agent system uses these key interfaces (defined in `packages/core/src/application/ports/output/agents/`):
 
-| Interface                     | Purpose                                          |
-| ----------------------------- | ------------------------------------------------ |
-| `IAgentExecutor`              | Execute prompts against an AI coding agent       |
-| `IAgentExecutorFactory`       | Create executor instances for a given agent type |
-| `IAgentExecutorProvider`      | Resolve the current executor from settings       |
-| `IAgentRegistry`              | Register and discover agent definitions          |
-| `IAgentRunner`                | Run agent workflows with lifecycle management    |
-| `IAgentValidator`             | Validate agent tool availability                 |
-| `IFeatureAgentProcessService` | Manage feature agent background processes        |
-| `IStructuredAgentCaller`      | Make structured (typed) calls to agents          |
+| Interface                     | Purpose                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `IAgentExecutor`              | Execute prompts against an AI coding agent                              |
+| `IAgentExecutorFactory`       | Create executor instances for a given agent type                        |
+| `IAgentExecutorProvider`      | Resolve the current executor from settings                              |
+| `IModelCatalog`               | Live model discovery per provider (HTTP or CLI); TTL-cached             |
+| `IAgentRegistry`              | Register and discover agent definitions                                 |
+| `IAgentRunner`                | Run agent workflows with lifecycle management                           |
+| `IAgentValidator`             | Validate agent tool availability                                        |
+| `IFeatureAgentProcessService` | Manage feature agent background processes                               |
+| `IStructuredAgentCaller`      | Make structured (typed) calls to agents                                 |
 
 ## Workflow Stages
 

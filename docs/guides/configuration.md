@@ -118,6 +118,11 @@ shep feat new "…" --model <id>   # per-feature override
 The default model is `claude-sonnet-4-6`. The picker only offers models the **configured agent**
 supports, so switching agents can change which models are available.
 
+| Agent | Model list |
+| ----- | ---------- |
+| Cursor CLI, Claude Code, Codex CLI, OpenRouter, Together AI | Live catalog (`IModelCatalog`), falls back to `agent-catalog.ts` |
+| Kimi Code, Copilot CLI, Gemini CLI, Cline, Ollama, LLM Proxy, Demo | Hardcoded in `agent-catalog.ts` only |
+
 ### Adaptive model tiers
 
 Adaptive selection routes each planned task to a model matching its complexity. The pinned model

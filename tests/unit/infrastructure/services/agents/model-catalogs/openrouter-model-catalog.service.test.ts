@@ -1,9 +1,9 @@
 /**
  * OpenRouterModelCatalogService Unit Tests
  *
- * The catalog is fetched while a settings page or the model picker waits on
- * it, so the upstream request must be bounded: a stalled connection has to
- * fail over to the cached/empty list instead of hanging the caller.
+ * Catalog requests are bounded so a stalled upstream fails over to the
+ * cached/empty list instead of hanging the caller. Boot may already have
+ * warmed the TTL cache; these tests still exercise fetch mapping directly.
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -57,6 +57,52 @@ describe('OpenRouterModelCatalogService', () => {
         description: undefined,
         contextLength: 1000,
         isFree: true,
+        vendor: 'vendor',
+      },
+    ]);
+  });
+
+  it('marks non-zero OpenRouter pricing as not free', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      okResponse({
+        data: [
+          {
+            id: 'vendor/paid',
+            name: 'Paid',
+            pricing: { prompt: '0.000001', completion: '0.000002' },
+          },
+        ],
+      })
+    );
+    const catalog = new OpenRouterModelCatalogService(fetchFn as unknown as typeof fetch);
+
+    await expect(catalog.listModels()).resolves.toEqual([
+      {
+        id: 'vendor/paid',
+        displayName: 'Paid',
+        description: undefined,
+        contextLength: undefined,
+        isFree: false,
+        vendor: 'vendor',
+      },
+    ]);
+  });
+
+  it('omits isFree when OpenRouter pricing is missing', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      okResponse({
+        data: [{ id: 'vendor/unknown', name: 'Unknown' }],
+      })
+    );
+    const catalog = new OpenRouterModelCatalogService(fetchFn as unknown as typeof fetch);
+
+    await expect(catalog.listModels()).resolves.toEqual([
+      {
+        id: 'vendor/unknown',
+        displayName: 'Unknown',
+        description: undefined,
+        contextLength: undefined,
+        isFree: undefined,
         vendor: 'vendor',
       },
     ]);

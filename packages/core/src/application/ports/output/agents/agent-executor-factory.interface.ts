@@ -36,7 +36,9 @@ export interface AgentCliInfo {
 
 /**
  * Rich model listing returned by dynamic model catalogs.
- * Used by providers that expose a model discovery API (e.g. OpenRouter, Together AI).
+ *
+ * Providers may fill display metadata when available; callers should tolerate
+ * listings that only have {@link id}.
  */
 export interface AgentModelListing {
   /** Provider-specific model identifier (e.g. 'anthropic/claude-sonnet-4.5'). */
@@ -97,21 +99,30 @@ export interface IAgentExecutorFactory {
 
   /**
    * List models available for the given agent type, enriched with metadata
-   * when the provider exposes a discovery API (OpenRouter, Together AI).
+   * when a registered {@link IModelCatalog} can discover them live.
    *
-   * For providers that expose a model catalog API, this fetches the full
-   * current list over HTTP (cached in-process with a short TTL). For static
-   * providers, it returns the same identifiers as {@link getSupportedModels}
-   * wrapped as listings with only the `id` field populated.
-   *
-   * Callers MUST pass the provider's auth config when one is required — some
-   * catalogs (e.g. OpenRouter) require a token to return the full list.
+   * Discovery is TTL-cached in-process. Agents without a catalog (or when
+   * discovery returns empty) fall back to the same identifiers as
+   * {@link getSupportedModels}, wrapped as listings with only the `id` field
+   * populated. Callers MUST pass auth when the active agent needs a token for
+   * a full list.
    *
    * @param agentType - The agent type to query
    * @param authConfig - Optional auth config supplying an API token
    * @returns Promise resolving to available model listings (possibly empty)
    */
   listAvailableModels(agentType: AgentType, authConfig?: AgentConfig): Promise<AgentModelListing[]>;
+
+  /**
+   * Prefetch every registered {@link IModelCatalog} in parallel so the model
+   * picker can hit the in-process TTL cache. Pass the active agent config when
+   * available — token-backed catalogs (e.g. Together AI) only receive auth when
+   * their agent type matches.
+   *
+   * Failures are swallowed per catalog; this must not throw for a single
+   * unreachable provider.
+   */
+  warmModelCatalogs(authConfig?: AgentConfig): Promise<void>;
 
   /**
    * Resolve which model adaptive selection would use for each complexity tier,
