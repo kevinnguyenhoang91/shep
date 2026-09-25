@@ -181,7 +181,11 @@ export function FleetTriageDrawer({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} direction="right">
-      <DrawerContent className={cn('sm:max-w-lg', className)} data-testid="fleet-triage-drawer">
+      <DrawerContent
+        direction="right"
+        className={cn('w-full sm:max-w-md', className)}
+        data-testid="fleet-triage-drawer"
+      >
         <DrawerHeader>
           <DrawerTitle>
             {loading || items.length === 0
