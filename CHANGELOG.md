@@ -4,6 +4,51 @@
   </a>
 </p>
 
+# 🚀 Shep [v1.230.0](/compare/v1.229.6...v1.230.0) · _2026-09-25_
+
+> Your organization does not have access to Claude. Please login again or contact your administrator.
+
+
+
+### ✨ Features
+
+* **agents:** discover Cursor models via cursor-agent --list-models ([#890](https://github.com/shep-ai/shep/issues/890)) ([b2b1800](https://github.com/shep-ai/shep/commit/b2b180081b6f13ba00563aa454012c7710454948)), closes [#889](https://github.com/shep-ai/shep/issues/889)
+
+
+
+### 🐛 Bug Fixes
+
+* **web:** redesign fleet status bar placement ([#891](https://github.com/shep-ai/shep/issues/891)) ([dff06b5](https://github.com/shep-ai/shep/commit/dff06b5196af9bde9dc7f9263c8694fa68dd0943))
+
+* **agents:** refresh Cursor CLI model catalog (auto, composer-2.5) ([#889](https://github.com/shep-ai/shep/issues/889)) ([8ed5ba5](https://github.com/shep-ai/shep/commit/8ed5ba56f39a599b8b58f38db7191913001f28a3))
+
+* **domain:** reject a fractional page limit before it reaches SQLite ([#898](https://github.com/shep-ai/shep/issues/898)) ([9f50de0](https://github.com/shep-ai/shep/commit/9f50de0d05930331cdca7f212b2b6538d732e418)), closes [microsoft/node-pty#919](https://github.com/microsoft/node-pty/issues/919)
+
+
+## 📦 Install or update
+
+```bash
+# upgrade an existing install
+npm i -g @shepai/cli@1.230.0
+
+# or run instantly without installing
+npx @shepai/cli@latest
+```
+
+## 💬 Join the community
+
+[💬 **Discord**](https://discord.gg/ES6tdVFfur) · [📖 **Docs**](https://github.com/shep-ai/shep#readme) · [⭐ **Star on GitHub**](https://github.com/shep-ai/shep) · [🐛 **Report an issue**](https://github.com/shep-ai/shep/issues)
+
+---
+
+<sub>🤖 Released autonomously by Shep — built by parallel AI agents working in isolated git worktrees. Try it: `npx @shepai/cli`</sub>
+
+<p align="center">
+  <a href="https://github.com/shep-ai/shep">
+    <img src="https://raw.githubusercontent.com/shep-ai/shep/main/docs/screenshots/shep-card.jpg" alt="Shep — run multiple AI agents in parallel" width="720" />
+  </a>
+</p>
+
 # 🚀 Shep [v1.229.6](/compare/v1.229.5...v1.229.6) · _2026-09-24_
 
 > Your organization does not have access to Claude. Please login again or contact your administrator.
